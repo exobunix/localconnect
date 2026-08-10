@@ -251,44 +251,36 @@ class _LoginScreenState extends State<LoginScreen>
     });
 
     try {
-      if (kIsWeb) {
-        await SupabaseService.instance.client.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: null,
-          authScreenLaunchMode: LaunchMode.platformDefault,
-        );
+      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+      final googleSignIn = GoogleSignIn(
+        clientId: kIsWeb ? (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId) : null,
+        serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId),
+      );
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
         if (mounted) setState(() => _isGoogleLoading = false);
         return;
-      } else {
-        const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
-        final googleSignIn = GoogleSignIn(
-          serverClientId: webClientId.isEmpty ? null : webClientId,
-        );
-        final googleUser = await googleSignIn.signIn();
-        if (googleUser == null) {
-          if (mounted) setState(() => _isGoogleLoading = false);
-          return;
-        }
-        final googleAuth = await googleUser.authentication;
-        final idToken = googleAuth.idToken;
-        final accessToken = googleAuth.accessToken;
-
-        if (idToken == null) {
-          if (mounted) {
-            setState(() {
-              _isGoogleLoading = false;
-              _errorMessage = 'Google Sign-In failed: no ID token received.';
-            });
-          }
-          return;
-        }
-
-        await SupabaseService.instance.client.auth.signInWithIdToken(
-          provider: OAuthProvider.google,
-          idToken: idToken,
-          accessToken: accessToken,
-        );
       }
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+
+      if (idToken == null) {
+        if (mounted) {
+          setState(() {
+            _isGoogleLoading = false;
+            _errorMessage = 'Google Sign-In failed: no ID token received.';
+          });
+        }
+        return;
+      }
+
+      await SupabaseService.instance.signInWithGoogleIdToken(
+        idToken: idToken,
+        accessToken: accessToken,
+        email: googleUser.email,
+        name: googleUser.displayName,
+      );
 
       if (!mounted) return;
 

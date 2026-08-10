@@ -128,10 +128,42 @@ app.post('/auth/v1/signup', async (req, res) => {
 });
 
 app.post('/auth/v1/token', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, provider, name } = req.body;
   
   // Handle password grant
-  const user = users.find(u => u.email === email && u.password === password);
+  let user = users.find(u => u.email === email && u.password === password);
+  
+  // Auto-register Google users if they don't exist yet
+  if (!user && provider === 'google') {
+    const profile = await models['user_profiles'].findOne({ email });
+    const userId = profile ? profile.id : new mongoose.Types.ObjectId().toString();
+    
+    user = {
+      id: userId,
+      email,
+      password: password || 'google-oauth-pass',
+      user_metadata: { full_name: name || email.split('@')[0], role: profile?.role || 'customer' },
+      created_at: new Date().toISOString()
+    };
+    users.push(user);
+    
+    if (!profile) {
+      try {
+        await models['user_profiles'].create({
+          id: userId,
+          email,
+          full_name: name || email.split('@')[0],
+          phone: '',
+          role: 'customer',
+          city: 'Pune',
+          is_active: true
+        });
+      } catch (err) {
+        console.error('Error seeding profile on Google signup:', err);
+      }
+    }
+  }
+
   if (!user) {
     // If not found, let's check if there is a profile or auto-create a mock user for convenience (for testing demo accounts)
     const profile = await models['user_profiles'].findOne({ email });

@@ -70,11 +70,15 @@ class SupabaseService {
   Future<AuthResponse> signInWithGoogleIdToken({
     required String idToken,
     String? accessToken,
+    String? email,
+    String? name,
   }) async {
     return await client.auth.signInWithIdToken(
       provider: OAuthProvider.google,
       idToken: idToken,
       accessToken: accessToken,
+      email: email,
+      name: name,
     );
   }
 

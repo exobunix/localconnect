@@ -296,14 +296,17 @@ class GoTrueClient {
     required OAuthProvider provider,
     required String idToken,
     String? accessToken,
+    String? email,
+    String? name,
   }) async {
     final response = await http.post(
       Uri.parse('$url/auth/v1/token'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
-        'email': 'google-user@localconnect.com',
+        'email': email ?? 'google-user@localconnect.com',
         'password': idToken,
         'provider': provider.name,
+        'name': name ?? '',
       }),
     );
 

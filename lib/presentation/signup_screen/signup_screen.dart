@@ -378,45 +378,33 @@ class _SignupScreenState extends State<SignupScreen>
     });
 
     try {
-      if (kIsWeb) {
-        // On web: use Supabase OAuth redirect (redirectTo: null lets Supabase
-        // use the current page URL automatically, avoiding PKCE verifier issues)
-        await SupabaseService.instance.client.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: null,
-          authScreenLaunchMode: LaunchMode.platformDefault,
-        );
-        // Page will redirect away — no further action needed
-        if (mounted) setState(() => _isGoogleLoading = false);
+      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+      final googleSignIn = GoogleSignIn(
+        clientId: kIsWeb ? (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId) : null,
+        serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId),
+      );
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() {
+          _isGoogleLoading = false;
+        });
         return;
-      } else {
-        // On mobile: use native Google Sign-In with ID token
-        const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
-        final googleSignIn = GoogleSignIn(
-          serverClientId: webClientId.isEmpty ? null : webClientId,
-        );
-        final googleUser = await googleSignIn.signIn();
-        if (googleUser == null) {
-          setState(() {
-            _isGoogleLoading = false;
-          });
-          return;
-        }
-        final googleAuth = await googleUser.authentication;
-        final idToken = googleAuth.idToken;
-        if (idToken == null) {
-          setState(() {
-            _isGoogleLoading = false;
-            _errorMessage = 'Google Sign-In failed. Please try again.';
-          });
-          return;
-        }
-        await SupabaseService.instance.client.auth.signInWithIdToken(
-          provider: OAuthProvider.google,
-          idToken: idToken,
-          accessToken: googleAuth.accessToken,
-        );
       }
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      if (idToken == null) {
+        setState(() {
+          _isGoogleLoading = false;
+          _errorMessage = 'Google Sign-In failed. Please try again.';
+        });
+        return;
+      }
+      await SupabaseService.instance.signInWithGoogleIdToken(
+        idToken: idToken,
+        accessToken: googleAuth.accessToken,
+        email: googleUser.email,
+        name: googleUser.displayName,
+      );
 
       if (!mounted) return;
 
