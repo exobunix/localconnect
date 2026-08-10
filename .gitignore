@@ -54,3 +54,5 @@ env.json
 node_modules/
 .gemini/
 
+
+client_secret_*.json
