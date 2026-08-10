@@ -394,6 +394,7 @@ class _SignupScreenState extends State<SignupScreen>
         });
         return;
       }
+      final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken ?? googleUser.id;
       await SupabaseService.instance.signInWithGoogleIdToken(
         idToken: idToken,
