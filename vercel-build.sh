@@ -27,6 +27,9 @@ flutter config --enable-web
 echo "=== Verifying Flutter Toolchain ==="
 flutter doctor
 
+echo "=== Configuring Web Platform in Project ==="
+flutter create --platforms=web .
+
 echo "=== Building Flutter Web Application ==="
 flutter build web --release
 
