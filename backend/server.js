@@ -133,34 +133,23 @@ app.post('/auth/v1/token', async (req, res) => {
   // Handle password grant
   let user = users.find(u => u.email === email && u.password === password);
   
-  // Auto-register Google users if they don't exist yet
-  if (!user && provider === 'google') {
+  // Handle Google OAuth check
+  if (provider === 'google') {
     const profile = await models['user_profiles'].findOne({ email });
-    const userId = profile ? profile.id : new mongoose.Types.ObjectId().toString();
-    
-    user = {
-      id: userId,
-      email,
-      password: password || 'google-oauth-pass',
-      user_metadata: { full_name: name || email.split('@')[0], role: profile?.role || 'customer' },
-      created_at: new Date().toISOString()
-    };
-    users.push(user);
-    
     if (!profile) {
-      try {
-        await models['user_profiles'].create({
-          id: userId,
-          email,
-          full_name: name || email.split('@')[0],
-          phone: '',
-          role: 'customer',
-          city: 'Pune',
-          is_active: true
-        });
-      } catch (err) {
-        console.error('Error seeding profile on Google signup:', err);
-      }
+      return res.status(404).json({ error: 'USER_NOT_REGISTERED', email });
+    }
+    
+    // Auto-seed session if not active in users memory cache
+    if (!user) {
+      user = {
+        id: profile.id,
+        email,
+        password: password || 'google-oauth-pass',
+        user_metadata: { full_name: profile.full_name, role: profile.role },
+        created_at: new Date().toISOString()
+      };
+      users.push(user);
     }
   }
 

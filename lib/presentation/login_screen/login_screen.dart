@@ -11,6 +11,7 @@ import 'package:localconnect/core/supabase_mock.dart';
 import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
+import '../signup_screen/signup_screen.dart';
 
 // local_auth is mobile-only — conditional import prevents web compilation errors
 import 'package:local_auth/local_auth.dart'
@@ -250,13 +251,14 @@ class _LoginScreenState extends State<LoginScreen>
       _errorMessage = null;
     });
 
+    GoogleSignInAccount? googleUser;
     try {
       const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
       final googleSignIn = GoogleSignIn(
         clientId: kIsWeb ? (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId) : null,
         serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId),
       );
-      final googleUser = await googleSignIn.signIn();
+      googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         if (mounted) setState(() => _isGoogleLoading = false);
         return;
@@ -299,6 +301,21 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (mounted) _navigateByRole();
     } catch (e) {
+      if (e.toString().contains('USER_NOT_REGISTERED')) {
+        if (mounted) {
+          setState(() {
+            _isGoogleLoading = false;
+            _errorMessage = null;
+          });
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SignupScreen(initialEmail: googleUser?.email),
+            ),
+          );
+        }
+        return;
+      }
       if (mounted) {
         setState(() {
           _isGoogleLoading = false;
