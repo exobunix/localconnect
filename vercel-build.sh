@@ -2,6 +2,9 @@
 # Exit on any error
 set -e
 
+# Configure git safety checks for serverless environment
+git config --global --add safe.directory '*'
+
 # Setup Flutter SDK
 FLUTTER_CHANNEL="stable"
 FLUTTER_VERSION="3.44.9"
