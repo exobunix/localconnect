@@ -5,10 +5,13 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'package:url_launcher/url_launcher.dart' show LaunchMode;
+export 'package:url_launcher/url_launcher.dart' show LaunchMode;
+
 // Re-export standard enums if needed
 enum OAuthProvider { google, apple, github }
-enum LaunchMode { platformDefault, inAppWebView, externalApplication, externalNonBrowserApplication }
 enum OtpType { signup, recovery, invite, magiclink, email, sms, phoneChange, emailChange }
+enum RealtimeSubscribeStatus { subscribed, channelError, timedOut, closed }
 
 class AuthState {
   final Session? session;
@@ -29,7 +32,8 @@ class AuthException implements Exception {
 
 class UserAttributes {
   final Map<String, dynamic>? data;
-  const UserAttributes({this.data});
+  final String? password;
+  const UserAttributes({this.data, this.password});
 }
 
 class User {
@@ -37,8 +41,15 @@ class User {
   final String email;
   final Map<String, dynamic> userMetadata;
   final List<dynamic> identities;
+  final String? emailConfirmedAt;
 
-  User({required this.id, required this.email, required this.userMetadata, this.identities = const []});
+  User({
+    required this.id,
+    required this.email,
+    required this.userMetadata,
+    this.identities = const [],
+    this.emailConfirmedAt = '2026-08-10T00:00:00Z',
+  });
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
@@ -46,6 +57,7 @@ class User {
       email: json['email'] ?? '',
       userMetadata: json['user_metadata'] ?? {},
       identities: json['identities'] ?? const [],
+      emailConfirmedAt: json['email_confirmed_at'] ?? '2026-08-10T00:00:00Z',
     );
   }
 }

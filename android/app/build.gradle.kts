@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.localconnect.app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         applicationId = "com.localconnect.app"
-        minSdk = 21  // Razorpay requires minSdk 21+
+        minSdk = flutter.minSdkVersion  // Razorpay requires minSdk 21+
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
