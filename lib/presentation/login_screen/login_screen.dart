@@ -264,18 +264,8 @@ class _LoginScreenState extends State<LoginScreen>
         return;
       }
       final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
+      final idToken = googleAuth.idToken ?? googleUser.id;
       final accessToken = googleAuth.accessToken;
-
-      if (idToken == null) {
-        if (mounted) {
-          setState(() {
-            _isGoogleLoading = false;
-            _errorMessage = 'Google Sign-In failed: no ID token received.';
-          });
-        }
-        return;
-      }
 
       await SupabaseService.instance.signInWithGoogleIdToken(
         idToken: idToken,

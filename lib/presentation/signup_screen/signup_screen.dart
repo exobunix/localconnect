@@ -394,15 +394,7 @@ class _SignupScreenState extends State<SignupScreen>
         });
         return;
       }
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
-      if (idToken == null) {
-        setState(() {
-          _isGoogleLoading = false;
-          _errorMessage = 'Google Sign-In failed. Please try again.';
-        });
-        return;
-      }
+      final idToken = googleAuth.idToken ?? googleUser.id;
       await SupabaseService.instance.signInWithGoogleIdToken(
         idToken: idToken,
         accessToken: googleAuth.accessToken,
