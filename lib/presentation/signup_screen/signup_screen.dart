@@ -1057,16 +1057,10 @@ class _SignupScreenState extends State<SignupScreen>
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.network(
-                      'https://www.google.com/favicon.ico',
-                      width: 20,
-                      height: 20,
-                      semanticLabel: 'Google logo',
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.g_mobiledata_rounded,
-                        size: 24,
-                        color: Color(0xFF4285F4),
-                      ),
+                    const Icon(
+                      Icons.g_mobiledata_rounded,
+                      size: 28,
+                      color: Color(0xFF4285F4),
                     ),
                     SizedBox(width: 2.w),
                     Text(
