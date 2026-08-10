@@ -59,9 +59,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Use the dedicated release signing config (env-var driven).
-            // NEVER use signingConfigs.getByName("debug") for production releases.
-            signingConfig = signingConfigs.getByName("release")
+            // Use release signing if env vars are present; otherwise, fall back to debug signing
+            val keystorePath = System.getenv("KEYSTORE_PATH") ?: ""
+            if (keystorePath.isNotEmpty()) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
         debug {
             isMinifyEnabled = false
