@@ -4,7 +4,7 @@ set -e
 
 # Setup Flutter SDK
 FLUTTER_CHANNEL="stable"
-FLUTTER_VERSION="3.22.0"
+FLUTTER_VERSION="3.44.9"
 
 echo "=== System Pre-requisites Check ==="
 echo "Operating System: $(uname -a)"
