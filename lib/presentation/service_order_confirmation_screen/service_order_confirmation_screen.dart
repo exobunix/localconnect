@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:localconnect/core/supabase_mock.dart';
 
 import '../../core/app_export.dart';
 import '../../services/razorpay_service.dart';

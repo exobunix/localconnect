@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:localconnect/core/supabase_mock.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/gps_tracking_service.dart';

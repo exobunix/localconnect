@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:localconnect/core/supabase_mock.dart';
 
 class SupabaseService {
   static SupabaseService? _instance;

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:localconnect/core/supabase_mock.dart';
 
 import './notification_service.dart';
 import './supabase_service.dart';
