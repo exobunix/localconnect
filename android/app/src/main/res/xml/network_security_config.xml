@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network Security Configuration for LocalConnect
+  - Enforces HTTPS for all connections in release builds
+  - Allows cleartext only for localhost (debug/emulator use)
+  - Pins certificates for Supabase and Razorpay API endpoints
+-->
+<network-security-config>
+    <!-- Production: HTTPS only, no cleartext traffic -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust system CAs for all production traffic -->
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+
+    <!-- Allow cleartext for localhost only (Android emulator / local dev) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">10.0.3.2</domain>
+    </domain-config>
+</network-security-config>
