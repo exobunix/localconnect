@@ -205,7 +205,6 @@ class _SignupScreenState extends State<SignupScreen>
     _createAccountAndSendVerification();
   }
 
-  // ── Step 2: Create account & send email verification ─────────────────────
   Future<void> _createAccountAndSendVerification() async {
     setState(() {
       _isLoading = true;
@@ -224,14 +223,22 @@ class _SignupScreenState extends State<SignupScreen>
       if (!mounted) return;
 
       setState(() {
-        _step = 2;
         _isLoading = false;
       });
-      _startEmailResendTimer();
-      _animateToNextStep();
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) _emailOtpFocusNodes[0].requestFocus();
-      });
+
+      if (roleStr == 'provider') {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.providerOnboardingScreen,
+          (route) => false,
+        );
+      } else {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.homeScreen,
+          (route) => false,
+        );
+      }
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -515,7 +522,7 @@ class _SignupScreenState extends State<SignupScreen>
                     ),
                   ),
                   Text(
-                    'Step ${_step + 1}/3',
+                    'Step ${_step + 1}/2',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 10.sp,
                       fontWeight: FontWeight.w600,
@@ -532,7 +539,7 @@ class _SignupScreenState extends State<SignupScreen>
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(4.0),
                 child: LinearProgressIndicator(
-                  value: (_step + 1) / 3,
+                  value: (_step + 1) / 2,
                   backgroundColor: const Color(0xFFE0E0E0),
                   valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
                   minHeight: 4,
