@@ -47,7 +47,11 @@ const collections = [
   'bookings',
   'support_tickets',
   'provider_earnings',
-  'provider_subscriptions'
+  'provider_subscriptions',
+  'categories',
+  'subcategories',
+  'seasonal_categories',
+  'quotations'
 ];
 
 const models = {};
