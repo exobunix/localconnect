@@ -9,11 +9,11 @@ class SupabaseService {
 
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: '',
+    defaultValue: 'https://ckyopijftlasebanhhqm.supabase.co',
   );
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: '',
+    defaultValue: 'sb_publishable_pztyR-WMEHV-T7k2MUgrlg_0KkpC75H',
   );
 
   static Future<void> initialize() async {
