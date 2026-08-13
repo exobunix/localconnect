@@ -778,23 +778,49 @@ class _LoginScreenState extends State<LoginScreen>
         const Spacer(),
         GestureDetector(
           onTap: () async {
-            await SupabaseService.instance.resetPassword(
-              _emailController.text.trim(),
-            );
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Password reset email sent.',
-                    style: GoogleFonts.plusJakartaSans(fontSize: 10.sp),
-                  ),
-                  backgroundColor: AppTheme.primary,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                ),
+            final email = _emailController.text.trim();
+            if (email.isEmpty) {
+              setState(() {
+                _errorMessage = 'Please enter your email address first to reset your password.';
+              });
+              return;
+            }
+            setState(() {
+              _isLoading = true;
+              _errorMessage = null;
+            });
+            try {
+              await SupabaseService.instance.resetPassword(
+                email,
+                redirectTo: kIsWeb ? Uri.base.toString() : null,
               );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Password reset email sent.',
+                      style: GoogleFonts.plusJakartaSans(fontSize: 10.sp),
+                    ),
+                    backgroundColor: AppTheme.primary,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                  ),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                setState(() {
+                  _errorMessage = 'Failed to send reset email: $e';
+                });
+              }
+            } finally {
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                });
+              }
             }
           },
           child: Text(

@@ -84,8 +84,8 @@ class SupabaseService {
     await client.auth.signOut();
   }
 
-  Future<void> resetPassword(String email) async {
-    await client.auth.resetPasswordForEmail(email);
+  Future<void> resetPassword(String email, {String? redirectTo}) async {
+    await client.auth.resetPasswordForEmail(email, redirectTo: redirectTo);
   }
 
   // ─── USER PROFILE ─────────────────────────────────────────────────────────
