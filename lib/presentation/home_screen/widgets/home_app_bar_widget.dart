@@ -30,49 +30,24 @@ class HomeAppBarWidget extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Row(
         children: [
-          // Logo & App Name
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.asset(
-                    'assets/images/localconnect_app_icon-1785844943052.png',
-                    fit: BoxFit.cover,
-                  ),
-                ),
+          // Logo (No text on left)
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(
+                'assets/images/localconnect_app_icon-1785844943052.png',
+                fit: BoxFit.cover,
               ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'LocalConnect',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Text(
-                    'All Local Services in One App',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
-                      color: Colors.white.withValues(alpha: 0.8),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
           const Spacer(),
-          // City Selector
+          // City Selector (Pin + Arrow only, no text)
           GestureDetector(
             onTap: onCityTap,
             child: Container(
@@ -85,24 +60,15 @@ class HomeAppBarWidget extends StatelessWidget {
                   width: 1,
                 ),
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.location_on_rounded,
                     color: Colors.white,
                     size: 14,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    selectedCity,
-                    style: GoogleFonts.plusJakartaSans(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  const Icon(
+                  SizedBox(width: 2),
+                  Icon(
                     Icons.expand_more_rounded,
                     color: Colors.white,
                     size: 14,

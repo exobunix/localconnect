@@ -69,15 +69,25 @@ class _HomeNearbyProvidersWidgetState extends State<HomeNearbyProvidersWidget> {
     }
 
     setState(() => _isLoading = true);
-    final data = await SupabaseService.instance.getNearbyProviders(limit: 12);
-    if (mounted) {
-      setState(() {
-        _providers = data;
-        _isLoading = false;
-        _cacheAge = null;
-        _expansionMessage = null;
-      });
-      await ConnectivityService.instance.cacheData(_cacheKey, data);
+    try {
+      final data = await SupabaseService.instance.getNearbyProviders(limit: 12);
+      if (mounted) {
+        setState(() {
+          _providers = data;
+          _isLoading = false;
+          _cacheAge = null;
+          _expansionMessage = null;
+        });
+        await ConnectivityService.instance.cacheData(_cacheKey, data);
+      }
+    } catch (e) {
+      debugPrint('[HomeNearbyProviders] Error loading providers: $e');
+      if (mounted) {
+        setState(() {
+          _providers = [];
+          _isLoading = false;
+        });
+      }
     }
   }
 

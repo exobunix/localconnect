@@ -922,9 +922,11 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             // Handle
             Container(
               width: 40,
@@ -1242,6 +1244,7 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
           ],
         ),
       ),
+    ),
     );
   }
 

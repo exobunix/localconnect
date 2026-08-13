@@ -131,9 +131,9 @@ class _HomeCategoryGridWidgetState extends State<HomeCategoryGridWidget>
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              childAspectRatio: 0.85,
+              childAspectRatio: 1.05,
               crossAxisSpacing: 8,
-              mainAxisSpacing: 12,
+              mainAxisSpacing: 8,
             ),
             itemCount: _activeCategories.length,
             itemBuilder: (context, index) {
