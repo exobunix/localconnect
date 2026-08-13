@@ -111,34 +111,13 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
       _expansionMessage = null;
     });
     try {
-      if (_customerLocation != null && _customerLocation!.latitude != 0) {
-        // Use smart nearby providers with radius expansion
-        final result = await LocationService.instance.getNearbyProvidersSmart(
-          lat: _customerLocation!.latitude,
-          lng: _customerLocation!.longitude,
-          initialRadiusKm: _radiusKm,
-          category: _selectedCategory,
-          limit: 100,
-        );
-
-        if (mounted) {
-          setState(() {
-            _providers = result.providers;
-            _actualSearchedRadius = result.searchedRadiusKm;
-            _expansionMessage = result.expansionMessage;
-            _applyFilters();
-            _isLoading = false;
-          });
-        }
-      } else {
-        final data = await SupabaseService.instance.getProviders(limit: 100);
-        if (mounted) {
-          setState(() {
-            _providers = data;
-            _applyFilters();
-            _isLoading = false;
-          });
-        }
+      final data = await SupabaseService.instance.getProviders(limit: 100);
+      if (mounted) {
+        setState(() {
+          _providers = data;
+          _applyFilters();
+          _isLoading = false;
+        });
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);

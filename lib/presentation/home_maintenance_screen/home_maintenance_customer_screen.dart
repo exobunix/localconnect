@@ -13,9 +13,7 @@ class HomeMaintenanceCustomerScreen extends StatefulWidget {
 }
 
 class _HomeMaintenanceCustomerScreenState
-    extends State<HomeMaintenanceCustomerScreen>
-    with TickerProviderStateMixin {
-  late TabController _tabController;
+    extends State<HomeMaintenanceCustomerScreen> {
   String _activeSubcategory = 'plumber';
   String _searchQuery = '';
   final _searchController = TextEditingController();
@@ -391,25 +389,9 @@ class _HomeMaintenanceCustomerScreenState
     return const Color(0xFF0277BD);
   }
 
-  void _onTabChanged() {
-    if (!_tabController.indexIsChanging) {
-      final subs = _subcategories;
-      if (_tabController.index < subs.length) {
-        setState(() {
-          _activeSubcategory = subs[_tabController.index]['id'] as String;
-        });
-      }
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(
-      length: _fallbackSubcategories.length,
-      vsync: this,
-    );
-    _tabController.addListener(_onTabChanged);
     _loadSubcategories();
   }
 
@@ -1412,7 +1394,9 @@ class _HomeMaintenanceCustomerScreenState
             'color': const Color(0xFF0277BD),
           };
 
-    return Scaffold(
+    return DefaultTabController(
+      length: subs.length,
+      child: Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       body: NestedScrollView(
         headerSliverBuilder: (_, __) => [
@@ -1477,7 +1461,11 @@ class _HomeMaintenanceCustomerScreenState
               child: Container(
                 color: activeColor,
                 child: TabBar(
-                  controller: _tabController,
+                  onTap: (index) {
+                    setState(() {
+                      _activeSubcategory = subs[index]['id'] as String;
+                    });
+                  },
                   isScrollable: true,
                   indicatorColor: Colors.white,
                   indicatorWeight: 3,
@@ -1888,7 +1876,7 @@ class _ProviderCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ));
   }
 
   static Widget _badge(String label, Color color, IconData icon) {
