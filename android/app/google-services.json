@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "78703580798",
+    "project_id": "localconnect-64790",
+    "storage_bucket": "localconnect-64790.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:78703580798:android:0fd300b7bf0cefe503aa2f",
+        "android_client_info": {
+          "package_name": "com.localconnect"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "78703580798-adhrbrvo772iftp3c0o82gs25rmlgik9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.localconnect",
+            "certificate_hash": "545df2a5063126ca4761e29bb8b9931dfbc513f5"
+          }
+        },
+        {
+          "client_id": "78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOPgX0yLIOqlxn8XVq58ytnt7eF8g35go"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -389,10 +389,10 @@ class _SignupScreenState extends State<SignupScreen>
     });
 
     try {
-      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
       final googleSignIn = GoogleSignIn(
-        clientId: kIsWeb ? (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId) : null,
-        serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId),
+        clientId: kIsWeb ? (webClientId.isEmpty ? '78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com' : webClientId) : null,
+        serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com' : webClientId),
       );
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
