@@ -524,6 +524,8 @@ class _EventProviderDetailScreenState extends State<EventProviderDetailScreen>
                   const SizedBox(height: 12),
                   TabBar(
                     controller: _tabController,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
                     labelColor: _color,
                     unselectedLabelColor: Colors.grey,
                     indicatorColor: _color,

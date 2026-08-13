@@ -417,7 +417,7 @@ class _BusinessLocationTab extends StatelessWidget {
                   TileLayer(
                     urlTemplate:
                         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.localconnect.app',
+                    userAgentPackageName: 'com.localconnect',
                   ),
                   MarkerLayer(
                     markers: [

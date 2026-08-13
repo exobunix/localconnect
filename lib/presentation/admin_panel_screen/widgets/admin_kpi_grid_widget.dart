@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:localconnect/core/supabase_mock.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/supabase_service.dart';
 
@@ -177,7 +177,7 @@ class _AdminKpiGridWidgetState extends State<AdminKpiGridWidget> {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              childAspectRatio: 1.6,
+              childAspectRatio: 1.35,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
             ),
@@ -337,3 +337,4 @@ class _KpiCard extends StatelessWidget {
     );
   }
 }
+

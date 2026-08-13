@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sizer/sizer.dart';
-import 'package:localconnect/core/supabase_mock.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/app_categories.dart';
 import '../../routes/app_routes.dart';
@@ -1961,3 +1961,4 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     );
   }
 }
+

@@ -1,4 +1,4 @@
-package com.localconnect.app
+package com.localconnect
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

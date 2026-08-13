@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:localconnect/core/supabase_mock.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
   static SupabaseService? _instance;
@@ -77,8 +77,6 @@ class SupabaseService {
       provider: OAuthProvider.google,
       idToken: idToken,
       accessToken: accessToken,
-      email: email,
-      name: name,
     );
   }
 
@@ -3363,3 +3361,4 @@ class SupabaseService {
     } catch (_) {}
   }
 }
+

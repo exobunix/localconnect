@@ -73,211 +73,8 @@ class _UnifiedInboxScreenState extends State<UnifiedInboxScreen>
   final Set<String> _readIds = {};
   bool _isLoading = false;
 
-  // ─── Mock consolidated alerts ─────────────────────────────────────────────
-  final List<InboxAlert> _alerts = [
-    // Customer alerts
-    InboxAlert(
-      id: 'c1',
-      type: AlertType.orderUpdate,
-      status: AlertStatus.inProgress,
-      role: InboxRole.customer,
-      title: 'Order #LC-2847 Out for Delivery',
-      subtitle: 'Rider Rahul is 2.3 km away · ETA 12 min',
-      timeAgo: '5m ago',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=80&h=80&fit=crop',
-      actionLabel1: 'Track Live',
-      actionLabel2: 'Call Rider',
-      meta: {'orderId': 'LC-2847', 'category': 'Grocery'},
-    ),
-    InboxAlert(
-      id: 'c2',
-      type: AlertType.orderUpdate,
-      status: AlertStatus.completed,
-      role: InboxRole.customer,
-      title: 'Booking Confirmed — Electrician',
-      subtitle: 'Suresh Patil will arrive tomorrow at 10:00 AM',
-      timeAgo: '1h ago',
-      isRead: true,
-      avatarUrl:
-          'https://images.pexels.com/photos/8005397/pexels-photo-8005397.jpeg?w=80&h=80&fit=crop',
-      actionLabel1: 'View Booking',
-      meta: {'bookingId': 'BK-1023'},
-    ),
-    InboxAlert(
-      id: 'c3',
-      type: AlertType.payment,
-      status: AlertStatus.completed,
-      role: InboxRole.customer,
-      title: 'Payment Successful ₹480',
-      subtitle: 'Plumbing service · Order #LC-2801',
-      timeAgo: '3h ago',
-      isRead: true,
-      actionLabel1: 'View Receipt',
-      meta: {'amount': 480},
-    ),
-    InboxAlert(
-      id: 'c4',
-      type: AlertType.orderUpdate,
-      status: AlertStatus.pending,
-      role: InboxRole.customer,
-      title: 'Quotation Received — Photography',
-      subtitle: 'Studio Clicks sent a ₹12,000 package quote for your wedding',
-      timeAgo: '6h ago',
-      avatarUrl:
-          'https://images.pixabay.com/photo/2017/08/06/12/06/people-2591874_960_720.jpg',
-      actionLabel1: 'Accept',
-      actionLabel2: 'Decline',
-      meta: {'quoteId': 'QT-445'},
-    ),
-
-    // Vendor / Provider alerts
-    InboxAlert(
-      id: 'v1',
-      type: AlertType.bookingRequest,
-      status: AlertStatus.pending,
-      role: InboxRole.vendor,
-      title: 'New Booking Request',
-      subtitle: 'Priya Sharma needs Plumbing repair · Today 3 PM · Roha',
-      timeAgo: '2m ago',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop',
-      actionLabel1: 'Accept',
-      actionLabel2: 'Decline',
-      meta: {'customerId': 'u-101', 'service': 'Plumbing'},
-    ),
-    InboxAlert(
-      id: 'v2',
-      type: AlertType.bookingRequest,
-      status: AlertStatus.confirmed,
-      role: InboxRole.vendor,
-      title: 'Shop Order Received #SH-0391',
-      subtitle: 'Amit Kumar ordered 3 items · ₹1,240 · Alibag',
-      timeAgo: '18m ago',
-      avatarUrl:
-          'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?w=80&h=80&fit=crop',
-      actionLabel1: 'Prepare Order',
-      actionLabel2: 'View Details',
-      meta: {'orderId': 'SH-0391'},
-    ),
-    InboxAlert(
-      id: 'v3',
-      type: AlertType.payment,
-      status: AlertStatus.completed,
-      role: InboxRole.vendor,
-      title: 'Payout Credited ₹3,200',
-      subtitle: 'Weekly settlement for 8 completed bookings',
-      timeAgo: '2h ago',
-      isRead: true,
-      actionLabel1: 'View Earnings',
-      meta: {'amount': 3200},
-    ),
-    InboxAlert(
-      id: 'v4',
-      type: AlertType.system,
-      status: AlertStatus.pending,
-      role: InboxRole.vendor,
-      title: 'Subscription Renewal Due',
-      subtitle: 'Your Pro plan expires in 3 days · Renew to stay visible',
-      timeAgo: '1d ago',
-      actionLabel1: 'Renew Now',
-      meta: {'plan': 'Pro'},
-    ),
-
-    // Rider alerts
-    InboxAlert(
-      id: 'r1',
-      type: AlertType.deliveryAssignment,
-      status: AlertStatus.pending,
-      role: InboxRole.rider,
-      title: 'New Delivery Assignment',
-      subtitle: 'Pickup: Roha Market · Drop: Nagothane · ₹85 earnings',
-      timeAgo: 'Just now',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=80&h=80&fit=crop',
-      actionLabel1: 'Accept',
-      actionLabel2: 'Reject',
-      meta: {'deliveryId': 'DL-7721', 'distance': '8.2 km'},
-    ),
-    InboxAlert(
-      id: 'r2',
-      type: AlertType.deliveryAssignment,
-      status: AlertStatus.inProgress,
-      role: InboxRole.rider,
-      title: 'Pickup OTP Verified',
-      subtitle: 'Order #LC-2847 picked up · Navigate to customer',
-      timeAgo: '8m ago',
-      actionLabel1: 'Navigate',
-      actionLabel2: 'Call Customer',
-      meta: {'deliveryId': 'DL-7720'},
-    ),
-    InboxAlert(
-      id: 'r3',
-      type: AlertType.payment,
-      status: AlertStatus.completed,
-      role: InboxRole.rider,
-      title: 'Daily Earnings ₹620',
-      subtitle: '7 deliveries completed today · 4.8★ avg rating',
-      timeAgo: '4h ago',
-      isRead: true,
-      actionLabel1: 'View Report',
-      meta: {'deliveries': 7, 'rating': 4.8},
-    ),
-
-    // Admin alerts
-    InboxAlert(
-      id: 'a1',
-      type: AlertType.adminApproval,
-      status: AlertStatus.pending,
-      role: InboxRole.admin,
-      title: 'Provider Approval Pending',
-      subtitle: 'Rajesh Electricals applied for verification · Pen city',
-      timeAgo: '10m ago',
-      avatarUrl:
-          'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?w=80&h=80&fit=crop',
-      actionLabel1: 'Approve',
-      actionLabel2: 'Reject',
-      meta: {'providerId': 'p-220', 'category': 'Electrician'},
-    ),
-    InboxAlert(
-      id: 'a2',
-      type: AlertType.adminApproval,
-      status: AlertStatus.pending,
-      role: InboxRole.admin,
-      title: 'Delivery Vendor Registration',
-      subtitle: 'SpeedEx Logistics wants to operate in Mumbai',
-      timeAgo: '45m ago',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=80&h=80&fit=crop',
-      actionLabel1: 'Review',
-      actionLabel2: 'Reject',
-      meta: {'vendorId': 'v-88', 'city': 'Mumbai'},
-    ),
-    InboxAlert(
-      id: 'a3',
-      type: AlertType.system,
-      status: AlertStatus.pending,
-      role: InboxRole.admin,
-      title: 'Complaint Escalated #CP-334',
-      subtitle: 'Customer reported unresolved issue · 48h SLA breach',
-      timeAgo: '2h ago',
-      actionLabel1: 'Resolve',
-      actionLabel2: 'Assign',
-      meta: {'complaintId': 'CP-334'},
-    ),
-    InboxAlert(
-      id: 'a4',
-      type: AlertType.adminApproval,
-      status: AlertStatus.completed,
-      role: InboxRole.admin,
-      title: 'Banner Ad Approved',
-      subtitle: 'LocalMart premium banner live for 7 days',
-      timeAgo: '5h ago',
-      isRead: true,
-      actionLabel1: 'View Analytics',
-      meta: {'adId': 'AD-112'},
-    ),
-  ];
+  List<InboxAlert> _dynamicAlerts = [];
+  List<InboxAlert> get _alerts => _dynamicAlerts;
 
   final List<Map<String, dynamic>> _roleTabs = [
     {'id': 'all', 'label': 'All', 'icon': Icons.inbox_rounded},
@@ -300,7 +97,7 @@ class _UnifiedInboxScreenState extends State<UnifiedInboxScreen>
         setState(() => _activeRole = _roleTabs[_tabController.index]['id']);
       }
     });
-    _loadUserRole();
+    _loadUserRole().then((_) => _loadDynamicAlerts());
   }
 
   Future<void> _loadUserRole() async {
@@ -309,6 +106,115 @@ class _UnifiedInboxScreenState extends State<UnifiedInboxScreen>
     final profile = await SupabaseService.instance.getUserProfile(userId);
     if (mounted && profile != null) {
       setState(() => _userRole = profile['role'] as String? ?? 'customer');
+    }
+  }
+
+  Future<void> _loadDynamicAlerts() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      final dbAlerts = await SupabaseService.instance.getNotifications();
+      
+      final List<InboxAlert> loaded = [];
+      for (final row in dbAlerts) {
+        final id = row['id']?.toString() ?? '';
+        final title = row['title'] as String? ?? '';
+        final body = row['body'] as String? ?? '';
+        final typeStr = row['type'] as String? ?? 'system';
+        final isRead = row['is_read'] as bool? ?? false;
+        final createdAtStr = row['created_at'] as String? ?? '';
+        
+        // Determine AlertType
+        AlertType type;
+        switch (typeStr.toLowerCase()) {
+          case 'booking':
+            type = AlertType.bookingRequest;
+            break;
+          case 'order':
+            type = AlertType.orderUpdate;
+            break;
+          case 'payment':
+            type = AlertType.payment;
+            break;
+          case 'delivery':
+            type = AlertType.deliveryAssignment;
+            break;
+          case 'admin':
+            type = AlertType.adminApproval;
+            break;
+          default:
+            type = AlertType.system;
+        }
+        
+        // Format time ago
+        String timeAgo = 'Just now';
+        if (createdAtStr.isNotEmpty) {
+          try {
+            final dt = DateTime.parse(createdAtStr).toLocal();
+            final diff = DateTime.now().difference(dt);
+            if (diff.inDays > 0) {
+              timeAgo = '${diff.inDays}d ago';
+            } else if (diff.inHours > 0) {
+              timeAgo = '${diff.inHours}h ago';
+            } else if (diff.inMinutes > 0) {
+              timeAgo = '${diff.inMinutes}m ago';
+            } else {
+              timeAgo = 'Just now';
+            }
+          } catch (_) {}
+        }
+        
+        // Determine status
+        AlertStatus status = AlertStatus.pending;
+        if (type == AlertType.payment) {
+          status = AlertStatus.completed;
+        }
+        
+        // Set role based on user role
+        InboxRole role = InboxRole.customer;
+        if (_userRole == 'provider') {
+          role = InboxRole.vendor;
+        } else if (_userRole == 'admin') {
+          role = InboxRole.admin;
+        } else if (_userRole == 'rider') {
+          role = InboxRole.rider;
+        }
+
+        // Add appropriate action labels
+        String? actionLabel1;
+        if (type == AlertType.bookingRequest) {
+          actionLabel1 = _userRole == 'provider' ? 'Accept' : 'View Booking';
+        } else if (type == AlertType.payment) {
+          actionLabel1 = 'View Receipt';
+        } else if (type == AlertType.orderUpdate) {
+          actionLabel1 = 'View Order';
+        }
+
+        loaded.add(
+          InboxAlert(
+            id: id,
+            type: type,
+            status: status,
+            role: role,
+            title: title,
+            subtitle: body,
+            timeAgo: timeAgo,
+            isRead: isRead,
+            actionLabel1: actionLabel1,
+          ),
+        );
+      }
+      
+      if (mounted) {
+        setState(() {
+          _dynamicAlerts = loaded;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -346,16 +252,22 @@ class _UnifiedInboxScreenState extends State<UnifiedInboxScreen>
         .length;
   }
 
-  void _markRead(String id) {
+  void _markRead(String id) async {
     setState(() => _readIds.add(id));
+    try {
+      await SupabaseService.instance.markNotificationRead(id);
+    } catch (_) {}
   }
 
-  void _markAllRead() {
+  void _markAllRead() async {
     setState(() {
       for (final a in _filteredAlerts) {
         _readIds.add(a.id);
       }
     });
+    try {
+      await SupabaseService.instance.markAllNotificationsRead();
+    } catch (_) {}
   }
 
   // ─── Status helpers ───────────────────────────────────────────────────────

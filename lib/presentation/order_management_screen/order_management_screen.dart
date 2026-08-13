@@ -1,5 +1,5 @@
 import 'package:google_fonts/google_fonts.dart';
-import 'package:localconnect/core/supabase_mock.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_export.dart';
 import '../../services/connectivity_service.dart';
@@ -1423,3 +1423,4 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
+

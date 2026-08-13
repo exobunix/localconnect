@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:localconnect/core/supabase_mock.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Delivery Realtime Service
 /// Handles GPS location broadcasting and delivery status sync
@@ -335,3 +335,4 @@ class DeliveryRealtimeService {
     _channels.clear();
   }
 }
+

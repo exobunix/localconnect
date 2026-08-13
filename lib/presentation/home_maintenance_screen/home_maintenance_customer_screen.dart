@@ -14,7 +14,7 @@ class HomeMaintenanceCustomerScreen extends StatefulWidget {
 
 class _HomeMaintenanceCustomerScreenState
     extends State<HomeMaintenanceCustomerScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late TabController _tabController;
   String _activeSubcategory = 'plumber';
   String _searchQuery = '';
@@ -391,6 +391,17 @@ class _HomeMaintenanceCustomerScreenState
     return const Color(0xFF0277BD);
   }
 
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) {
+      final subs = _subcategories;
+      if (_tabController.index < subs.length) {
+        setState(() {
+          _activeSubcategory = subs[_tabController.index]['id'] as String;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -398,16 +409,7 @@ class _HomeMaintenanceCustomerScreenState
       length: _fallbackSubcategories.length,
       vsync: this,
     );
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        final subs = _subcategories;
-        if (_tabController.index < subs.length) {
-          setState(() {
-            _activeSubcategory = subs[_tabController.index]['id'] as String;
-          });
-        }
-      }
-    });
+    _tabController.addListener(_onTabChanged);
     _loadSubcategories();
   }
 
@@ -449,10 +451,26 @@ class _HomeMaintenanceCustomerScreenState
           };
         }).toList();
 
-        if (!mounted) return;
+        // Rebuild TabController with correct length
+        final oldController = _tabController;
+        oldController.removeListener(_onTabChanged);
+
+        final newController = TabController(length: subs.length, vsync: this);
+        
+        // Jump to correct index
+        final newIdx = subs.indexWhere((s) => s['id'] == _activeSubcategory);
+        if (newIdx >= 0) newController.index = newIdx;
+
+        if (!mounted) {
+          newController.dispose();
+          return;
+        }
+
         setState(() {
           _dynamicSubcategories = subs;
           _subcategoriesLoaded = true;
+          _tabController = newController;
+          _tabController.addListener(_onTabChanged);
           // Reset active subcategory to first if current not in list
           final ids = subs.map((s) => s['id'] as String).toList();
           if (!ids.contains(_activeSubcategory)) {
@@ -462,23 +480,6 @@ class _HomeMaintenanceCustomerScreenState
           }
         });
 
-        // Rebuild TabController with correct length
-        final oldController = _tabController;
-        _tabController = TabController(length: subs.length, vsync: this);
-        _tabController.addListener(() {
-          if (!_tabController.indexIsChanging) {
-            final currentSubs = _subcategories;
-            if (_tabController.index < currentSubs.length) {
-              setState(() {
-                _activeSubcategory =
-                    currentSubs[_tabController.index]['id'] as String;
-              });
-            }
-          }
-        });
-        // Jump to correct index
-        final newIdx = subs.indexWhere((s) => s['id'] == _activeSubcategory);
-        if (newIdx >= 0) _tabController.index = newIdx;
         oldController.dispose();
 
         debugPrint(

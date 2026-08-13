@@ -1037,7 +1037,7 @@ class _EventManagementCustomerScreenState
       body: NestedScrollView(
         headerSliverBuilder: (ctx, innerScrolled) => [
           SliverAppBar(
-            expandedHeight: 160,
+            expandedHeight: 180,
             pinned: true,
             backgroundColor: _activeColor,
             foregroundColor: Colors.white,
@@ -1109,39 +1109,49 @@ class _EventManagementCustomerScreenState
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 56, 16, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          'Find the Best',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            color: Colors.white70,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double appBarHeight = constraints.maxHeight;
+                    final double opacity = ((appBarHeight - 110) / (180 - 110)).clamp(0.0, 1.0);
+                    return SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 40, 16, 56),
+                        child: AnimatedOpacity(
+                          opacity: opacity,
+                          duration: Duration.zero,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Find the Best',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              Text(
+                                _activeSubcategoryData['label'] as String,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${_filteredProviders.length} providers near you',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        Text(
-                          _activeSubcategoryData['label'] as String,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${_filteredProviders.length} providers near you',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  }
                 ),
               ),
             ),

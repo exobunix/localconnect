@@ -43,27 +43,30 @@ class HomeBottomNavWidget extends StatelessWidget {
       child: AnimatedOpacity(
         opacity: isVisible ? 1.0 : 0.0,
         duration: const Duration(milliseconds: 250),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: Container(
-            height: 68,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: AppTheme.floatingNavShadow,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(
-                _items.length,
-                (i) => _NavItem(
-                  activeIcon: _items[i].$1,
-                  inactiveIcon: _items[i].$2,
-                  label: _items[i].$3,
-                  isSelected: selectedIndex == i,
-                  onTap: () => onTap(i),
-                  hasNotification: i == 2 || i == 3,
-                  badgeCount: i == 3 ? unreadMessageCount : 0,
+        child: SafeArea(
+          bottom: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            child: Container(
+              height: 68,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: AppTheme.floatingNavShadow,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(
+                  _items.length,
+                  (i) => _NavItem(
+                    activeIcon: _items[i].$1,
+                    inactiveIcon: _items[i].$2,
+                    label: _items[i].$3,
+                    isSelected: selectedIndex == i,
+                    onTap: () => onTap(i),
+                    hasNotification: i == 2 || i == 3,
+                    badgeCount: i == 3 ? unreadMessageCount : 0,
+                  ),
                 ),
               ),
             ),

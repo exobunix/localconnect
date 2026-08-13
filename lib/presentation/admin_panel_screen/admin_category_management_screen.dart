@@ -352,7 +352,11 @@ class _AdminCategoryManagementScreenState
                                                                 FontWeight.w700,
                                                           ),
                                                     ),
-                                                    Row(
+                                                    Wrap(
+                                                      crossAxisAlignment:
+                                                          WrapCrossAlignment.center,
+                                                      spacing: 6,
+                                                      runSpacing: 2,
                                                       children: [
                                                         Text(
                                                           '${subcategories.length} subcategories',
@@ -361,33 +365,30 @@ class _AdminCategoryManagementScreenState
                                                                 fontSize: 11,
                                                                 color:
                                                                     const Color(
-                                                                      0xFF74777F,
-                                                                    ),
+                                                                  0xFF74777F,
+                                                                ),
                                                               ),
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 6,
                                                         ),
                                                         Container(
                                                           padding:
                                                               const EdgeInsets.symmetric(
-                                                                horizontal: 6,
-                                                                vertical: 2,
-                                                              ),
+                                                            horizontal: 6,
+                                                            vertical: 2,
+                                                          ),
                                                           decoration: BoxDecoration(
                                                             color: isActive
                                                                 ? Colors.green
-                                                                      .withValues(
-                                                                        alpha:
-                                                                            0.12,
-                                                                      )
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.12,
+                                                                    )
                                                                 : Colors
-                                                                      .grey
-                                                                      .shade100,
+                                                                    .grey
+                                                                    .shade100,
                                                             borderRadius:
                                                                 BorderRadius.circular(
-                                                                  20,
-                                                                ),
+                                                              20,
+                                                            ),
                                                           ),
                                                           child: Text(
                                                             isActive
@@ -400,11 +401,11 @@ class _AdminCategoryManagementScreenState
                                                                       .w700,
                                                               color: isActive
                                                                   ? Colors
-                                                                        .green
-                                                                        .shade700
+                                                                      .green
+                                                                      .shade700
                                                                   : Colors
-                                                                        .grey
-                                                                        .shade600,
+                                                                      .grey
+                                                                      .shade600,
                                                             ),
                                                           ),
                                                         ),

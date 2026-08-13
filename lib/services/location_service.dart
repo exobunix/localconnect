@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import './supabase_service.dart';
 
@@ -84,9 +85,30 @@ class NearbyProvidersResult {
 class LocationService {
   static LocationService? _instance;
   static LocationService get instance => _instance ??= LocationService._();
-  LocationService._();
+  LocationService._() {
+    loadSearchRadius();
+  }
 
   final _dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+
+  double _searchRadius = 50.0;
+  double get searchRadius => _searchRadius;
+
+  Future<void> saveSearchRadius(double radius) async {
+    _searchRadius = radius;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('search_radius_km', radius);
+    } catch (_) {}
+  }
+
+  Future<double> loadSearchRadius() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _searchRadius = prefs.getDouble('search_radius_km') ?? 50.0;
+    } catch (_) {}
+    return _searchRadius;
+  }
 
   // Smart expansion radii (can be overridden by admin settings)
   static const List<double> _smartRadii = [5, 10, 20, 50];
@@ -348,7 +370,18 @@ class LocationService {
     int minProviders = _minProvidersThreshold,
   }) async {
     // Load admin settings for smart expansion radii
-    final radii = await _getSmartRadii(category);
+    final baseRadii = await _getSmartRadii(category);
+    final radii = List<double>.from(baseRadii);
+    if (!radii.contains(_searchRadius)) {
+      radii.add(_searchRadius);
+      radii.sort();
+    }
+    // Filter out step elements that exceed the custom searchRadius limits
+    radii.removeWhere((r) => r > _searchRadius);
+    if (radii.isEmpty || (radii.isNotEmpty && radii.last != _searchRadius)) {
+      radii.add(_searchRadius);
+    }
+    
     final startRadius = initialRadiusKm ?? radii.first;
 
     // Try each radius step

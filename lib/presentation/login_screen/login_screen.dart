@@ -3,20 +3,14 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
-import 'package:localconnect/core/supabase_mock.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 import '../signup_screen/signup_screen.dart';
-
-// local_auth is mobile-only — conditional import prevents web compilation errors
-import 'package:local_auth/local_auth.dart'
-    if (dart.library.html) '../../utils/_local_auth_stub.dart'
-    as local_auth;
 
 // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -58,10 +52,8 @@ class _LoginScreenState extends State<LoginScreen>
   final TextEditingController _passwordController = TextEditingController();
 
   bool _isLoading = false;
-  bool _isGoogleLoading = false;
   bool _obscurePassword = true;
   bool _rememberMe = false;
-  bool _biometricAvailable = false;
   String? _errorMessage;
   int _selectedRole = 0;
 
@@ -82,17 +74,7 @@ class _LoginScreenState extends State<LoginScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
-    _checkBiometricAvailability();
     _loadSavedCredentials();
-  }
-
-  Future<void> _checkBiometricAvailability() async {
-    if (kIsWeb) return;
-    try {
-      final auth = local_auth.LocalAuthentication();
-      final available = await auth.canCheckBiometrics;
-      if (mounted) setState(() => _biometricAvailable = available);
-    } catch (_) {}
   }
 
   Future<void> _loadSavedCredentials() async {
@@ -122,17 +104,6 @@ class _LoginScreenState extends State<LoginScreen>
     await prefs.setString('saved_password', password);
   }
 
-  Future<bool> _authenticateWithBiometrics() async {
-    try {
-      final auth = local_auth.LocalAuthentication();
-      return await auth.authenticate(
-        localizedReason: 'Authenticate to sign in',
-        options: const local_auth.AuthenticationOptions(biometricOnly: true),
-      );
-    } catch (_) {
-      return false;
-    }
-  }
 
   @override
   void dispose() {
@@ -240,78 +211,6 @@ class _LoginScreenState extends State<LoginScreen>
       setState(() => _errorMessage = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // ── Google Sign-In ────────────────────────────────────────────────────────
-
-  Future<void> _handleGoogleSignIn() async {
-    setState(() {
-      _isGoogleLoading = true;
-      _errorMessage = null;
-    });
-
-    GoogleSignInAccount? googleUser;
-    try {
-      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
-      final googleSignIn = GoogleSignIn(
-        clientId: kIsWeb ? (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId) : null,
-        serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId),
-      );
-      googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        if (mounted) setState(() => _isGoogleLoading = false);
-        return;
-      }
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken ?? googleUser.id;
-      final accessToken = googleAuth.accessToken;
-
-      await SupabaseService.instance.signInWithGoogleIdToken(
-        idToken: idToken,
-        accessToken: accessToken,
-        email: googleUser.email,
-        name: googleUser.displayName,
-      );
-
-      if (!mounted) return;
-
-      final user = SupabaseService.instance.currentUser;
-      if (user != null) {
-        final existingRole = user.userMetadata?['role'] as String?;
-        if (existingRole == null || existingRole.isEmpty) {
-          final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
-          await SupabaseService.instance.client.auth.updateUser(
-            UserAttributes(data: {'role': roleStr}),
-          );
-        }
-      }
-
-      if (_rememberMe) await _saveRememberMe(true);
-
-      if (mounted) _navigateByRole();
-    } catch (e) {
-      if (e.toString().contains('USER_NOT_REGISTERED')) {
-        if (mounted) {
-          setState(() {
-            _isGoogleLoading = false;
-            _errorMessage = null;
-          });
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SignupScreen(initialEmail: googleUser?.email),
-            ),
-          );
-        }
-        return;
-      }
-      if (mounted) {
-        setState(() {
-          _isGoogleLoading = false;
-          _errorMessage = 'Google Sign-In failed. Please try again.';
-        });
-      }
     }
   }
 
@@ -597,11 +496,6 @@ class _LoginScreenState extends State<LoginScreen>
         SizedBox(height: 1.h),
         _buildRememberMe(),
 
-        if (_rememberMe && _biometricAvailable && !kIsWeb) ...[
-          SizedBox(height: 1.5.h),
-          _buildBiometricUnlockButton(),
-        ],
-
         if (_errorMessage != null) ...[
           SizedBox(height: 1.5.h),
           _buildErrorBox(_errorMessage!),
@@ -659,29 +553,6 @@ class _LoginScreenState extends State<LoginScreen>
         ),
 
         SizedBox(height: 2.h),
-
-        Row(
-          children: [
-            const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 3.w),
-              child: Text(
-                'or',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10.sp,
-                  color: const Color(0xFF90A4AE),
-                ),
-              ),
-            ),
-            const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
-          ],
-        ),
-
-        SizedBox(height: 2.h),
-
-        _buildGoogleButton(),
-
-        SizedBox(height: 1.5.h),
 
         if (_selectedRole == 1) ...[
           Container(
@@ -756,140 +627,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildGoogleButton() {
-    return GestureDetector(
-      onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
-      child: Container(
-        width: double.infinity,
-        height: 6.5.h,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14.0),
-          border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Center(
-          child: _isGoogleLoading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.g_mobiledata_rounded,
-                      size: 28,
-                      color: Color(0xFF4285F4),
-                    ),
-                    SizedBox(width: 2.w),
-                    Text(
-                      'Continue with Google',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1A1C1E),
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildBiometricUnlockButton() {
-    return GestureDetector(
-      onTap: _isLoading ? null : _onBiometricButtonTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(vertical: 1.4.h, horizontal: 4.w),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0F4FF),
-          borderRadius: BorderRadius.circular(14.0),
-          border: Border.all(
-            color: AppTheme.primary.withValues(alpha: 0.3),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.fingerprint_rounded, color: AppTheme.primary, size: 22),
-            SizedBox(width: 2.w),
-            Text(
-              'Sign in with Touch ID / Face ID',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 11.sp,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _onBiometricButtonTap() async {
-    if (kIsWeb) return;
-    final prefs = await SharedPreferences.getInstance();
-    final savedEmail = prefs.getString('saved_email') ?? '';
-    final savedPassword = prefs.getString('saved_password') ?? '';
-
-    if (savedEmail.isEmpty || savedPassword.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Please log in once with "Remember Me" enabled to activate biometric unlock.',
-              style: GoogleFonts.plusJakartaSans(fontSize: 10.sp),
-            ),
-            backgroundColor: AppTheme.primary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10.0),
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
-    final authenticated = await _authenticateWithBiometrics();
-    if (!mounted) return;
-
-    if (authenticated) {
-      setState(() {
-        _emailController.text = savedEmail;
-        _passwordController.text = savedPassword;
-        _isLoading = true;
-        _errorMessage = null;
-      });
-      try {
-        await SupabaseService.instance.signInWithEmail(
-          email: savedEmail,
-          password: savedPassword,
-        );
-        if (mounted) _navigateByRole();
-      } catch (_) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = 'Biometric sign-in failed. Please log in manually.';
-          });
-        }
-      }
-    }
-  }
 
   Widget _buildRememberMe() {
     return Row(
@@ -1054,3 +792,4 @@ class _RoleCard extends StatelessWidget {
     );
   }
 }
+

@@ -256,11 +256,310 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
   }
 
   void _openLocationSetup() {
-    Navigator.pushNamed(context, '/customer-location-setup-screen').then((
-      result,
-    ) {
-      if (result == true) _loadCustomerLocation();
-    });
+    _showSetLocationSheet();
+  }
+
+  void _showSetLocationSheet() {
+    final houseDetailsCtrl = TextEditingController();
+    final villageCtrl = TextEditingController(text: _customerLocation?.village ?? '');
+    final cityCtrl = TextEditingController(text: _customerLocation?.city ?? '');
+    final talukaCtrl = TextEditingController(text: _customerLocation?.taluka ?? '');
+    final districtCtrl = TextEditingController(text: _customerLocation?.district ?? '');
+    final stateCtrl = TextEditingController(text: _customerLocation?.state ?? 'Maharashtra');
+    final pincodeCtrl = TextEditingController(text: _customerLocation?.pincode ?? '');
+    
+    // Extract house details if existing full_address has it
+    if (_customerLocation != null && _customerLocation!.fullAddress.isNotEmpty) {
+      final full = _customerLocation!.fullAddress;
+      final parts = full.split(', ');
+      if (parts.isNotEmpty) {
+        final List<String> matchParts = [
+          _customerLocation!.village,
+          _customerLocation!.city,
+          _customerLocation!.taluka,
+          _customerLocation!.district,
+          _customerLocation!.state,
+          _customerLocation!.pincode
+        ].where((e) => e.isNotEmpty).toList();
+        
+        final List<String> houseParts = [];
+        for (var p in parts) {
+          if (!matchParts.contains(p)) {
+            houseParts.add(p);
+          }
+        }
+        if (houseParts.isNotEmpty) {
+          houseDetailsCtrl.text = houseParts.join(', ');
+        }
+      }
+    }
+
+    double? savedLat = _customerLocation?.latitude;
+    double? savedLng = _customerLocation?.longitude;
+    String savedMethod = _customerLocation?.method ?? 'manual';
+    bool gpsLoading = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.outline,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Set Your Location',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // GPS Button
+                  GestureDetector(
+                    onTap: gpsLoading
+                        ? null
+                        : () async {
+                            setSheetState(() => gpsLoading = true);
+                            final loc = await LocationService.instance.getGpsLocation();
+                            if (loc != null) {
+                              villageCtrl.text = loc.village;
+                              cityCtrl.text = loc.city;
+                              talukaCtrl.text = loc.taluka;
+                              districtCtrl.text = loc.district;
+                              stateCtrl.text = loc.state;
+                              pincodeCtrl.text = loc.pincode;
+                              savedLat = loc.latitude;
+                              savedLng = loc.longitude;
+                              savedMethod = 'gps';
+                            }
+                            setSheetState(() => gpsLoading = false);
+                          },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          gpsLoading
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppTheme.primary,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.gps_fixed,
+                                  size: 16,
+                                  color: AppTheme.primary,
+                                ),
+                          const SizedBox(width: 8),
+                          Text(
+                            gpsLoading
+                                ? 'Detecting Location…'
+                                : 'Use Current GPS Location',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (savedLat != null && savedLng != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 14,
+                          color: AppTheme.success,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'GPS Coordinates Entered Successfully',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            color: AppTheme.success,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: houseDetailsCtrl,
+                    decoration: _sheetInputDecoration('Flat / House No, Building, Street *'),
+                    style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: villageCtrl,
+                          decoration: _sheetInputDecoration('Village / Locality'),
+                          style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: talukaCtrl,
+                          decoration: _sheetInputDecoration('Taluka'),
+                          style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: districtCtrl,
+                          decoration: _sheetInputDecoration('District *'),
+                          style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: cityCtrl,
+                          decoration: _sheetInputDecoration('City *'),
+                          style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: pincodeCtrl,
+                          decoration: _sheetInputDecoration('Pincode *'),
+                          keyboardType: TextInputType.number,
+                          style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: stateCtrl,
+                          decoration: _sheetInputDecoration('State'),
+                          style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final house = houseDetailsCtrl.text.trim();
+                        final dist = districtCtrl.text.trim();
+                        final city = cityCtrl.text.trim();
+                        final pin = pincodeCtrl.text.trim();
+                        
+                        if (house.isEmpty || dist.isEmpty || city.isEmpty || pin.isEmpty) {
+                          _showSnack('Please fill all required (*) fields');
+                          return;
+                        }
+
+                        final full = [
+                          house,
+                          villageCtrl.text.trim(),
+                          talukaCtrl.text.trim(),
+                          dist,
+                          city,
+                          pin,
+                          stateCtrl.text.trim()
+                        ].where((s) => s.isNotEmpty).join(', ');
+
+                        final loc = LocationData(
+                          latitude: savedLat ?? 0.0,
+                          longitude: savedLng ?? 0.0,
+                          fullAddress: full,
+                          village: villageCtrl.text.trim(),
+                          city: city,
+                          taluka: talukaCtrl.text.trim(),
+                          district: dist,
+                          state: stateCtrl.text.trim(),
+                          pincode: pin,
+                          method: savedMethod,
+                        );
+
+                        await LocationService.instance.saveCustomerLocation(loc);
+                        _loadCustomerLocation();
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          _showSnack('Location updated successfully!', success: true);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Save Location',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _saveProfile() async {
@@ -387,6 +686,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
                   ),
                   bottom: TabBar(
                     controller: _tabController,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
                     indicatorColor: Colors.white,
                     indicatorWeight: 3,
                     labelColor: Colors.white,

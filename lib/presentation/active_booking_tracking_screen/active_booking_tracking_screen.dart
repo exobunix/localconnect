@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:localconnect/core/supabase_mock.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/gps_tracking_service.dart';
@@ -429,7 +429,7 @@ class _ActiveBookingTrackingScreenState
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.localconnect.app',
+          userAgentPackageName: 'com.localconnect',
         ),
         if (_providerLocation != null && _customerLocation != null)
           PolylineLayer(
@@ -1210,3 +1210,4 @@ class _TrackingActionButton extends StatelessWidget {
     );
   }
 }
+

@@ -491,7 +491,7 @@ class _TransportPostPaymentScreenState extends State<TransportPostPaymentScreen>
                       TileLayer(
                         urlTemplate:
                             'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.localconnect.app',
+                        userAgentPackageName: 'com.localconnect',
                       ),
                       if (_pickupLatLng != null && _dropLatLng != null)
                         PolylineLayer(

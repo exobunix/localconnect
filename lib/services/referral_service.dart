@@ -1,4 +1,4 @@
-import 'package:localconnect/core/supabase_mock.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './supabase_service.dart';
 
@@ -8,7 +8,7 @@ class ReferralService {
 
   static const String _appName = 'LocalConnect';
   static const String _playStoreUrl =
-      'https://play.google.com/store/apps/details?id=com.localconnect.app';
+      'https://play.google.com/store/apps/details?id=com.localconnect';
 
   String get playStoreUrl => _playStoreUrl;
 
@@ -203,3 +203,4 @@ class ReferralService {
     }
   }
 }
+

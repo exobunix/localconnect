@@ -1,4 +1,4 @@
-import 'package:localconnect/core/supabase_mock.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './supabase_service.dart';
 
@@ -191,3 +191,4 @@ class AccountDeletionService {
     return null; // success
   }
 }
+
