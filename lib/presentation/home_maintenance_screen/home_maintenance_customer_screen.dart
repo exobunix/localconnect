@@ -360,9 +360,10 @@ class _HomeMaintenanceCustomerScreenState
       if (_verifiedOnly && p['verified'] != true) return false;
       if (_emergencyOnly && p['emergency'] != true) return false;
       if (_availableOnly && p['available'] != true) return false;
-      if ((p['distance'] as num) > _maxDistance) return false;
+      final dist = (p['distance'] as num?)?.toDouble() ?? 0.0;
+      if (dist > _maxDistance) return false;
       if (_searchQuery.isNotEmpty &&
-          !(p['name'] as String).toLowerCase().contains(
+          !(p['name'] as String? ?? '').toLowerCase().contains(
             _searchQuery.toLowerCase(),
           )) {
         return false;
@@ -371,13 +372,21 @@ class _HomeMaintenanceCustomerScreenState
     }).toList()..sort((a, b) {
       switch (_sortBy) {
         case 'rating':
-          return (b['rating'] as num).compareTo(a['rating'] as num);
+          final rA = (a['rating'] as num?)?.toDouble() ?? 0.0;
+          final rB = (b['rating'] as num?)?.toDouble() ?? 0.0;
+          return rB.compareTo(rA);
         case 'price_low':
-          return (a['charge'] as num).compareTo(b['charge'] as num);
+          final cA = (a['charge'] as num?)?.toDouble() ?? 0.0;
+          final cB = (b['charge'] as num?)?.toDouble() ?? 0.0;
+          return cA.compareTo(cB);
         case 'experience':
-          return (b['experience'] as num).compareTo(a['experience'] as num);
+          final eA = (a['experience'] as num?)?.toDouble() ?? 0.0;
+          final eB = (b['experience'] as num?)?.toDouble() ?? 0.0;
+          return eB.compareTo(eA);
         default:
-          return (a['distance'] as num).compareTo(b['distance'] as num);
+          final dA = (a['distance'] as num?)?.toDouble() ?? 0.0;
+          final dB = (b['distance'] as num?)?.toDouble() ?? 0.0;
+          return dA.compareTo(dB);
       }
     });
   }

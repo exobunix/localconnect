@@ -44,21 +44,9 @@ void main() async {
     }
   });
 
-  bool hasShownError = false;
-
   // 🚨 CRITICAL: Custom error handling - DO NOT REMOVE
   ErrorWidget.builder = (FlutterErrorDetails details) {
-    if (!hasShownError) {
-      hasShownError = true;
-
-      // Reset flag after 3 seconds to allow error widget on new screens
-      Future.delayed(Duration(seconds: 5), () {
-        hasShownError = false;
-      });
-
-      return CustomErrorWidget(errorDetails: details);
-    }
-    return SizedBox.shrink();
+    return CustomErrorWidget(errorDetails: details);
   };
 
   // 🚨 CRITICAL: Device orientation lock - DO NOT REMOVE

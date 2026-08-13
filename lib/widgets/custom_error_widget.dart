@@ -1,8 +1,4 @@
-import 'package:flutter_svg/svg.dart';
-
-import '../core/app_export.dart';
-
-// custom_error_widget.dart
+import 'package:flutter/material.dart';
 
 class CustomErrorWidget extends StatelessWidget {
   final FlutterErrorDetails? errorDetails;
@@ -13,49 +9,75 @@ class CustomErrorWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final String errorText = errorMessage ?? 
+        errorDetails?.exception.toString() ?? 
+        'Unknown unexpected error';
+    final String stackTraceText = errorDetails?.stack?.toString() ?? '';
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       body: SafeArea(
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(16.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                SvgPicture.asset(
-                  'assets/images/sad_face.svg',
-                  height: 42,
-                  width: 42,
+                const Icon(
+                  Icons.error_outline_rounded,
+                  size: 54,
+                  color: Colors.redAccent,
                 ),
-                const SizedBox(height: 8),
-                Text(
+                const SizedBox(height: 12),
+                const Text(
                   "Something went wrong",
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w500,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                     color: Color(0xFF262626),
                   ),
                 ),
-                const SizedBox(height: 4),
-                SizedBox(
-                  child: const Text(
-                    'We encountered an unexpected error while processing your request.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF525252), // neutral-600
-                    ),
+                const SizedBox(height: 8),
+                Text(
+                  errorText,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
+                if (stackTraceText.isNotEmpty)
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Text(
+                          stackTraceText,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
                 ElevatedButton.icon(
                   onPressed: () {
                     bool canBeBack = Navigator.canPop(context);
                     if (canBeBack) {
                       Navigator.of(context).pop();
                     } else {
-                      Navigator.pushNamed(context, AppRoutes.initial);
+                      Navigator.pushNamed(context, '/home-screen');
                     }
                   },
                   icon: const Icon(
