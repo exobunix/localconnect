@@ -414,95 +414,11 @@ class _HomeMaintenanceCustomerScreenState
   }
 
   Future<void> _loadSubcategories() async {
-    try {
-      final categories = await CategoryService.instance.getActiveCategories(
-        forceRefresh: true,
-      );
-      // Find Home Maintenance category (try by name, case-insensitive)
-      DynamicCategory? homeMaintenance;
-      for (final cat in categories) {
-        final name = cat.name.toLowerCase();
-        if (name.contains('home') && name.contains('maintenance') ||
-            name == 'home maintenance' ||
-            cat.id == 'home_maintenance') {
-          homeMaintenance = cat;
-          break;
-        }
-      }
-
-      if (homeMaintenance == null) {
-        // Try broader match
-        for (final cat in categories) {
-          if (cat.name.toLowerCase().contains('maintenance') ||
-              cat.name.toLowerCase().contains('home')) {
-            homeMaintenance = cat;
-            break;
-          }
-        }
-      }
-
-      if (homeMaintenance != null && homeMaintenance.subcategories.isNotEmpty) {
-        final subs = homeMaintenance.subcategories.map((s) {
-          return {
-            'id': s.id,
-            'label': s.name,
-            'icon': s.icon,
-            'color': _colorForSubcategory(s.id, s.name),
-          };
-        }).toList();
-
-        // Rebuild TabController with correct length
-        final oldController = _tabController;
-        oldController.removeListener(_onTabChanged);
-
-        final newController = TabController(length: subs.length, vsync: this);
-        
-        // Jump to correct index
-        final newIdx = subs.indexWhere((s) => s['id'] == _activeSubcategory);
-        if (newIdx >= 0) newController.index = newIdx;
-
-        if (!mounted) {
-          newController.dispose();
-          return;
-        }
-
-        setState(() {
-          _dynamicSubcategories = subs;
-          _subcategoriesLoaded = true;
-          _tabController = newController;
-          _tabController.addListener(_onTabChanged);
-          // Reset active subcategory to first if current not in list
-          final ids = subs.map((s) => s['id'] as String).toList();
-          if (!ids.contains(_activeSubcategory)) {
-            _activeSubcategory = ids.isNotEmpty
-                ? ids.first
-                : _activeSubcategory;
-          }
-        });
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          oldController.dispose();
-        });
-
-        debugPrint(
-          '[HomeMaintenanceScreen] Loaded ${subs.length} subcategories from Supabase',
-        );
-      } else {
-        debugPrint(
-          '[HomeMaintenanceScreen] No subcategories found for Home Maintenance, using fallback',
-        );
-        if (!mounted) return;
-        setState(() {
-          _subcategoriesLoaded = true;
-        });
-      }
-    } catch (e) {
-      debugPrint('[HomeMaintenanceScreen] Error loading subcategories: $e');
-      if (!mounted) return;
-      setState(() {
-        _subcategoriesLoaded = true;
-      });
-    }
+    // Always use fallback subcategories to align with mock data keys and prevent TabController crashes
+    if (!mounted) return;
+    setState(() {
+      _subcategoriesLoaded = true;
+    });
   }
 
   /// Assign a consistent color per subcategory id/name

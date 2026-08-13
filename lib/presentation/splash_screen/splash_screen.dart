@@ -109,22 +109,7 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    // User is logged in — check Remember Me preference
-    final prefs = await SharedPreferences.getInstance();
-    final rememberMe = prefs.getBool('remember_me') ?? true;
-
-    // If remember_me is explicitly false, sign out and go to login
-    if (!rememberMe) {
-      await SupabaseService.instance.signOut();
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.loginScreen,
-          (route) => false,
-        );
-      }
-      return;
-    }
+    // Keep user logged in once authenticated.
 
     final userId = SupabaseService.instance.currentUser?.id;
 
