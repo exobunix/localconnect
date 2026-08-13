@@ -1064,6 +1064,28 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
                 ),
                 const Divider(height: 1),
                 _actionRow(
+                  icon: Icons.inbox_rounded,
+                  label: 'Unified Inbox',
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    AppRoutes.unifiedInboxScreen,
+                  ),
+                ),
+                const Divider(height: 1),
+                _actionRow(
+                  icon: Icons.share_rounded,
+                  label: 'Share & Invite Friends',
+                  onTap: () async {
+                    final message = ReferralService.instance.shareMessage;
+                    await Share.share(message, subject: 'LocalConnect App');
+                    await ReferralService.instance.logShare(
+                      shareType: 'app',
+                      platform: 'native',
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+                _actionRow(
                   icon: Icons.logout_rounded,
                   label: 'Sign Out',
                   color: AppTheme.error,

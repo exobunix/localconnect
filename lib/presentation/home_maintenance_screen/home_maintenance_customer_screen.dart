@@ -1389,110 +1389,76 @@ class _HomeMaintenanceCustomerScreenState
             'icon': Icons.home_repair_service_rounded,
             'color': const Color(0xFF0277BD),
           };
-
     return DefaultTabController(
       length: subs.length,
       child: Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
-      body: NestedScrollView(
-        headerSliverBuilder: (_, __) => [
-          SliverAppBar(
-            expandedHeight: 130,
-            pinned: true,
-            backgroundColor: activeColor,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+        backgroundColor: const Color(0xFFF5F6FA),
+        appBar: AppBar(
+          backgroundColor: activeColor,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            'Home Maintenance',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.map_rounded, color: Colors.white),
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRoutes.mapDiscoveryScreen),
-              ),
-              IconButton(
-                icon: const Icon(Icons.tune_rounded, color: Colors.white),
-                onPressed: _showFilterSheet,
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [activeColor, activeColor.withValues(alpha: 0.75)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 48, 20, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Home Maintenance',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Find trusted professionals near you',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.map_rounded, color: Colors.white),
+              onPressed: () =>
+                  Navigator.pushNamed(context, AppRoutes.mapDiscoveryScreen),
             ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(48),
-              child: Container(
-                color: activeColor,
-                child: TabBar(
-                  onTap: (index) {
-                    setState(() {
-                      _activeSubcategory = subs[index]['id'] as String;
-                    });
-                  },
-                  isScrollable: true,
-                  indicatorColor: Colors.white,
-                  indicatorWeight: 3,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
-                  labelStyle: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  unselectedLabelStyle: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                  ),
-                  tabs: subs
-                      .map(
-                        (s) => Tab(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(s['icon'] as IconData, size: 14),
-                              const SizedBox(width: 5),
-                              Text(s['label'] as String),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
+            IconButton(
+              icon: const Icon(Icons.tune_rounded, color: Colors.white),
+              onPressed: _showFilterSheet,
+            ),
+          ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(48),
+            child: Container(
+              color: activeColor,
+              child: TabBar(
+                onTap: (index) {
+                  setState(() {
+                    _activeSubcategory = subs[index]['id'] as String;
+                  });
+                },
+                isScrollable: true,
+                indicatorColor: Colors.white,
+                indicatorWeight: 3,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
+                labelStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
+                unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                ),
+                tabs: subs
+                    .map(
+                      (s) => Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(s['icon'] as IconData, size: 14),
+                            const SizedBox(width: 5),
+                            Text(s['label'] as String),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ),
           ),
-        ],
+        ),
         body: Column(
           children: [
             // Search bar
@@ -1622,7 +1588,6 @@ class _HomeMaintenanceCustomerScreenState
           ],
         ),
       ),
-    ),
     );
   }
 }

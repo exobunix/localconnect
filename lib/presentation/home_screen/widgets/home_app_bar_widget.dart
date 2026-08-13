@@ -78,57 +78,6 @@ class HomeAppBarWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // Unified Inbox button
-          Stack(
-            children: [
-              IconButton(
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRoutes.unifiedInboxScreen),
-                icon: const Icon(
-                  Icons.inbox_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(),
-                tooltip: 'Inbox',
-              ),
-              Positioned(
-                top: 4,
-                right: 4,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppTheme.secondary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.5),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 2),
-          // Share button
-          IconButton(
-            onPressed: () async {
-              final message = ReferralService.instance.shareMessage;
-              await Share.share(message, subject: 'LocalConnect App');
-              await ReferralService.instance.logShare(
-                shareType: 'app',
-                platform: 'native',
-              );
-            },
-            icon: const Icon(
-              Icons.share_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-            padding: const EdgeInsets.all(4),
-            constraints: const BoxConstraints(),
-            tooltip: 'Share LocalConnect',
-          ),
-          const SizedBox(width: 2),
           // Notification
           Stack(
             children: [
@@ -190,12 +139,10 @@ class HomeAppBarWidget extends StatelessWidget {
                 ),
             ],
           ),
-          // Profile Avatar with logout menu
+          const SizedBox(width: 8),
+          // Profile Avatar
           GestureDetector(
             onTap: onProfileTap,
-            onLongPress: onSignOut != null
-                ? () => _showLogoutMenu(context)
-                : null,
             child: Container(
               width: 34,
               height: 34,
@@ -214,43 +161,6 @@ class HomeAppBarWidget extends StatelessWidget {
               ),
             ),
           ),
-          // Logout button (visible)
-          if (onSignOut != null) ...[
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: onSignOut,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.logout_rounded,
-                      color: Colors.white,
-                      size: 13,
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      'Logout',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
