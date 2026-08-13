@@ -229,7 +229,11 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       if (kIsWeb) {
         final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
-        await SupabaseService.instance.client.auth.signInWithOAuth(
+        final realClient = SupabaseClient(
+          'https://ckyopijftlasebanhhqm.supabase.co',
+          SupabaseService.supabaseAnonKey,
+        );
+        await realClient.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: Uri.base.toString(),
           queryParams: {
