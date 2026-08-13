@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -57,6 +58,7 @@ class _SignupScreenState extends State<SignupScreen>
   bool _canResendEmail = false;
 
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   String? _errorMessage;
 
   late AnimationController _fadeController;
@@ -379,6 +381,60 @@ class _SignupScreenState extends State<SignupScreen>
     });
   }
 
+  // ── Google Sign-In ────────────────────────────────────────────────────────
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isGoogleLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+      final googleSignIn = GoogleSignIn(
+        clientId: kIsWeb ? (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId) : null,
+        serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId),
+      );
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() {
+          _isGoogleLoading = false;
+        });
+        return;
+      }
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken ?? googleUser.id;
+      await SupabaseService.instance.signInWithGoogleIdToken(
+        idToken: idToken,
+        accessToken: googleAuth.accessToken,
+        email: googleUser.email,
+        name: googleUser.displayName,
+      );
+
+      if (!mounted) return;
+
+      // Set role metadata if not already set
+      final user = SupabaseService.instance.currentUser;
+      if (user != null) {
+        final existingRole = user.userMetadata?['role'] as String?;
+        if (existingRole == null || existingRole.isEmpty) {
+          final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
+          await SupabaseService.instance.client.auth.updateUser(
+            UserAttributes(data: {'role': roleStr}),
+          );
+        }
+      }
+
+      if (!mounted) return;
+      _navigateAfterAuth();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isGoogleLoading = false;
+        _errorMessage = 'Google Sign-In failed. Please try again.';
+      });
+    }
+  }
+
   void _navigateAfterAuth() {
     final user = SupabaseService.instance.currentUser;
     final role = user?.userMetadata?['role'] as String? ?? 'customer';
@@ -681,6 +737,10 @@ class _SignupScreenState extends State<SignupScreen>
           onTap: _proceedFromBasicInfo,
           color: AppTheme.primary,
         ),
+        SizedBox(height: 2.h),
+        _buildDivider(),
+        SizedBox(height: 2.h),
+        _buildGoogleButton(),
         SizedBox(height: 2.h),
         Center(
           child: GestureDetector(
@@ -1099,6 +1159,72 @@ class _SignupScreenState extends State<SignupScreen>
             ),
           ),
         ],
+      ),
+    );
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 3.w),
+          child: Text(
+            'or continue with',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 10.sp,
+              color: const Color(0xFF90A4AE),
+            ),
+          ),
+        ),
+        const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
+      ],
+    );
+  }
+
+  Widget _buildGoogleButton() {
+    return GestureDetector(
+      onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
+      child: Container(
+        width: double.infinity,
+        height: 6.5.h,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14.0),
+          border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: _isGoogleLoading
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.g_mobiledata_rounded,
+                      size: 28,
+                      color: Color(0xFF4285F4),
+                    ),
+                    SizedBox(width: 2.w),
+                    Text(
+                      'Continue with Google',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1A1C1E),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }
