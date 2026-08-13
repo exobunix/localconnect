@@ -7,14 +7,16 @@ class SupabaseService {
 
   SupabaseService._();
 
-  static const String supabaseUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://ckyopijftlasebanhhqm.supabase.co',
-  );
-  static const String supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: 'sb_publishable_pztyR-WMEHV-T7k2MUgrlg_0KkpC75H',
-  );
+  static const String _envUrl = String.fromEnvironment('SUPABASE_URL');
+  static const String _envAnon = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+  static String get supabaseUrl => _envUrl.trim().isNotEmpty
+      ? _envUrl.trim()
+      : 'https://ckyopijftlasebanhhqm.supabase.co';
+
+  static String get supabaseAnonKey => _envAnon.trim().isNotEmpty
+      ? _envAnon.trim()
+      : 'sb_publishable_pztyR-WMEHV-T7k2MUgrlg_0KkpC75H';
 
   static Future<void> initialize() async {
     if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
