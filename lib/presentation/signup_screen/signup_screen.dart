@@ -446,7 +446,7 @@ class _SignupScreenState extends State<SignupScreen>
       if (!mounted) return;
       setState(() {
         _isGoogleLoading = false;
-        _errorMessage = 'Google Sign-In failed. Please try again.';
+        _errorMessage = 'Google Sign-In failed: $e';
       });
     }
   }
