@@ -1387,17 +1387,21 @@ class _HomeMaintenanceCustomerScreenState
     final providers = _filteredProviders;
     final activeColor = _activeColor;
     final subs = _subcategories;
-    final activeSub = subs.isNotEmpty
-        ? subs.firstWhere(
-            (s) => s['id'] == _activeSubcategory,
-            orElse: () => subs.first,
-          )
-        : {
-            'id': '',
-            'label': 'Services',
-            'icon': Icons.home_repair_service_rounded,
-            'color': const Color(0xFF0277BD),
-          };
+    Map<String, dynamic> activeSub = {
+      'id': '',
+      'label': 'Services',
+      'icon': Icons.home_repair_service_rounded,
+      'color': const Color(0xFF0277BD),
+    };
+    for (final s in subs) {
+      if (s['id'] == _activeSubcategory) {
+        activeSub = s;
+        break;
+      }
+    }
+    if (activeSub['id'] == '' && subs.isNotEmpty) {
+      activeSub = subs.first;
+    }
     return DefaultTabController(
       length: subs.length,
       child: Scaffold(
