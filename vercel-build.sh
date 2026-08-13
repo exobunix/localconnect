@@ -30,8 +30,8 @@ flutter doctor
 echo "=== Generating env.json dynamically for compilation ==="
 cat <<EOF > env.json
 {
-  "SUPABASE_URL": "${SUPABASE_URL:-http://localhost:3000}",
-  "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY:-mock-anon-key-localconnect-mongodb}",
+  "SUPABASE_URL": "${SUPABASE_URL:-${NEXT_PUBLIC_SUPABASE_URL:-https://ckyopijftlasebanhhqm.supabase.co}}",
+  "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY:-${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-sb_publishable_pztyR-WMEHV-T7k2MUgrlg_0KkpC75H}}",
   "OPENAI_API_KEY": "${OPENAI_API_KEY:-your-openai-api-key-here}",
   "GEMINI_API_KEY": "${GEMINI_API_KEY:-your-gemini-api-key-here}",
   "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY:-your-anthropic-api-key-here}",
