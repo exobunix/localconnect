@@ -69,44 +69,15 @@ class _HomeNearbyProvidersWidgetState extends State<HomeNearbyProvidersWidget> {
     }
 
     setState(() => _isLoading = true);
-
-    // Try GPS-based smart search first
-    final customerLocation = await LocationService.instance
-        .getCustomerLocation();
-
-    if (customerLocation != null && customerLocation.latitude != 0) {
-      // Use smart GPS-based search with radius expansion
-      final result = await LocationService.instance.getNearbyProvidersSmart(
-        lat: customerLocation.latitude,
-        lng: customerLocation.longitude,
-        limit: 6,
-        minProviders: 2,
-      );
-
-      if (mounted) {
-        setState(() {
-          _providers = result.providers;
-          _expansionMessage = result.expansionMessage;
-          _isLoading = false;
-          _cacheAge = null;
-        });
-        await ConnectivityService.instance.cacheData(
-          _cacheKey,
-          result.providers,
-        );
-      }
-    } else {
-      // Fallback: city-based search
-      final data = await SupabaseService.instance.getNearbyProviders(limit: 6);
-      if (mounted) {
-        setState(() {
-          _providers = data;
-          _isLoading = false;
-          _cacheAge = null;
-          _expansionMessage = null;
-        });
-        await ConnectivityService.instance.cacheData(_cacheKey, data);
-      }
+    final data = await SupabaseService.instance.getNearbyProviders(limit: 12);
+    if (mounted) {
+      setState(() {
+        _providers = data;
+        _isLoading = false;
+        _cacheAge = null;
+        _expansionMessage = null;
+      });
+      await ConnectivityService.instance.cacheData(_cacheKey, data);
     }
   }
 

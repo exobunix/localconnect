@@ -480,7 +480,9 @@ class _HomeMaintenanceCustomerScreenState
           }
         });
 
-        oldController.dispose();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          oldController.dispose();
+        });
 
         debugPrint(
           '[HomeMaintenanceScreen] Loaded ${subs.length} subcategories from Supabase',

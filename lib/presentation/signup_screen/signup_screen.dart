@@ -389,6 +389,18 @@ class _SignupScreenState extends State<SignupScreen>
     });
 
     try {
+      if (kIsWeb) {
+        final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
+        await SupabaseService.instance.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: Uri.base.toString(),
+          queryParams: {
+            'role': roleStr,
+          },
+        );
+        return;
+      }
+
       const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
       final googleSignIn = GoogleSignIn(
         clientId: kIsWeb ? (webClientId.isEmpty ? '78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com' : webClientId) : null,
@@ -1161,6 +1173,8 @@ class _SignupScreenState extends State<SignupScreen>
         ],
       ),
     );
+  }
+
   Widget _buildDivider() {
     return Row(
       children: [

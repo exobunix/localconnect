@@ -488,41 +488,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'शोध त्रिज्या / Search Radius:',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        '${LocationService.instance.searchRadius.toInt()} km',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Slider(
-                    value: LocationService.instance.searchRadius.clamp(5.0, 2000.0),
-                    min: 5.0,
-                    max: 2000.0,
-                    divisions: 199,
-                    activeColor: AppTheme.primary,
-                    inactiveColor: AppTheme.outline,
-                    onChanged: (double val) {
-                      setSheetState(() {
-                        LocationService.instance.saveSearchRadius(val);
-                      });
-                      setState(() {});
-                    },
-                  ),
-                  const SizedBox(height: 20),
                   Text(
                     'Preset Cities:',
                     style: GoogleFonts.plusJakartaSans(
