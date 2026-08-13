@@ -449,16 +449,12 @@ class _HomeMaintenanceCustomerScreenState
       final idx = subs.indexWhere((s) => s['id'] == sub);
       if (idx >= 0) {
         setState(() => _activeSubcategory = sub);
-        if (idx < _tabController.length) {
-          _tabController.animateTo(idx);
-        }
       }
     }
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -1626,6 +1622,7 @@ class _HomeMaintenanceCustomerScreenState
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -1876,7 +1873,7 @@ class _ProviderCard extends StatelessWidget {
           ],
         ),
       ),
-    ));
+    );
   }
 
   static Widget _badge(String label, Color color, IconData icon) {
