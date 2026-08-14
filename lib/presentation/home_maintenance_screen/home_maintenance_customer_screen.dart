@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_export.dart';
 import '../../services/category_service.dart';
+import '../../services/supabase_service.dart';
 
 class HomeMaintenanceCustomerScreen extends StatefulWidget {
   const HomeMaintenanceCustomerScreen({super.key});
@@ -1348,21 +1349,91 @@ class _HomeMaintenanceCustomerScreenState
                         borderRadius: BorderRadius.circular(12.0),
                       ),
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Booking request sent to ${provider['name']}!',
-                            style: GoogleFonts.plusJakartaSans(),
-                          ),
-                          backgroundColor: _activeColor,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10.0),
-                          ),
+                    onPressed: () async {
+                      final dateStr = selectedDate != null
+                          ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
+                          : 'Now';
+                      final timeStr = selectedTime != null
+                          ? '${selectedTime!.hour}:${selectedTime!.minute.toString().padLeft(2, "0")}'
+                          : 'On Demand';
+
+                      // Show loading indicator
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => const Center(
+                          child: CircularProgressIndicator(),
                         ),
                       );
+
+                      try {
+                        final result = await SupabaseService.instance.createOrder(
+                          providerName: provider['name'] as String? ?? 'Provider',
+                          service: provider['speciality'] as String? ?? 'Home Maintenance',
+                          category: 'home_maintenance',
+                          scheduledDate: dateStr,
+                          scheduledTime: timeStr,
+                          amount: provider['charge'] != null ? '₹${provider['charge']}' : '₹300',
+                          providerId: provider['id'] as String?,
+                          paymentMethod: 'cash',
+                        );
+
+                        if (context.mounted) {
+                          Navigator.pop(context); // Pop loading dialog
+                          Navigator.pop(context); // Pop booking sheet
+                        }
+
+                        if (result != null) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Booking request sent to ${provider['name']}!',
+                                  style: GoogleFonts.plusJakartaSans(),
+                                ),
+                                backgroundColor: _activeColor,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10.0),
+                                ),
+                              ),
+                            );
+                          }
+                        } else {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Failed to create order. Please try again.',
+                                  style: GoogleFonts.plusJakartaSans(),
+                                ),
+                                backgroundColor: AppTheme.error,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10.0),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          Navigator.pop(context); // Pop loading dialog
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'An error occurred. Please try again.',
+                                style: GoogleFonts.plusJakartaSans(),
+                              ),
+                              backgroundColor: AppTheme.error,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10.0),
+                              ),
+                            ),
+                          );
+                        }
+                      }
                     },
                     child: Text(
                       'Confirm Booking',

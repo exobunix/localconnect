@@ -92,14 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       await ConnectivityService.instance.cacheData(_cacheKeyProfile, profile);
       
-      // Auto prompt if city is empty or coordinates are missing (suggesting incomplete setup)
-      if (_selectedCity.isEmpty || profile['latitude'] == null || profile['latitude'] == 0) {
-        Future.delayed(const Duration(milliseconds: 600), () {
-          if (mounted) {
-            _showCitySelector();
-          }
-        });
-      }
+      // Auto prompt removed as per user request to avoid popup every time.
     }
   }
 
@@ -163,22 +156,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       extendBody: true,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () =>
-            Navigator.pushNamed(context, AppRoutes.mapDiscoveryScreen),
-        backgroundColor: AppTheme.primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        icon: const Icon(Icons.map_rounded, size: 20),
-        label: Text(
-          'Map View',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -379,265 +356,379 @@ class _HomeScreenState extends State<HomeScreen> {
   };
 
   void _showCitySelector() {
-    final cities = _cityCoords.keys.toList();
-    final customCityCtrl = TextEditingController();
-    final customPincodeCtrl = TextEditingController();
+    List<Map<String, dynamic>> savedAddresses = [];
+    bool loadingAddresses = true;
+    bool showAddAddressForm = false;
     bool gpsLoading = false;
+    bool hasFetched = false;
+
+    final labelCtrl = TextEditingController();
+    final line1Ctrl = TextEditingController();
+    final cityCtrl = TextEditingController();
+    final districtCtrl = TextEditingController();
+    final pincodeCtrl = TextEditingController();
+    final stateCtrl = TextEditingController(text: 'Maharashtra');
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (bctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        builder: (ctx, setSheetState) {
+          if (!hasFetched) {
+            hasFetched = true;
+            SupabaseService.instance.getSavedAddresses().then((list) {
+              setSheetState(() {
+                savedAddresses = list;
+                loadingAddresses = false;
+              });
+            });
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
             ),
-            padding: const EdgeInsets.all(24),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        color: AppTheme.outline,
-                        borderRadius: BorderRadius.circular(2),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: AppTheme.outline,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                  ),
-                  Text(
-                    'शहर निवडा / Select City',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                    Row(
+                      children: [
+                        if (showAddAddressForm)
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_rounded),
+                            onPressed: () {
+                              setSheetState(() => showAddAddressForm = false);
+                            },
+                          ),
+                        Text(
+                          showAddAddressForm ? 'Add New Address' : 'Select Location',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  // GPS Button
-                  GestureDetector(
-                    onTap: gpsLoading
-                        ? null
-                        : () async {
-                            setSheetState(() => gpsLoading = true);
-                            final loc = await LocationService.instance.getGpsLocation();
-                            if (loc != null) {
-                              await LocationService.instance.saveCustomerLocation(loc);
-                              setState(() => _selectedCity = loc.city.isNotEmpty ? loc.city : loc.district);
-                              if (mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Location updated to ${loc.city}!'),
-                                    backgroundColor: AppTheme.success,
-                                  ),
-                                );
-                              }
-                            } else {
-                              setSheetState(() => gpsLoading = false);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Failed to detect GPS location.'),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.07),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                    const SizedBox(height: 16),
+                    if (showAddAddressForm) ...[
+                      // Address Form
+                      TextField(
+                        controller: labelCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Label (e.g. Home, Work, Other)',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: line1Ctrl,
+                        decoration: InputDecoration(
+                          labelText: 'Address Line 1',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: cityCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'City / Village',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
-                          gpsLoading
-                              ? SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppTheme.primary,
-                                  ),
-                                )
-                              : Icon(Icons.gps_fixed, size: 16, color: AppTheme.primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            gpsLoading ? 'Detecting Location…' : 'Use Current GPS Location',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.primary,
+                          Expanded(
+                            child: TextField(
+                              controller: districtCtrl,
+                              decoration: InputDecoration(
+                                labelText: 'District',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: pincodeCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'Pincode',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Preset Cities:',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: cities
-                        .map(
-                          (c) => GestureDetector(
-                            onTap: () async {
-                              final coords = _cityCoords[c] ?? [18.5204, 73.8567];
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final label = labelCtrl.text.trim();
+                            final line1 = line1Ctrl.text.trim();
+                            final city = cityCtrl.text.trim();
+                            final dist = districtCtrl.text.trim();
+                            final pin = pincodeCtrl.text.trim();
+                            
+                            if (label.isEmpty || line1.isEmpty || city.isEmpty || pin.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please fill all required fields')),
+                              );
+                              return;
+                            }
+
+                            // Show loading
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => const Center(child: CircularProgressIndicator()),
+                            );
+
+                            try {
+                              await SupabaseService.instance.addAddress(
+                                label: label,
+                                addressLine1: line1,
+                                city: city,
+                                pincode: pin,
+                                district: dist,
+                                fullAddress: '$line1, $city, ${stateCtrl.text}, $pin',
+                              );
+
                               final loc = LocationData(
-                                latitude: coords[0],
-                                longitude: coords[1],
-                                fullAddress: '$c, Maharashtra',
+                                latitude: 18.5204,
+                                longitude: 73.8567,
+                                fullAddress: '$line1, $city, ${stateCtrl.text}, $pin',
                                 village: '',
-                                city: c,
+                                city: city,
                                 taluka: '',
-                                district: c,
-                                state: 'Maharashtra',
-                                pincode: '',
+                                district: dist,
+                                state: stateCtrl.text,
+                                pincode: pin,
                                 method: 'manual',
                               );
+
                               await LocationService.instance.saveCustomerLocation(loc);
-                              setState(() => _selectedCity = c);
-                              if (mounted) Navigator.pop(context);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _selectedCity.toLowerCase() == c.toLowerCase()
-                                    ? AppTheme.primaryContainer
-                                    : AppTheme.surfaceVariant,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: _selectedCity.toLowerCase() == c.toLowerCase()
-                                      ? AppTheme.primary
-                                      : Colors.transparent,
-                                ),
-                              ),
-                              child: Text(
-                                c,
-                                style: TextStyle(
-                                  color: _selectedCity.toLowerCase() == c.toLowerCase()
-                                      ? AppTheme.primary
-                                      : const Color(0xFF44474E),
-                                  fontWeight: FontWeight.w500,
+                              setState(() => _selectedCity = city);
+
+                              if (context.mounted) {
+                                Navigator.pop(context); // Pop loading dialog
+                                Navigator.pop(context); // Pop sheet
+                              }
+                            } catch (e) {
+                              if (context.mounted) Navigator.pop(context); // Pop loading dialog
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Failed to save address. Please try again.')),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: Text(
+                            'Save Address & Select',
+                            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      // GPS Button
+                      GestureDetector(
+                        onTap: gpsLoading
+                            ? null
+                            : () async {
+                                setSheetState(() => gpsLoading = true);
+                                final loc = await LocationService.instance.getGpsLocation();
+                                if (loc != null) {
+                                  await LocationService.instance.saveCustomerLocation(loc);
+                                  setState(() => _selectedCity = loc.city.isNotEmpty ? loc.city : loc.district);
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Location updated to ${loc.city}!'),
+                                        backgroundColor: AppTheme.success,
+                                      ),
+                                    );
+                                  }
+                                } else {
+                                  setSheetState(() => gpsLoading = false);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Failed to detect GPS location.'),
+                                        backgroundColor: Colors.redAccent,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              gpsLoading
+                                  ? SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppTheme.primary,
+                                      ),
+                                    )
+                                  : Icon(Icons.gps_fixed, size: 16, color: AppTheme.primary),
+                              const SizedBox(width: 8),
+                              Text(
+                                gpsLoading ? 'Detecting Location…' : 'Use Current GPS Location',
+                                style: GoogleFonts.plusJakartaSans(
                                   fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.primary,
                                 ),
                               ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Saved Addresses:',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () {
+                              setSheetState(() => showAddAddressForm = true);
+                            },
+                            icon: const Icon(Icons.add, size: 14),
+                            label: Text(
+                              'Add New',
+                              style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                            style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (loadingAddresses)
+                        const Center(child: CircularProgressIndicator())
+                      else if (savedAddresses.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Center(
+                            child: Text(
+                              'No saved addresses found.\nAdd one using the "Add New" button above.',
+                              style: GoogleFonts.plusJakartaSans(color: Colors.grey, fontSize: 13),
+                              textAlign: Center,
                             ),
                           ),
                         )
-                        .toList(),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Enter Other City by Pincode:',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: customCityCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'City Name (e.g. Roha)',
-                            hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: savedAddresses.length,
+                          separatorBuilder: (_, __) => const Divider(height: 12),
+                          itemBuilder: (context, index) {
+                            final addr = savedAddresses[index];
+                            final city = addr['city'] as String? ?? '';
+                            final label = addr['label'] as String? ?? 'Address';
+                            final line1 = addr['address_line1'] as String? ?? '';
+                            
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceVariant,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  label.toLowerCase() == 'home'
+                                      ? Icons.home_outlined
+                                      : label.toLowerCase() == 'work'
+                                          ? Icons.work_outline
+                                          : Icons.location_on_outlined,
+                                  color: AppTheme.primary,
+                                  size: 18,
+                                ),
+                              ),
+                              title: Text(
+                                label,
+                                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 14),
+                              ),
+                              subtitle: Text(
+                                line1.isNotEmpty ? '$line1, $city' : city,
+                                style: GoogleFonts.plusJakartaSans(fontSize: 12, color: Colors.grey[600]),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () async {
+                                final lat = (addr['latitude'] as num?)?.toDouble() ?? 18.5204;
+                                final lng = (addr['longitude'] as num?)?.toDouble() ?? 73.8567;
+                                final loc = LocationData(
+                                  latitude: lat,
+                                  longitude: lng,
+                                  fullAddress: addr['full_address'] as String? ?? '',
+                                  village: addr['village'] as String? ?? '',
+                                  city: city,
+                                  taluka: addr['taluka'] as String? ?? '',
+                                  district: addr['district'] as String? ?? '',
+                                  state: addr['state'] as String? ?? 'Maharashtra',
+                                  pincode: addr['pincode'] as String? ?? '',
+                                  method: addr['location_method'] as String? ?? 'manual',
+                                );
+
+                                await LocationService.instance.saveCustomerLocation(loc);
+                                setState(() => _selectedCity = city);
+                                if (mounted) Navigator.pop(context);
+                              },
+                            );
+                          },
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: customPincodeCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: 'Pincode (e.g. 402109)',
-                            hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          style: GoogleFonts.plusJakartaSans(fontSize: 13),
-                        ),
-                      ),
+                      const SizedBox(height: 16),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final cName = customCityCtrl.text.trim();
-                        final pinVal = customPincodeCtrl.text.trim();
-                        if (cName.isEmpty || pinVal.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please fill both City and Pincode')),
-                          );
-                          return;
-                        }
-                        final loc = LocationData(
-                          latitude: 18.5204, // Default general coords for custom city
-                          longitude: 73.8567,
-                          fullAddress: '$cName, Maharashtra, $pinVal',
-                          village: '',
-                          city: cName,
-                          taluka: '',
-                          district: cName,
-                          state: 'Maharashtra',
-                          pincode: pinVal,
-                          method: 'manual',
-                        );
-                        await LocationService.instance.saveCustomerLocation(loc);
-                        setState(() => _selectedCity = cName);
-                        if (mounted) Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(
-                        'Apply & Save City',
-                        style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

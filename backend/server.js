@@ -331,7 +331,12 @@ app.post('/rest/v1/:table', async (req, res) => {
     
     broadcast(table, 'INSERT', result);
     
-    res.status(201).json(Array.isArray(result) ? result : [result]);
+    const accept = req.headers['accept'] || '';
+    if (accept.includes('vnd.pgrst.object') && !Array.isArray(result)) {
+      res.status(201).json(result);
+    } else {
+      res.status(201).json(Array.isArray(result) ? result : [result]);
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -356,7 +361,12 @@ app.patch('/rest/v1/:table', async (req, res) => {
       broadcast(table, 'UPDATE', doc);
     });
     
-    res.status(200).json(updatedDocs);
+    const accept = req.headers['accept'] || '';
+    if (accept.includes('vnd.pgrst.object')) {
+      res.status(200).json(updatedDocs[0] || null);
+    } else {
+      res.status(200).json(updatedDocs);
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

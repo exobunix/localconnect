@@ -47,7 +47,16 @@ class HomeAppBarWidget extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          // City Selector (Pin + Arrow only, no text)
+          // Map View Icon Button (left of city name)
+          IconButton(
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.mapDiscoveryScreen),
+            icon: const Icon(Icons.map_rounded, color: Colors.white, size: 20),
+            tooltip: 'Map View',
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(4),
+          ),
+          const SizedBox(width: 8),
+          // City Selector
           GestureDetector(
             onTap: onCityTap,
             child: Container(
@@ -60,15 +69,26 @@ class HomeAppBarWidget extends StatelessWidget {
                   width: 1,
                 ),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.location_on_rounded,
                     color: Colors.white,
                     size: 14,
                   ),
-                  SizedBox(width: 2),
-                  Icon(
+                  if (selectedCity.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      selectedCity,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 2),
+                  const Icon(
                     Icons.expand_more_rounded,
                     color: Colors.white,
                     size: 14,

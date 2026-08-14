@@ -328,7 +328,7 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
 
           // ── Sort & Radius Controls ────────────────────────────────────
           Positioned(
-            bottom: _selectedProvider != null ? 280 : 24,
+            bottom: _selectedProvider != null ? 330 : 24,
             right: 16,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -342,7 +342,7 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
 
           // ── Provider Count Badge ──────────────────────────────────────
           Positioned(
-            bottom: _selectedProvider != null ? 280 : 24,
+            bottom: _selectedProvider != null ? 330 : 24,
             left: 16,
             child: _buildCountBadge(),
           ),
@@ -350,9 +350,9 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
           // ── Provider Bottom Sheet ─────────────────────────────────────
           if (_selectedProvider != null)
             Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
+              bottom: 24,
+              left: 16,
+              right: 16,
               child: _buildProviderSheet(),
             ),
 
@@ -911,14 +911,14 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
         );
       },
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: const [
             BoxShadow(
-              color: Color(0x22000000),
-              blurRadius: 24,
-              offset: Offset(0, -4),
+              color: Color(0x18000000),
+              blurRadius: 16,
+              offset: Offset(0, 4),
             ),
           ],
         ),
