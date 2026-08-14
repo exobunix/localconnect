@@ -483,7 +483,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       return;
     }
 
-    final correctOtp = orderData['completion_otp']?.toString() ?? '';
+    final correctOtp = orderData['completion_otp'] != null && orderData['completion_otp'].toString().isNotEmpty
+        ? orderData['completion_otp'].toString()
+        : (RegExp(r'Completion OTP:\s*(\d{4})').firstMatch(orderData['notes'] as String? ?? '')?.group(1) ?? '');
     if (correctOtp.isEmpty) {
       final confirm = await _showConfirmDialog(
         'Complete Order',

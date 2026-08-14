@@ -1142,7 +1142,9 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
             _detailRow(
               Icons.pin_rounded,
               'Completion OTP',
-              '${order['completion_otp'] ?? 'N/A'}',
+              order['completion_otp'] != null && order['completion_otp'].toString().isNotEmpty
+                  ? order['completion_otp'].toString()
+                  : (RegExp(r'Completion OTP:\s*(\d{4})').firstMatch(order['notes'] as String? ?? '')?.group(1) ?? 'N/A'),
             ),
           if ((order['notes'] as String? ?? '').isNotEmpty)
             _detailRow(

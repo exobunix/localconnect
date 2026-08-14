@@ -554,6 +554,7 @@ class SupabaseService {
     String? promoCode,
     double? discountAmount,
     String? paymentMethod,
+    String? notes,
   }) async {
     try {
       final userId = currentUser?.id;
@@ -578,6 +579,9 @@ class SupabaseService {
       } catch (_) {}
 
       final otp = (1000 + Random().nextInt(9000)).toString();
+      final finalNotes = notes != null && notes.isNotEmpty
+          ? '$notes (Completion OTP: $otp)'
+          : 'Completion OTP: $otp';
 
       final insertData = <String, dynamic>{
         'order_number': orderNumber,
@@ -591,7 +595,7 @@ class SupabaseService {
         'amount': numericAmount,
         'customer_name': customerName,
         'status': 'pending',
-        'completion_otp': otp,
+        'notes': finalNotes,
         // Store payment method and initial payment_status
         if (paymentMethod != null) 'payment_method': paymentMethod,
         'payment_status': paymentMethod == 'razorpay' ? 'pending' : 'paid',
@@ -626,6 +630,7 @@ class SupabaseService {
 
       return response;
     } catch (e) {
+      print('createOrder error: $e');
       return null;
     }
   }

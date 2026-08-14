@@ -2078,7 +2078,63 @@ class _InquirySheetState extends State<_InquirySheet> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () => setState(() => _submitted = true),
+                      onPressed: () async {
+                        final name = _nameCtrl.text.trim();
+                        final phone = _phoneCtrl.text.trim();
+                        if (name.isEmpty || phone.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please fill in your name and phone number')),
+                          );
+                          return;
+                        }
+
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (ctx) => const Center(child: CircularProgressIndicator()),
+                        );
+
+                        try {
+                          final dateStr = _eventDate != null
+                              ? '${_eventDate!.day}/${_eventDate!.month}/${_eventDate!.year}'
+                              : DateTime.now().toString().split(' ').first;
+                          
+                          final startingPrice = widget.provider['starting_price']?.toString() ?? '15000';
+
+                          final res = await SupabaseService.instance.createOrder(
+                            providerName: widget.provider['name'] as String? ?? 'Event Partner',
+                            providerId: widget.provider['id'] as String?,
+                            service: widget.provider['speciality'] as String? ?? 'Event Management',
+                            category: 'event_management',
+                            scheduledDate: dateStr,
+                            scheduledTime: 'On Demand',
+                            amount: startingPrice.startsWith('₹') ? startingPrice : '₹$startingPrice',
+                            paymentMethod: 'cash',
+                            notes: _msgCtrl.text.trim().isNotEmpty 
+                                ? 'Contact info: $name ($phone), Method: $_contactMethod | ${_msgCtrl.text.trim()}'
+                                : 'Contact info: $name ($phone), Method: $_contactMethod',
+                          );
+
+                          if (context.mounted) Navigator.pop(context); // Pop loading dialog
+
+                          if (res != null) {
+                            setState(() => _submitted = true);
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Failed to send inquiry. Please try again.')),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (context.mounted) Navigator.pop(context);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e')),
+                            );
+                          }
+                        }
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: widget.color,
                         foregroundColor: Colors.white,

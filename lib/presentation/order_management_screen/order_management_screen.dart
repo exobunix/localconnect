@@ -596,7 +596,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                           _DetailRow(
                             icon: Icons.pin_rounded,
                             label: 'Completion OTP',
-                            value: '${order['completion_otp'] ?? 'N/A'}',
+                            value: order['completion_otp'] != null && order['completion_otp'].toString().isNotEmpty
+                                ? order['completion_otp'].toString()
+                                : (RegExp(r'Completion OTP:\s*(\d{4})').firstMatch(order['notes'] as String? ?? '')?.group(1) ?? 'N/A'),
                           ),
                         if ((order['notes'] as String? ?? '').isNotEmpty)
                           _DetailRow(
