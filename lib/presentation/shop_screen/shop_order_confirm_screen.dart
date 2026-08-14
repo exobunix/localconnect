@@ -119,7 +119,7 @@ class _ShopOrderConfirmScreenState extends State<ShopOrderConfirmScreen> {
         service: _subcategoryName.isNotEmpty ? _subcategoryName : 'Shop Order',
         category: 'shop',
         scheduledDate: DateTime.now().toString().split(' ').first,
-        scheduledTime: _deliverySlot.isNotEmpty ? _deliverySlot : 'Now',
+        scheduledTime: (_deliverySlot != null && _deliverySlot!.isNotEmpty) ? _deliverySlot! : 'Now',
         amount: '₹$_grandTotal',
         paymentMethod: _paymentMethod,
       );
