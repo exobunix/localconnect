@@ -122,7 +122,7 @@ class _ProviderEarningsDashboardScreenState
       }
 
       for (final order in completed) {
-        final amountStr = order['amount'] as String? ?? '0';
+        final amountStr = order['amount']?.toString() ?? '0';
         final gross =
             double.tryParse(amountStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
         final net = gross * (1 - _kCommissionRate);
@@ -1901,7 +1901,7 @@ class _EarningsListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final amountStr = order['amount'] as String? ?? '₹0';
+    final amountStr = order['amount']?.toString() ?? '₹0';
     final gross =
         double.tryParse(amountStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
     final net = gross * (1 - _kCommissionRate);

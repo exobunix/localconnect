@@ -133,7 +133,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
     for (final order in orders) {
       final status = order['status'] as String? ?? '';
-      final amountStr = order['amount'] as String? ?? '0';
+      final amountStr = order['amount']?.toString() ?? '0';
       final amount =
           double.tryParse(amountStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
       final createdAt = order['created_at'] != null
@@ -414,12 +414,86 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     }
   }
 
-  Future<void> _completeOrder(String orderId) async {
-    final confirm = await _showConfirmDialog(
-      'Complete Order',
-      'Mark this order as completed?',
+  Future<String?> _showOtpDialog(String orderId, String correctOtp) async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Enter Completion OTP',
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Please ask the customer for the 4-digit Completion OTP shown on their active booking page.',
+                style: GoogleFonts.plusJakartaSans(fontSize: 13, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                decoration: InputDecoration(
+                  labelText: 'OTP',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.trim() == correctOtp.trim()) {
+                  Navigator.pop(context, controller.text.trim());
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invalid OTP. Please try again.')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.success,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Verify & Complete'),
+            ),
+          ],
+        );
+      },
     );
-    if (!confirm) return;
+  }
+
+  Future<void> _completeOrder(String orderId) async {
+    setState(() => _processingOrderIds.add(orderId));
+    final orderData = await SupabaseService.instance.getOrderById(orderId);
+    setState(() => _processingOrderIds.remove(orderId));
+
+    if (orderData == null) {
+      _showSnack('Failed to fetch order details. Please try again.');
+      return;
+    }
+
+    final correctOtp = orderData['completion_otp']?.toString() ?? '';
+    if (correctOtp.isEmpty) {
+      final confirm = await _showConfirmDialog(
+        'Complete Order',
+        'Mark this order as completed?',
+      );
+      if (!confirm) return;
+    } else {
+      final enteredOtp = await _showOtpDialog(orderId, correctOtp);
+      if (enteredOtp == null) return;
+    }
 
     setState(() => _processingOrderIds.add(orderId));
     await SupabaseService.instance.updateOrderStatus(

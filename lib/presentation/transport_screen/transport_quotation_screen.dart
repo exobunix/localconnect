@@ -1,6 +1,7 @@
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/app_export.dart';
+import '../../services/supabase_service.dart';
 
 class TransportQuotationScreen extends StatefulWidget {
   const TransportQuotationScreen({super.key});
@@ -80,9 +81,20 @@ class _TransportQuotationScreenState extends State<TransportQuotationScreen> {
 
     await Future.delayed(const Duration(milliseconds: 800));
 
-    if (!mounted) return;
-
     final q = _quotations.firstWhere((q) => q['provider_id'] == providerId);
+
+    await SupabaseService.instance.createOrder(
+      providerId: providerId,
+      providerName: q['provider_name'] ?? 'Transport Provider',
+      service: _args['vehicleLabel'] ?? 'Transport',
+      category: 'transport',
+      scheduledDate: _args['date'] ?? DateTime.now().toString().split(' ').first,
+      scheduledTime: _args['time'] ?? 'Now',
+      amount: q['fare']?.toString() ?? '0',
+      paymentMethod: 'online',
+    );
+
+    if (!mounted) return;
 
     Navigator.pushReplacementNamed(
       context,

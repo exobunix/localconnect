@@ -160,11 +160,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
   List<Map<String, dynamic>> _filteredOrders(String tab) {
     switch (tab) {
       case 'active':
-        return _orders.where((o) => o['status'] == 'active').toList();
+        return _orders.where((o) => o['status'] == 'active' || (o['status'] == 'completed' && o['rating'] == null && o['reviewed'] != true)).toList();
       case 'pending':
         return _orders.where((o) => o['status'] == 'pending').toList();
       case 'completed':
-        return _orders.where((o) => o['status'] == 'completed').toList();
+        return _orders.where((o) => o['status'] == 'completed' && (o['rating'] != null || o['reviewed'] == true)).toList();
       case 'cancelled':
         return _orders.where((o) => o['status'] == 'cancelled').toList();
       default:
@@ -586,8 +586,18 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         _DetailRow(
                           icon: Icons.currency_rupee_rounded,
                           label: 'Amount',
-                          value: order['amount'] as String? ?? '',
+                          value: order['amount'] != null
+                              ? (order['amount'].toString().startsWith('₹')
+                                  ? '${order['amount']}'
+                                  : '₹${order['amount']}')
+                              : '',
                         ),
+                        if (order['status'] == 'active' || order['status'] == 'pending')
+                          _DetailRow(
+                            icon: Icons.pin_rounded,
+                            label: 'Completion OTP',
+                            value: '${order['completion_otp'] ?? 'N/A'}',
+                          ),
                         if ((order['notes'] as String? ?? '').isNotEmpty)
                           _DetailRow(
                             icon: Icons.notes_rounded,
@@ -949,7 +959,11 @@ class _OrderList extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  order['amount'] as String? ?? '',
+                                  order['amount'] != null
+                                      ? (order['amount'].toString().startsWith('₹')
+                                          ? '${order['amount']}'
+                                          : '₹${order['amount']}')
+                                      : '',
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,

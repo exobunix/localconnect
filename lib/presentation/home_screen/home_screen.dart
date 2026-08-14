@@ -76,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _userName = data?['full_name'] as String? ?? '';
           _selectedCity = data?['city'] as String? ?? 'Pune';
+          SupabaseService.instance.selectedCity = _selectedCity;
           _userRole = data?['role'] as String? ?? 'customer';
           _cacheAge = ConnectivityService.instance.formatCacheAge(ts);
         });
@@ -88,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _userName = profile['full_name'] as String? ?? '';
         _selectedCity = profile['city'] as String? ?? 'Pune';
+        SupabaseService.instance.selectedCity = _selectedCity;
         _userRole = profile['role'] as String? ?? 'customer';
       });
       await ConnectivityService.instance.cacheData(_cacheKeyProfile, profile);
@@ -529,7 +531,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               );
 
                               await LocationService.instance.saveCustomerLocation(loc);
-                              setState(() => _selectedCity = city);
+                              setState(() {
+                                _selectedCity = city;
+                                SupabaseService.instance.selectedCity = _selectedCity;
+                              });
 
                               if (context.mounted) {
                                 Navigator.pop(context); // Pop loading dialog
@@ -564,7 +569,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 final loc = await LocationService.instance.getGpsLocation();
                                 if (loc != null) {
                                   await LocationService.instance.saveCustomerLocation(loc);
-                                  setState(() => _selectedCity = loc.city.isNotEmpty ? loc.city : loc.district);
+                                  setState(() {
+                                    _selectedCity = loc.city.isNotEmpty ? loc.city : loc.district;
+                                    SupabaseService.instance.selectedCity = _selectedCity;
+                                  });
                                   if (mounted) {
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -715,7 +723,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
 
                                 await LocationService.instance.saveCustomerLocation(loc);
-                                setState(() => _selectedCity = city);
+                                setState(() {
+                                  _selectedCity = city;
+                                  SupabaseService.instance.selectedCity = _selectedCity;
+                                });
                                 if (mounted) Navigator.pop(context);
                               },
                             );

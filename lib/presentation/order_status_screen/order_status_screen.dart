@@ -1132,8 +1132,18 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
           _detailRow(
             Icons.currency_rupee_rounded,
             'Amount',
-            order['amount'] as String? ?? '',
+            order['amount'] != null
+                ? (order['amount'].toString().startsWith('₹')
+                    ? '${order['amount']}'
+                    : '₹${order['amount']}')
+                : '',
           ),
+          if (order['status'] == 'active' || order['status'] == 'pending')
+            _detailRow(
+              Icons.pin_rounded,
+              'Completion OTP',
+              '${order['completion_otp'] ?? 'N/A'}',
+            ),
           if ((order['notes'] as String? ?? '').isNotEmpty)
             _detailRow(
               Icons.notes_rounded,

@@ -328,7 +328,7 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
 
           // ── Sort & Radius Controls ────────────────────────────────────
           Positioned(
-            bottom: _selectedProvider != null ? 330 : 24,
+            bottom: _selectedProvider != null ? 330 : 64,
             right: 16,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -342,7 +342,7 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
 
           // ── Provider Count Badge ──────────────────────────────────────
           Positioned(
-            bottom: _selectedProvider != null ? 330 : 24,
+            bottom: _selectedProvider != null ? 330 : 64,
             left: 16,
             child: _buildCountBadge(),
           ),

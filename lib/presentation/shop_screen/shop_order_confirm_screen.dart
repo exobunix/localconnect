@@ -112,6 +112,18 @@ class _ShopOrderConfirmScreenState extends State<ShopOrderConfirmScreen> {
           .select()
           .single();
 
+      // Create a matching entry in the unified 'orders' table
+      await SupabaseService.instance.createOrder(
+        providerId: _providerId.isNotEmpty ? _providerId : null,
+        providerName: _providerName.isNotEmpty ? _providerName : 'Shop Partner',
+        service: _subcategoryName.isNotEmpty ? _subcategoryName : 'Shop Order',
+        category: 'shop',
+        scheduledDate: DateTime.now().toString().split(' ').first,
+        scheduledTime: _deliverySlot.isNotEmpty ? _deliverySlot : 'Now',
+        amount: '₹$_grandTotal',
+        paymentMethod: _paymentMethod,
+      );
+
       if (mounted) {
         Navigator.pushReplacementNamed(
           context,

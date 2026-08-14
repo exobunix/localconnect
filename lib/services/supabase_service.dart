@@ -1,9 +1,12 @@
 import 'dart:typed_data';
+import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
   static SupabaseService? _instance;
   static SupabaseService get instance => _instance ??= SupabaseService._();
+
+  String selectedCity = 'Pune';
 
   SupabaseService._();
 
@@ -574,6 +577,8 @@ class SupabaseService {
         customerName = profile?['full_name'] as String? ?? '';
       } catch (_) {}
 
+      final otp = (1000 + Random().nextInt(9000)).toString();
+
       final insertData = <String, dynamic>{
         'order_number': orderNumber,
         'customer_id': userId,
@@ -586,6 +591,7 @@ class SupabaseService {
         'amount': numericAmount,
         'customer_name': customerName,
         'status': 'pending',
+        'completion_otp': otp,
         // Store payment method and initial payment_status
         if (paymentMethod != null) 'payment_method': paymentMethod,
         'payment_status': paymentMethod == 'razorpay' ? 'pending' : 'paid',

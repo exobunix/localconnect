@@ -528,11 +528,21 @@ class PostgrestFilterBuilder implements Future<dynamic> {
     final queryParams = _filters.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
     final uri = Uri.parse('$url/rest/v1/$table${queryParams.isNotEmpty ? "?$queryParams" : ""}');
     
+    final preferList = <String>[];
+    if (method == 'POST' || method == 'PATCH') {
+      preferList.add('return=representation');
+    }
+    if (_maybeSingle) {
+      preferList.add('handling=strict');
+    }
+    if (_isUpsert) {
+      preferList.add('resolution=merge-duplicates');
+    }
+
     final headers = {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
-      if (_maybeSingle) 'Prefer': 'handling=strict',
-      if (_isUpsert) 'Prefer': 'resolution=merge-duplicates',
+      if (preferList.isNotEmpty) 'Prefer': preferList.join(', '),
     };
 
     http.Response response;

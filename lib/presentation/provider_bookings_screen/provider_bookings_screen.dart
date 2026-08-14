@@ -81,7 +81,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
 
       for (final order in orders) {
         final status = (order['status'] as String?) ?? '';
-        final amountStr = (order['amount'] as String?) ?? '0';
+        final amountStr = order['amount']?.toString() ?? '0';
         final amount =
             double.tryParse(amountStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
         final createdAt = order['created_at'] != null
@@ -539,7 +539,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
             ? (order['user_profiles']['full_name'] as String?) ?? 'Customer'
             : 'Customer');
     final service = (order['service_type'] as String?) ?? 'Service';
-    final amountStr = (order['amount'] as String?) ?? '0';
+    final amountStr = order['amount']?.toString() ?? '0';
     final amount =
         double.tryParse(amountStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
     final scheduledAt = order['scheduled_at'] as String?;
@@ -830,7 +830,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
             ? (order['user_profiles']['full_name'] as String?) ?? 'Customer'
             : 'Customer');
     final service = (order['service_type'] as String?) ?? 'Service';
-    final amountStr = (order['amount'] as String?) ?? '0';
+    final amountStr = order['amount']?.toString() ?? '0';
     final amount =
         double.tryParse(amountStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
     final createdAt = order['created_at'] as String?;
