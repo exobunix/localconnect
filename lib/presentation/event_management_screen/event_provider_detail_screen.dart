@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_export.dart';
+import '../../services/supabase_service.dart';
 
 class EventProviderDetailScreen extends StatefulWidget {
   final Map<String, dynamic> provider;
