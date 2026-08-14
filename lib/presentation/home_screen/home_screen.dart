@@ -654,7 +654,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Text(
                               'No saved addresses found.\nAdd one using the "Add New" button above.',
                               style: GoogleFonts.plusJakartaSans(color: Colors.grey, fontSize: 13),
-                              textAlign: Center,
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         )
