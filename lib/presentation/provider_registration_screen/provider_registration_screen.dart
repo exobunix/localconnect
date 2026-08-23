@@ -186,16 +186,68 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   }
 
   Future<void> _goToOtpStep() async {
-    // Phone OTP (Twilio) has been removed.
-    // Skip directly to Document Upload step.
     setState(() {
-      _currentStep = 5; // Document Upload step
-      _phoneVerified = true;
-      _isLoading = false;
+      _isLoading = true;
       _errorMessage = null;
     });
-    _animController.reset();
-    _animController.forward();
+
+    final emailText = _emailController.text.trim();
+    bool existsInDb = false;
+    try {
+      final dbResult = await SupabaseService.instance.client
+          .from('user_profiles')
+          .select('id')
+          .eq('email', emailText)
+          .maybeSingle();
+      existsInDb = dbResult != null;
+    } catch (_) {
+      // Fallback if query fails
+    }
+
+    try {
+      await SupabaseService.instance.signUpWithEmail(
+        email: emailText,
+        password: _passwordController.text.trim(),
+        fullName: _ownerNameController.text.trim(),
+        role: 'provider',
+        phone: _phoneController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentStep = 4;
+        _isLoading = false;
+        _otpSent = true;
+      });
+      _startResendTimer();
+      _animController.reset();
+      _animController.forward();
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      if (existsInDb && (e.message.contains('already registered') || e.message.contains('already exists'))) {
+        setState(() {
+          _currentStep = 4;
+          _isLoading = false;
+          _otpSent = true;
+          _errorMessage = 'Account already exists. Please verify the code sent to your email.';
+        });
+        _startResendTimer();
+        _animController.reset();
+        _animController.forward();
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.message;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to send verification code. Please try again.';
+      });
+    }
   }
 
   String get _formattedPhone {
@@ -226,19 +278,82 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   }
 
   Future<void> _resendOtp() async {
-    // Phone OTP removed — no-op
+    if (!_canResend) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      for (final c in _otpControllers) {
+        c.clear();
+      }
+    });
+
+    try {
+      await SupabaseService.instance.signUpWithEmail(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        fullName: _ownerNameController.text.trim(),
+        role: 'provider',
+        phone: _phoneController.text.trim(),
+      );
+    } catch (_) {}
+
+    setState(() {
+      _isLoading = false;
+    });
+    _startResendTimer();
+    if (mounted) _otpFocusNodes[0].requestFocus();
   }
 
   Future<void> _verifyOtp() async {
-    // Phone OTP removed — skip to Document Upload
+    final otp = _otpControllers.map((c) => c.text).join();
+    if (otp.length < 6) {
+      setState(() => _errorMessage = 'Please enter the complete 6-digit code.');
+      return;
+    }
+
     setState(() {
-      _phoneVerified = true;
-      _currentStep = 5;
-      _isLoading = false;
+      _isLoading = true;
       _errorMessage = null;
     });
-    _animController.reset();
-    _animController.forward();
+
+    try {
+      await SupabaseService.instance.client.auth.verifyOTP(
+        email: _emailController.text.trim(),
+        token: otp,
+        type: OtpType.signup,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _phoneVerified = true;
+        _currentStep = 5;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+      _animController.reset();
+      _animController.forward();
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.message.contains('expired') || e.message.contains('invalid')
+            ? 'Invalid or expired code. Please try again.'
+            : e.message;
+        _isLoading = false;
+        for (final c in _otpControllers) {
+          c.clear();
+        }
+      });
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted) _otpFocusNodes[0].requestFocus();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Verification failed. Please try again.';
+        _isLoading = false;
+      });
+    }
   }
 
   void _onOtpChanged(int index, String value) {
@@ -345,8 +460,11 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
         break;
       case 4:
         // OTP step — handled by _verifyOtp
-        _verifyOtp();
-        return false;
+        if (!_phoneVerified) {
+          setState(() => _errorMessage = 'Please verify the OTP code before continuing.');
+          return false;
+        }
+        break;
       case 5:
         // Document upload — at least identity doc required
         if (_identityDocFile == null &&
@@ -430,16 +548,20 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
       // Ensure documents are synced before submission
       _syncDocumentsForSubmission();
 
-      // Step 1: Sign up with Supabase Auth
-      final authResponse = await SupabaseService.instance.signUpWithEmail(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-        fullName: _ownerNameController.text.trim(),
-        role: 'provider',
-        phone: _phoneController.text.trim(),
-      );
+      String? userId = SupabaseService.instance.currentUser?.id;
 
-      final userId = authResponse.user?.id;
+      if (userId == null) {
+        // Fallback or signup if not already signed up/logged in
+        final authResponse = await SupabaseService.instance.signUpWithEmail(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+          fullName: _ownerNameController.text.trim(),
+          role: 'provider',
+          phone: _phoneController.text.trim(),
+        );
+        userId = authResponse.user?.id;
+      }
+
       if (userId == null) throw Exception('Account creation failed.');
 
       // Step 2: Create provider profile + category approval request
@@ -524,7 +646,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
       'Business Info',
       'Service Category',
       'Location & Contact',
-      'Verify Phone',
+      'Verify Email',
       'Upload Documents',
       'Confirm & Submit',
     ];
@@ -533,7 +655,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
       'Tell us about your business',
       'Request category approval',
       'Where customers can find you',
-      'Confirm your phone number',
+      'Confirm your email address',
       'Identity & business license',
       'Review and complete registration',
     ];
@@ -995,21 +1117,19 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   }
 
   Widget _buildStep4PhoneOtp() {
-    final maskedPhone = _formattedPhone.length > 4
-        ? '${_formattedPhone.substring(0, _formattedPhone.length - 4).replaceAll(RegExp(r'\d'), '*')}${_formattedPhone.substring(_formattedPhone.length - 4)}'
-        : _formattedPhone;
+    final emailText = _emailController.text.trim();
 
     return _buildCard(
-      icon: Icons.verified_user_rounded,
-      title: 'Verify Phone Number',
+      icon: Icons.mark_email_read_rounded,
+      title: 'Verify Email Address',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildInfoBanner(
-            icon: Icons.sms_rounded,
+            icon: Icons.email_rounded,
             color: AppTheme.primary,
             message:
-                'A 6-digit OTP has been sent to $maskedPhone via SMS. Enter it below to verify your number.',
+                'A 6-digit OTP has been sent to $emailText via email. Enter it below to verify your account.',
           ),
           SizedBox(height: 3.h),
           Text(
@@ -1113,7 +1233,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
             child: GestureDetector(
               onTap: () {
                 setState(() {
-                  _currentStep = 3;
+                  _currentStep = 0;
                   _errorMessage = null;
                   _otpSent = false;
                   for (final c in _otpControllers) {
@@ -1125,7 +1245,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
                 _animController.forward();
               },
               child: Text(
-                'Change phone number',
+                'Change email address',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 10.sp,
                   color: const Color(0xFF74777F),
@@ -1142,17 +1262,18 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   // ─── Step 5: Document Upload ───────────────────────────────────────────────
 
   Widget _buildStep5DocumentUpload() {
+    final emailText = _emailController.text.trim();
     return Column(
       children: [
-        // Phone verified banner
+        // Email verified banner
         _buildCard(
           icon: Icons.check_circle_rounded,
-          title: 'Phone Verified ✓',
+          title: 'Email Verified ✓',
           child: _buildInfoBanner(
             icon: Icons.verified_rounded,
             color: AppTheme.secondary,
             message:
-                'Your phone number $_formattedPhone has been successfully verified.',
+                'Your email address $emailText has been successfully verified.',
           ),
         ),
         SizedBox(height: 2.h),
@@ -1727,7 +1848,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
             child: ElevatedButton(
               onPressed: _isLoading
                   ? null
-                  : isOtpStep
+                  : (isOtpStep && !_phoneVerified)
                   ? _verifyOtp
                   : _nextStep,
               style: ElevatedButton.styleFrom(

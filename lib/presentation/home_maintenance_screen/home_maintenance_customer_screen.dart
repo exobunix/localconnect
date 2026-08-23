@@ -1401,10 +1401,13 @@ class _HomeMaintenanceCustomerScreenState
                           }
                         } else {
                           if (context.mounted) {
+                            final errorMsg = SupabaseService.instance.lastOrderError != null
+                                ? 'Failed to create order: ${SupabaseService.instance.lastOrderError}'
+                                : 'Failed to create order. Please try again.';
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'Failed to create order. Please try again.',
+                                  errorMsg,
                                   style: GoogleFonts.plusJakartaSans(),
                                 ),
                                 backgroundColor: AppTheme.error,
@@ -1422,7 +1425,7 @@ class _HomeMaintenanceCustomerScreenState
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'An error occurred. Please try again.',
+                                'An error occurred: $e',
                                 style: GoogleFonts.plusJakartaSans(),
                               ),
                               backgroundColor: AppTheme.error,

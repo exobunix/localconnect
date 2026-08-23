@@ -286,7 +286,10 @@ class _ServiceOrderConfirmationScreenState
       if (!mounted) return;
 
       if (result == null) {
-        _showSnack('Failed to create order. Please try again.', isError: true);
+        final errorMsg = SupabaseService.instance.lastOrderError != null
+            ? 'Failed to create order: ${SupabaseService.instance.lastOrderError}'
+            : 'Failed to create order. Please try again.';
+        _showSnack(errorMsg, isError: true);
         setState(() => _isConfirming = false);
         return;
       }
@@ -313,7 +316,7 @@ class _ServiceOrderConfirmationScreenState
       }
     } catch (e) {
       if (mounted) {
-        _showSnack('Something went wrong. Please try again.', isError: true);
+        _showSnack('Something went wrong: $e', isError: true);
         setState(() => _isConfirming = false);
       }
     }

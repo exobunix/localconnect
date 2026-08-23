@@ -2852,6 +2852,24 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                     'Category',
                     order['category'] as String? ?? '-',
                   ),
+                  const SizedBox(height: 8),
+                  _buildOrderDetailRow(
+                    Icons.phone_outlined,
+                    'Phone',
+                    customerPhone.isNotEmpty ? customerPhone : 'Not Provided',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildOrderDetailRow(
+                    Icons.location_on_outlined,
+                    'Address',
+                    order['address'] as String? ?? 'Not Provided',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildOrderDetailRow(
+                    Icons.payment_outlined,
+                    'Payment Method',
+                    order['payment_method'] as String? ?? 'Not Specified',
+                  ),
                   if (hasTimeSlot) ...[
                     const SizedBox(height: 8),
                     _buildOrderDetailRow(
@@ -3001,6 +3019,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         ? DateTime.tryParse(order['created_at'] as String)
         : null;
 
+    final customerMap = order['customer'] as Map<String, dynamic>?;
+    final customerName =
+        customerMap?['full_name'] as String? ??
+        order['customer_name'] as String? ??
+        'Customer';
+    final customerPhone = customerMap?['phone'] as String? ?? '';
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -3092,6 +3117,24 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildOrderDetailRow(
+                  Icons.person_outline,
+                  'Customer',
+                  customerName,
+                ),
+                const SizedBox(height: 8),
+                _buildOrderDetailRow(
+                  Icons.phone_outlined,
+                  'Phone',
+                  customerPhone.isNotEmpty ? customerPhone : 'Not Provided',
+                ),
+                const SizedBox(height: 8),
+                _buildOrderDetailRow(
+                  Icons.location_on_outlined,
+                  'Address',
+                  order['address'] as String? ?? 'Not Provided',
+                ),
+                const SizedBox(height: 8),
                 _buildOrderDetailRow(
                   Icons.miscellaneous_services_outlined,
                   'Service',

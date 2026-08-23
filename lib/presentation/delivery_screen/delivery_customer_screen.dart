@@ -2057,9 +2057,12 @@ class _DeliveryCustomerScreenState extends State<DeliveryCustomerScreen>
                               }
                             } else {
                               if (mounted) {
+                                final errorMsg = SupabaseService.instance.lastOrderError != null
+                                    ? 'Failed to place delivery order: ${SupabaseService.instance.lastOrderError}'
+                                    : 'Failed to place delivery order. Please try again.';
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Failed to place delivery order. Please try again.'),
+                                  SnackBar(
+                                    content: Text(errorMsg),
                                     backgroundColor: AppTheme.error,
                                     behavior: SnackBarBehavior.floating,
                                   ),

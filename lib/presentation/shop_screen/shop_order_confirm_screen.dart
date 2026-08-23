@@ -563,64 +563,89 @@ class _ShopOrderConfirmScreenState extends State<ShopOrderConfirmScreen> {
   Widget _buildPaymentCard() {
     final isCod = _paymentMethod == 'cod';
     return _buildCard(
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isCod ? const Color(0xFFFFF8E1) : AppTheme.infoContainer,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              isCod ? Icons.money_rounded : Icons.payment_rounded,
-              color: isCod ? const Color(0xFFFF8F00) : AppTheme.info,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isCod
-                      ? 'Cash on Delivery'
-                      : _paymentMethodLabel(_paymentMethod),
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1A1C1E),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _paymentMethod = 'cod';
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: isCod ? const Color(0xFFFFF8E1) : const Color(0xFFF5F6FA),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isCod ? const Color(0xFFFF8F00) : const Color(0xFFE0E0E0),
+                        width: isCod ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.money_rounded,
+                          color: isCod ? const Color(0xFFFF8F00) : Colors.grey,
+                          size: 22,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Cash on Delivery',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: isCod ? FontWeight.w700 : FontWeight.w500,
+                            color: isCod ? const Color(0xFFFF8F00) : const Color(0xFF44474E),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                Text(
-                  isCod
-                      ? 'Pay when your order is delivered'
-                      : 'Secure online payment',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: const Color(0xFF74777F),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: isCod
-                  ? const Color(0xFFFFF8E1)
-                  : AppTheme.successContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              isCod ? 'COD' : 'ONLINE',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: isCod ? const Color(0xFFFF8F00) : AppTheme.success,
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _paymentMethod = 'razorpay';
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: !isCod ? AppTheme.infoContainer : const Color(0xFFF5F6FA),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: !isCod ? AppTheme.info : const Color(0xFFE0E0E0),
+                        width: !isCod ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.payment_rounded,
+                          color: !isCod ? AppTheme.info : Colors.grey,
+                          size: 22,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Online Payment',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: !isCod ? FontWeight.w700 : FontWeight.w500,
+                            color: !isCod ? AppTheme.info : const Color(0xFF44474E),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_export.dart';
 import '../../services/notification_service.dart';
+import '../../services/location_service.dart';
 
 class TransportCustomerScreen extends StatefulWidget {
   const TransportCustomerScreen({super.key});
@@ -27,7 +28,7 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
 
   // Filters
   String _sortBy = 'nearest';
-  double _maxDistance = 10.0;
+  double _maxDistance = 51.0;
   bool _showAvailableOnly = true;
 
   // Providers list
@@ -140,23 +141,103 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
     });
   }
 
+  static const Map<String, List<double>> _cityCoordsFallback = {
+    'pune': [18.5204, 73.8567],
+    'mumbai': [19.0760, 72.8777],
+    'nashik': [19.9975, 73.7898],
+    'aurangabad': [19.8762, 75.3433],
+    'nagpur': [21.1458, 79.0882],
+    'kolhapur': [16.7050, 74.2433],
+    'alibag': [18.6414, 72.8722],
+    'roha': [18.4400, 73.1200],
+    'nagothane': [18.5500, 73.1500],
+    'pen': [18.7400, 73.0900],
+    'mangaon': [18.2300, 73.2800],
+    'mahad': [18.0800, 73.4200],
+    'poladpur': [17.9800, 73.5200],
+    'shrivardhan': [18.0400, 73.0200],
+    'murud': [18.3200, 72.9600],
+    'panvel': [18.9894, 73.1175],
+    'khopoli': [18.7900, 73.3400],
+    'karjat': [18.9100, 73.3200],
+    'noida': [28.5355, 77.3910],
+    'delhi': [28.6139, 77.2090],
+    'gurgaon': [28.4595, 77.0266],
+    'ghaziabad': [28.6692, 77.4538],
+  };
+
+  String _getDbSubcategory(String vt) {
+    switch (vt) {
+      case 'rickshaw':
+        return 'Auto Rickshaw';
+      case 'tempo':
+        return 'Tempo';
+      case 'pickup_van':
+        return 'Pickup Van';
+      case 'truck':
+        return 'Truck';
+      case 'car':
+        return 'Car (Taxi)';
+      default:
+        return vt;
+    }
+  }
+
   Future<void> _loadProviders() async {
     setState(() => _isLoading = true);
     try {
       final supabase = Supabase.instance.client;
+      
+      // Get the customer's selected/current location
+      final LocationData? customerLoc = await LocationService.instance.getCustomerLocation();
+      
+      final dbSubcategory = _getDbSubcategory(_vehicleType);
+      
       final data = await supabase
           .from('service_providers')
-          .select(
-            'id, user_id, business_name, address, rating, review_count, image_url, is_open, subcategory, price_range',
-          )
-          .eq('category', 'transport')
-          .eq('subcategory', _vehicleType)
-          .eq('is_approved', true)
-          .order('rating', ascending: false)
-          .limit(30);
+          .select()
+          .ilike('category', 'transport')
+          .or('subcategory.ilike."%$dbSubcategory%",subcategory.ilike."%$_vehicleType%"')
+          .eq('is_active', true);
+          
+      final List<Map<String, dynamic>> processed = [];
+      
+      for (var p in List<Map<String, dynamic>>.from(data)) {
+        double distanceKm = 9999.0;
+        
+        double? pLat = (p['business_latitude'] as num?)?.toDouble() ?? (p['lat'] as num?)?.toDouble();
+        double? pLng = (p['business_longitude'] as num?)?.toDouble() ?? (p['lng'] as num?)?.toDouble();
+        
+        final providerCity = (p['city'] as String? ?? '').trim().toLowerCase();
+        final isDefaultPune = pLat != null && (pLat - 18.5204).abs() < 0.001 && pLng != null && (pLng - 73.8567).abs() < 0.001;
+        
+        if (pLat == null || pLng == null || pLat == 0 || (isDefaultPune && providerCity != 'pune')) {
+          final fallback = _cityCoordsFallback[providerCity];
+          if (fallback != null) {
+            pLat = fallback[0];
+            pLng = fallback[1];
+          }
+        }
+        
+        if (customerLoc != null && customerLoc.latitude != 0 && pLat != null && pLng != null && pLat != 0) {
+          distanceKm = LocationService.instance.calculateDistance(
+            customerLoc.latitude,
+            customerLoc.longitude,
+            pLat,
+            pLng,
+          );
+        }
+        
+        p['distance'] = distanceKm < 9999.0 
+            ? LocationService.instance.formatDistance(distanceKm) 
+            : '';
+        p['distance_value'] = distanceKm;
+        processed.add(p);
+      }
+      
       if (mounted) {
         setState(() {
-          _providers = List<Map<String, dynamic>>.from(data);
+          _providers = processed;
           _isLoading = false;
         });
       }
@@ -251,19 +332,17 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
     if (_showAvailableOnly) {
       list = list.where((p) => p['is_open'] == true).toList();
     }
+    if (_maxDistance < 51.0) {
+      list = list.where((p) {
+        final dist = (p['distance_value'] as num?)?.toDouble() ?? 9999.0;
+        return dist <= _maxDistance;
+      }).toList();
+    }
     switch (_sortBy) {
       case 'nearest':
         list.sort((a, b) {
-          final da =
-              double.tryParse(
-                (a['distance'] as String? ?? '99').replaceAll(' km', ''),
-              ) ??
-              99;
-          final db =
-              double.tryParse(
-                (b['distance'] as String? ?? '99').replaceAll(' km', ''),
-              ) ??
-              99;
+          final da = (a['distance_value'] as num?)?.toDouble() ?? 9999.0;
+          final db = (b['distance_value'] as num?)?.toDouble() ?? 9999.0;
           return da.compareTo(db);
         });
         break;
@@ -1858,7 +1937,7 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
               ),
               const SizedBox(height: 12),
               Text(
-                'Max Distance: ${_maxDistance.toInt()} km',
+                _maxDistance == 51.0 ? 'Max Distance: See All' : 'Max Distance: ${_maxDistance.toInt()} km',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -1867,8 +1946,8 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
               Slider(
                 value: _maxDistance,
                 min: 1,
-                max: 50,
-                divisions: 49,
+                max: 51,
+                divisions: 50,
                 activeColor: _vehicleColor,
                 onChanged: (v) {
                   setSheetState(() => _maxDistance = v);

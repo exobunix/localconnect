@@ -223,22 +223,11 @@ class _SignupScreenState extends State<SignupScreen>
       if (!mounted) return;
 
       setState(() {
+        _step = 2;
         _isLoading = false;
       });
-
-      if (roleStr == 'provider') {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.providerOnboardingScreen,
-          (route) => false,
-        );
-      } else {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.homeScreen,
-          (route) => false,
-        );
-      }
+      _animateToNextStep();
+      _startEmailResendTimer();
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() {

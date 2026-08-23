@@ -363,15 +363,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (result != null) {
         _showSuccessSheet(context, result);
       } else {
+        final errorMsg = SupabaseService.instance.lastOrderError != null
+            ? 'Failed to place order: ${SupabaseService.instance.lastOrderError}'
+            : 'Failed to place order. Please try again.';
         Fluttertoast.showToast(
-          msg: 'Failed to place order. Please try again.',
+          msg: errorMsg,
           backgroundColor: AppTheme.error,
           textColor: Colors.white,
         );
       }
     } catch (e) {
       Fluttertoast.showToast(
-        msg: 'Something went wrong. Please try again.',
+        msg: 'Something went wrong: $e',
         backgroundColor: AppTheme.error,
         textColor: Colors.white,
       );
@@ -467,10 +470,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }
       }
 
+      if (result == null) {
+        final errorMsg = SupabaseService.instance.lastOrderError != null
+            ? 'Failed to create booking: ${SupabaseService.instance.lastOrderError}'
+            : 'Failed to create booking. Please try again.';
+        Fluttertoast.showToast(
+          msg: errorMsg,
+          backgroundColor: AppTheme.error,
+          textColor: Colors.white,
+        );
+      }
+
       return result;
     } catch (e) {
       Fluttertoast.showToast(
-        msg: 'Failed to create booking. Please try again.',
+        msg: 'Failed to create booking: $e',
         backgroundColor: AppTheme.error,
         textColor: Colors.white,
       );

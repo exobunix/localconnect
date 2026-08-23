@@ -628,7 +628,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
                         size: 18,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                  const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -651,6 +651,31 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.phone_outlined, size: 14, color: Color(0xFF6B7280)),
+                    const SizedBox(width: 6),
+                    Text(
+                      order['customer']?['phone'] as String? ?? 'No phone number provided',
+                      style: GoogleFonts.plusJakartaSans(fontSize: 12, color: const Color(0xFF44474E)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF6B7280)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        order['address'] as String? ?? 'No address provided',
+                        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: const Color(0xFF44474E)),
                       ),
                     ),
                   ],
@@ -923,6 +948,31 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
                         const SizedBox(height: 4),
                         _buildStatusBadge(status),
                       ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.phone_outlined, size: 14, color: Color(0xFF6B7280)),
+                    const SizedBox(width: 6),
+                    Text(
+                      order['customer']?['phone'] as String? ?? 'No phone number provided',
+                      style: GoogleFonts.plusJakartaSans(fontSize: 12, color: const Color(0xFF44474E)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF6B7280)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        order['address'] as String? ?? 'No address provided',
+                        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: const Color(0xFF44474E)),
+                      ),
                     ),
                   ],
                 ),

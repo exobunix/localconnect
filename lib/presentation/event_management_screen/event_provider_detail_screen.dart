@@ -2122,8 +2122,11 @@ class _InquirySheetState extends State<_InquirySheet> {
                             setState(() => _submitted = true);
                           } else {
                             if (mounted) {
+                              final errorMsg = SupabaseService.instance.lastOrderError != null
+                                  ? 'Failed to send inquiry: ${SupabaseService.instance.lastOrderError}'
+                                  : 'Failed to send inquiry. Please try again.';
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Failed to send inquiry. Please try again.')),
+                                SnackBar(content: Text(errorMsg)),
                               );
                             }
                           }

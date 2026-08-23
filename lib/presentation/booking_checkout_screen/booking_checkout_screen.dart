@@ -253,7 +253,10 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
       if (!mounted) return;
 
       if (result == null) {
-        _showError('Failed to confirm booking. Please try again.');
+        final errorMsg = SupabaseService.instance.lastOrderError != null
+            ? 'Failed to confirm booking: ${SupabaseService.instance.lastOrderError}'
+            : 'Failed to confirm booking. Please try again.';
+        _showError(errorMsg);
         setState(() => _isConfirming = false);
         return;
       }
@@ -283,7 +286,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showError('Something went wrong. Please try again.');
+        _showError('Something went wrong: $e');
         setState(() => _isConfirming = false);
       }
     }

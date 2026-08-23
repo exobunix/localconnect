@@ -702,24 +702,54 @@ class _AdminProviderManagementScreenState
     );
   }
 
-  void _approveProvider(Map<String, dynamic> provider) {
-    setState(() => provider['status'] = 'approved');
-    _showSnack('${provider['full_name']} approved!', AppTheme.success);
+  Future<void> _approveProvider(Map<String, dynamic> provider) async {
+    try {
+      final providerId = provider['id'] as String;
+      await SupabaseService.instance.approveProvider(providerId);
+      setState(() => provider['status'] = 'approved');
+      _showSnack('${provider['full_name']} approved!', AppTheme.success);
+    } catch (e) {
+      _showSnack('Failed to approve provider.', AppTheme.error);
+    }
   }
 
-  void _rejectProvider(Map<String, dynamic> provider) {
-    setState(() => provider['status'] = 'rejected');
-    _showSnack('${provider['full_name']} rejected.', AppTheme.error);
+  Future<void> _rejectProvider(Map<String, dynamic> provider) async {
+    try {
+      final providerId = provider['id'] as String;
+      await SupabaseService.instance.adminUpdateProviderStatus(
+        providerId: providerId,
+        status: 'rejected',
+      );
+      setState(() => provider['status'] = 'rejected');
+      _showSnack('${provider['full_name']} rejected.', AppTheme.error);
+    } catch (e) {
+      _showSnack('Failed to reject provider.', AppTheme.error);
+    }
   }
 
-  void _suspendProvider(Map<String, dynamic> provider) {
-    setState(() => provider['status'] = 'suspended');
-    _showSnack('${provider['full_name']} suspended.', AppTheme.warning);
+  Future<void> _suspendProvider(Map<String, dynamic> provider) async {
+    try {
+      final providerId = provider['id'] as String;
+      await SupabaseService.instance.adminUpdateProviderStatus(
+        providerId: providerId,
+        status: 'suspended',
+      );
+      setState(() => provider['status'] = 'suspended');
+      _showSnack('${provider['full_name']} suspended.', AppTheme.warning);
+    } catch (e) {
+      _showSnack('Failed to suspend provider.', AppTheme.error);
+    }
   }
 
-  void _reactivateProvider(Map<String, dynamic> provider) {
-    setState(() => provider['status'] = 'approved');
-    _showSnack('${provider['full_name']} reactivated!', AppTheme.success);
+  Future<void> _reactivateProvider(Map<String, dynamic> provider) async {
+    try {
+      final providerId = provider['id'] as String;
+      await SupabaseService.instance.approveProvider(providerId);
+      setState(() => provider['status'] = 'approved');
+      _showSnack('${provider['full_name']} reactivated!', AppTheme.success);
+    } catch (e) {
+      _showSnack('Failed to reactivate provider.', AppTheme.error);
+    }
   }
 
   void _deleteProvider(Map<String, dynamic> provider) {

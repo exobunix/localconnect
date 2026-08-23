@@ -7,6 +7,7 @@ class SupabaseService {
   static SupabaseService get instance => _instance ??= SupabaseService._();
 
   String selectedCity = 'Pune';
+  String? lastOrderError;
 
   SupabaseService._();
 
@@ -557,8 +558,12 @@ class SupabaseService {
     String? notes,
   }) async {
     try {
+      lastOrderError = null;
       final userId = currentUser?.id;
-      if (userId == null) return null;
+      if (userId == null) {
+        lastOrderError = 'User not logged in';
+        return null;
+      }
 
       final orderNumber =
           'ORD-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
@@ -583,10 +588,20 @@ class SupabaseService {
           ? '$notes (Completion OTP: $otp)'
           : 'Completion OTP: $otp';
 
+      // Validate providerId UUID format
+      String? safeProviderId = providerId;
+      if (providerId != null && providerId.isNotEmpty) {
+        final uuidRegExp = RegExp(
+            r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+        if (!uuidRegExp.hasMatch(providerId)) {
+          safeProviderId = null;
+        }
+      }
+
       final insertData = <String, dynamic>{
         'order_number': orderNumber,
         'customer_id': userId,
-        'provider_id': providerId,
+        'provider_id': safeProviderId,
         'provider_name': providerName,
         'service': service,
         'category': category,
@@ -601,20 +616,37 @@ class SupabaseService {
         'payment_status': paymentMethod == 'razorpay' ? 'pending' : 'paid',
       };
 
-      final response = await client
-          .from('orders')
-          .insert(insertData)
-          .select()
-          .single();
+      Map<String, dynamic> response;
+      try {
+        response = await client
+            .from('orders')
+            .insert(insertData)
+            .select()
+            .single();
+      } catch (e) {
+        final errStr = e.toString().toLowerCase();
+        if (errStr.contains('22p02') || errStr.contains('23503') || errStr.contains('foreign key') || errStr.contains('uuid')) {
+          // Retry inserting without provider_id
+          final retryData = Map<String, dynamic>.from(insertData);
+          retryData['provider_id'] = null;
+          response = await client
+              .from('orders')
+              .insert(retryData)
+              .select()
+              .single();
+        } else {
+          rethrow;
+        }
+      }
 
       // Notify provider of new order request
-      if (providerId != null && providerId.isNotEmpty) {
+      if (safeProviderId != null && safeProviderId.isNotEmpty) {
         // Look up the provider's user_id
         try {
           final providerRow = await client
               .from('service_providers')
               .select('user_id')
-              .eq('id', providerId)
+              .eq('id', safeProviderId)
               .maybeSingle();
           final providerUserId = providerRow?['user_id'] as String?;
           if (providerUserId != null && providerUserId.isNotEmpty) {
@@ -631,6 +663,7 @@ class SupabaseService {
       return response;
     } catch (e) {
       print('createOrder error: $e');
+      lastOrderError = e.toString();
       return null;
     }
   }
@@ -1192,7 +1225,7 @@ class SupabaseService {
       final response = await client
           .from('service_providers')
           .select(
-            'id, full_name, business_name, category, city, status, rating, total_orders, phone, email, created_at',
+            'id, full_name, business_name, category, city, status:registration_status, rating, total_orders, phone, email, created_at',
           )
           .order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
@@ -1207,7 +1240,10 @@ class SupabaseService {
   }) async {
     await client
         .from('service_providers')
-        .update({'status': status})
+        .update({
+          'registration_status': status,
+          'is_active': status == 'approved',
+        })
         .eq('id', providerId);
   }
 
