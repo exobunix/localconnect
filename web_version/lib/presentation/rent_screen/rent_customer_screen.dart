@@ -854,9 +854,9 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
   Widget _buildSubcategoryTab(String sub, Color color) {
     final listings = _filteredListings(sub);
     final featured = listings.where((l) => l['isFeatured'] == true).toList();
-    final regular = listings.where((l) => l['isFeatured'] != true).toList();
+    final isDesktop = MediaQuery.of(context).size.width > 800;
 
-    return RefreshIndicator(
+    Widget scrollView = RefreshIndicator(
       color: color,
       onRefresh: () async => setState(() {}),
       child: CustomScrollView(
@@ -881,10 +881,10 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           colors: [
-                            const Color(0xFFF9A825),
-                            const Color(0xFFFF8F00),
+                            Color(0xFFF9A825),
+                            Color(0xFFFF8F00),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(6),
@@ -982,16 +982,39 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => _buildListingCard(listings[i], color),
-                  childCount: listings.length,
-                ),
-              ),
+              sliver: isDesktop
+                  ? SliverGrid(
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => _buildListingCard(listings[i], color),
+                        childCount: listings.length,
+                      ),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1.8,
+                      ),
+                    )
+                  : SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => _buildListingCard(listings[i], color),
+                        childCount: listings.length,
+                      ),
+                    ),
             ),
         ],
       ),
     );
+
+    if (isDesktop) {
+      scrollView = Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: scrollView,
+        ),
+      );
+    }
+    return scrollView;
   }
 
   Widget _buildSortBar(int count, Color color) {

@@ -181,110 +181,46 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
       return matchesSub && matchesSearch;
     }).toList();
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 140,
-            pinned: true,
-            backgroundColor: category.color,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              if (!_isOnline)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.wifi_off_rounded,
-                            color: Colors.white,
-                            size: 13,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Offline',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+    Widget bodyContent = CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          expandedHeight: 140,
+          pinned: true,
+          backgroundColor: category.color,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          actions: [
+            if (!_isOnline)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-                  ),
-                ),
-              IconButton(
-                icon: const Icon(Icons.tune_rounded, color: Colors.white),
-                onPressed: () => _showFilterSheet(context, category),
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      category.color,
-                      category.color.withValues(alpha: 0.7),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 50, 20, 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(
-                            category.icon,
-                            color: Colors.white,
-                            size: 28,
-                          ),
+                        const Icon(
+                          Icons.wifi_off_rounded,
+                          color: Colors.white,
+                          size: 13,
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                category.name,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                category.nameMarathi,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 13,
-                                  color: Colors.white.withValues(alpha: 0.85),
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: 4),
+                        Text(
+                          'Offline',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -292,121 +228,182 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                   ),
                 ),
               ),
+            IconButton(
+              icon: const Icon(Icons.tune_rounded, color: Colors.white),
+              onPressed: () => _showFilterSheet(context, category),
             ),
-          ),
-          // Offline banner
-          SliverToBoxAdapter(child: OfflineBannerWidget(onRetry: _handleRetry)),
-          SliverToBoxAdapter(
-            child: Container(
-              color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    onChanged: (v) => setState(() => _searchQuery = v),
-                    style: GoogleFonts.plusJakartaSans(fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: 'Search in ${category.name}...',
-                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                      filled: true,
-                      fillColor: AppTheme.surfaceVariant,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                  if (_cacheAge != null) ...[
-                    const SizedBox(height: 8),
-                    OfflineChipWidget(cacheAge: _cacheAge),
+          ],
+          flexibleSpace: FlexibleSpaceBar(
+            background: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    category.color,
+                    category.color.withValues(alpha: 0.7),
                   ],
-                ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 50, 20, 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(
+                          category.icon,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              category.name,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Find the best ${category.name.toLowerCase()} services',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-          SliverToBoxAdapter(
-            child: _SubcategoryChips(
-              subcategories: category.subcategories,
-              selectedId: _selectedSubcategoryId,
-              categoryColor: category.color,
-              onSelected: (id) => setState(() {
-                _selectedSubcategoryId = _selectedSubcategoryId == id
-                    ? null
-                    : id;
-              }),
+        ),
+        SliverToBoxAdapter(
+          child: Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  style: GoogleFonts.plusJakartaSans(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Search in ${category.name}...',
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                    filled: true,
+                    fillColor: AppTheme.surfaceVariant,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+                if (_cacheAge != null) ...[
+                  const SizedBox(height: 8),
+                  OfflineChipWidget(cacheAge: _cacheAge),
+                ],
+              ],
             ),
           ),
-          if (_isLoading)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: List.generate(
-                    4,
-                    (i) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: LoadingSkeletonWidget(
-                        width: double.infinity,
-                        height: 100,
-                        borderRadius: 14,
-                      ),
+        ),
+        SliverToBoxAdapter(
+          child: _SubcategoryChips(
+            subcategories: category.subcategories,
+            selectedId: _selectedSubcategoryId,
+            categoryColor: category.color,
+            onSelected: (id) => setState(() {
+              _selectedSubcategoryId = _selectedSubcategoryId == id
+                  ? null
+                  : id;
+            }),
+          ),
+        ),
+        if (_isLoading)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: List.generate(
+                  4,
+                  (i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: LoadingSkeletonWidget(
+                      width: double.infinity,
+                      height: 100,
+                      borderRadius: 14,
                     ),
                   ),
                 ),
               ),
-            )
-          else if (!_isOnline && _providers.isEmpty)
-            SliverToBoxAdapter(
-              child: OfflineFallbackWidget(
-                onRetry: _handleRetry,
-                message:
-                    'No cached providers for ${category.name}. Connect to the internet to load providers.',
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: filteredProviders.isEmpty
-                  ? SliverToBoxAdapter(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(40),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.search_off_rounded,
-                                size: 48,
-                                color: AppTheme.outline,
+            ),
+          )
+        else if (!_isOnline && _providers.isEmpty)
+          SliverToBoxAdapter(
+            child: OfflineFallbackWidget(
+              onRetry: _handleRetry,
+              message:
+                  'No cached providers for ${category.name}. Connect to the internet to load providers.',
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: filteredProviders.isEmpty
+                ? SliverToBoxAdapter(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.search_off_rounded,
+                              size: 48,
+                              color: AppTheme.outline,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No providers found',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Be the first to offer ${category.name} services!',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                color: const Color(0xFF74777F),
                               ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'No providers found',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Be the first to offer ${category.name} services!',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 13,
-                                  color: const Color(0xFF74777F),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
                       ),
-                    )
-                  : SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _ProviderListCard(
+                    ),
+                  )
+                : isDesktop
+                    ? SliverGrid(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => _ProviderListCard(
                             provider: filteredProviders[index],
                             categoryColor: category.color,
                             onTap: () => Navigator.pushNamed(
@@ -414,23 +411,60 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                               AppRoutes.providerProfileScreen,
                               arguments: {
                                 'providerId': filteredProviders[index]['id'],
-                                'providerUserId':
-                                    filteredProviders[index]['user_id'],
-                                'name':
-                                    filteredProviders[index]['business_name'],
-                                'imageUrl':
-                                    filteredProviders[index]['image_url'] ?? '',
+                                'providerUserId': filteredProviders[index]['user_id'],
+                                'name': filteredProviders[index]['business_name'],
+                                'imageUrl': filteredProviders[index]['image_url'] ?? '',
                               },
                             ),
                           ),
+                          childCount: filteredProviders.length,
                         ),
-                        childCount: filteredProviders.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 2.6,
+                        ),
+                      )
+                    : SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _ProviderListCard(
+                              provider: filteredProviders[index],
+                              categoryColor: category.color,
+                              onTap: () => Navigator.pushNamed(
+                                context,
+                                AppRoutes.providerProfileScreen,
+                                arguments: {
+                                  'providerId': filteredProviders[index]['id'],
+                                  'providerUserId': filteredProviders[index]['user_id'],
+                                  'name': filteredProviders[index]['business_name'],
+                                  'imageUrl': filteredProviders[index]['image_url'] ?? '',
+                                },
+                              ),
+                            ),
+                          ),
+                          childCount: filteredProviders.length,
+                        ),
                       ),
-                    ),
-            ),
-          const SliverToBoxAdapter(child: SizedBox(height: 20)),
-        ],
-      ),
+          ),
+        const SliverToBoxAdapter(child: SizedBox(height: 20)),
+      ],
+    );
+
+    if (isDesktop) {
+      bodyContent = Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: bodyContent,
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      body: bodyContent,
     );
   }
 
