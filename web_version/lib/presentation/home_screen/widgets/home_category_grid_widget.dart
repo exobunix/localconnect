@@ -99,7 +99,8 @@ class _HomeCategoryGridWidgetState extends State<HomeCategoryGridWidget>
       return const SizedBox.shrink();
     }
 
-    final crossAxisCount = widget.isTablet ? 6 : 3;
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+    final crossAxisCount = isDesktop ? 6 : (widget.isTablet ? 6 : 3);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
       child: Column(
@@ -110,14 +111,18 @@ class _HomeCategoryGridWidgetState extends State<HomeCategoryGridWidget>
             children: [
               Text(
                 'सेवा / Services',
-                style: Theme.of(context).textTheme.titleLarge,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: isDesktop ? 20 : 16,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF1A1C1E),
+                ),
               ),
               TextButton(
                 onPressed: () => widget.onCategoryTap('all'),
                 child: Text(
                   'सर्व पहा',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
+                    fontSize: isDesktop ? 14 : 13,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.primary,
                   ),
@@ -131,9 +136,9 @@ class _HomeCategoryGridWidgetState extends State<HomeCategoryGridWidget>
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              childAspectRatio: 1.05,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
+              childAspectRatio: isDesktop ? 1.05 : 1.05,
+              crossAxisSpacing: isDesktop ? 16 : 8,
+              mainAxisSpacing: isDesktop ? 16 : 8,
             ),
             itemCount: _activeCategories.length,
             itemBuilder: (context, index) {
@@ -202,6 +207,8 @@ class _CategoryItemState extends State<_CategoryItem>
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+
     return GestureDetector(
       onTapDown: (_) => _pressController.forward(),
       onTapUp: (_) {
@@ -211,40 +218,96 @@ class _CategoryItemState extends State<_CategoryItem>
       onTapCancel: () => _pressController.reverse(),
       child: ScaleTransition(
         scale: _scaleAnim,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: widget.category.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: widget.category.color.withValues(alpha: 0.25),
-                  width: 1.5,
+        child: isDesktop
+            ? Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: widget.category.color.withValues(alpha: 0.15),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.category.color.withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: widget.category.color.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        widget.category.icon,
+                        color: widget.category.color,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      widget.category.name,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1C1B1F),
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Explore services',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        color: const Color(0xFF74777F),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: widget.category.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: widget.category.color.withValues(alpha: 0.25),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      widget.category.icon,
+                      color: widget.category.color,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.category.name,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1A1C1E),
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              child: Icon(
-                widget.category.icon,
-                color: widget.category.color,
-                size: 28,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              widget.category.name,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1A1C1E),
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
       ),
     );
   }

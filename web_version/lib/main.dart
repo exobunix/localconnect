@@ -94,34 +94,10 @@ class _MyAppState extends State<MyApp> {
           navigatorKey: NotificationService.navigatorKey,
           // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
           builder: (context, child) {
-            Widget appChild = MediaQuery(
+            return MediaQuery(
               data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.0)),
               child: child!,
             );
-
-            if (kIsWeb && MediaQuery.of(context).size.width > 850) {
-              return Container(
-                color: const Color(0xFFEEF2FF),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 850),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 24,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: appChild,
-                    ),
-                  ),
-                ),
-              );
-            }
-            return appChild;
           },
           // 🚨 END CRITICAL SECTION
           debugShowCheckedModeBanner: false,

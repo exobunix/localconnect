@@ -94,12 +94,16 @@ class _HomeBannerSliderWidgetState extends State<HomeBannerSliderWidget> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+    final bannerHeight = isDesktop ? 320.0 : 168.0;
+
     return Column(
       children: [
         const SizedBox(height: 16),
         SizedBox(
-          height: 168,
+          height: bannerHeight,
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (i) => setState(() => _currentPage = i),
@@ -149,6 +153,8 @@ class _BannerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Stack(
@@ -176,15 +182,15 @@ class _BannerCard extends StatelessWidget {
           ),
           // Content
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isDesktop ? 32.0 : 16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 12 : 8,
+                    vertical: isDesktop ? 5 : 3,
                   ),
                   decoration: BoxDecoration(
                     color: AppTheme.secondary,
@@ -193,18 +199,18 @@ class _BannerCard extends StatelessWidget {
                   child: Text(
                     banner.badge,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
+                      fontSize: isDesktop ? 12 : 10,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: isDesktop ? 16 : 8),
                 Text(
                   banner.title,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
+                    fontSize: isDesktop ? 28 : 17,
+                    fontWeight: FontWeight.w800,
                     color: Colors.white,
                     height: 1.2,
                   ),
@@ -213,15 +219,15 @@ class _BannerCard extends StatelessWidget {
                 Text(
                   banner.subtitle,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
+                    fontSize: isDesktop ? 16 : 11,
                     color: Colors.white.withValues(alpha: 0.85),
                   ),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: isDesktop ? 20 : 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 5,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 20 : 12,
+                    vertical: isDesktop ? 8 : 5,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -230,7 +236,7 @@ class _BannerCard extends StatelessWidget {
                   child: Text(
                     'Book Now',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
+                      fontSize: isDesktop ? 13 : 11,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.primary,
                     ),

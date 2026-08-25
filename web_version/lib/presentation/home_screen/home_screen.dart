@@ -152,6 +152,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (kIsWeb && width > 800) {
+      return _buildDesktopWebLayout();
+    }
+
     final isTablet = MediaQuery.of(context).size.width >= 600;
     final unreadNotifCount = NotificationHubService.instance.unreadCount;
 
@@ -830,6 +835,422 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopWebLayout() {
+    final unreadNotifCount = NotificationHubService.instance.unreadCount;
+    
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FD),
+      body: Column(
+        children: [
+          // 1. Website Header Navigation Menu
+          Container(
+            height: 72,
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            decoration: BoxDecoration(
+              color: AppTheme.primary,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Left Logo
+                Image.asset(
+                  'assets/images/localconnect_app_icon.png',
+                  height: 44,
+                  width: 44,
+                  fit: BoxFit.cover,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'LocalConnect',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(width: 48),
+                
+                // Middle Menu Links
+                Expanded(
+                  child: Row(
+                    children: [
+                      _buildHeaderLink('Home', isActive: true, onTap: () {}),
+                      _buildHeaderLink('All Categories', onTap: () {
+                        Navigator.pushNamed(context, AppRoutes.allCategoriesScreen);
+                      }),
+                      _buildHeaderLink('My Bookings', onTap: () {
+                        Navigator.pushNamed(context, AppRoutes.orderManagementScreen);
+                      }),
+                      _buildHeaderLink('My Quotations', onTap: () {
+                        Navigator.pushNamed(context, AppRoutes.customerQuotationBookingsScreen);
+                      }),
+                      if (_userRole == 'provider')
+                        _buildHeaderLink('My Dashboard', onTap: () {
+                          Navigator.pushNamed(context, AppRoutes.providerDashboardScreen);
+                        }),
+                      _buildHeaderLink('Nearby Shops', onTap: () {
+                        Navigator.pushNamed(context, AppRoutes.allCategoriesScreen);
+                      }),
+                      _buildHeaderLink('Invite Friends', onTap: () {
+                        ShareWidgets.showShareSheet(context, title: "Share LocalConnect", text: "Download LocalConnect to book services!");
+                      }),
+                    ],
+                  ),
+                ),
+
+                // Right Side Controls
+                // City Selector
+                GestureDetector(
+                  onTap: _showCitySelector,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on_rounded, color: Colors.white, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedCity,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const Icon(Icons.arrow_drop_down_rounded, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+
+                // Notifications
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                      onPressed: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.notificationScreen,
+                      ).then((_) => NotificationHubService.instance.reinitialize()),
+                    ),
+                    if (unreadNotifCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppTheme.secondary,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            '$unreadNotifCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+
+                // User profile avatar
+                GestureDetector(
+                  onTap: _handleProfileTap,
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
+                    child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Sign Out
+                IconButton(
+                  icon: const Icon(Icons.logout_rounded, color: Colors.white70),
+                  tooltip: 'Sign Out',
+                  onPressed: _handleSignOut,
+                ),
+              ],
+            ),
+          ),
+
+          // 2. Main Page Content
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  OfflineBannerWidget(onRetry: _handleRetry),
+                  
+                  // Wrap body sections in 1200px max width centered layout
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          HomeSearchWidget(onSearch: (_) {}),
+                          const HomeBannerSliderWidget(),
+                          HomeCategoryGridWidget(
+                            isTablet: true,
+                            onCategoryTap: (categoryId) {
+                              if (categoryId == 'all') {
+                                Navigator.pushNamed(context, AppRoutes.allCategoriesScreen);
+                              } else {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.categoryDetailScreen,
+                                  arguments: categoryId,
+                                );
+                              }
+                            },
+                          ),
+                          
+                          // Best Offers & Nearby side-by-side or stacked cleanly
+                          HomeNearbyProvidersWidget(
+                            key: ValueKey(_selectedCity),
+                            isOnline: _isOnline,
+                            onProviderTap: (id) => Navigator.pushNamed(
+                              context,
+                              AppRoutes.providerProfileScreen,
+                              arguments: {'providerId': id},
+                            ),
+                          ),
+                          HomeBestOffersWidget(isOnline: _isOnline),
+                          const HomeQuickActionsWidget(),
+                          const SizedBox(height: 48),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 3. Web Footer Section
+                  _buildWebFooter(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderLink(String title, {bool isActive = false, VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                color: isActive ? Colors.white : Colors.white70,
+              ),
+            ),
+            if (isActive) ...[
+              const SizedBox(height: 4),
+              Container(
+                width: 16,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: AppTheme.secondary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWebFooter() {
+    return Container(
+      color: const Color(0xFF0F172A), // Premium dark footer color
+      padding: const EdgeInsets.fromLTRB(80, 60, 80, 30),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Logo & Summary Column
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Image.asset(
+                          'assets/images/localconnect_app_icon.png',
+                          height: 40,
+                          width: 40,
+                          fit: BoxFit.cover,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'LocalConnect',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Your trusted local service marketplace connecting customers with verified professionals in Pune and surrounding regions.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        color: Colors.white.withOpacity(0.6),
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 80),
+
+              // Categories Quick Links
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Quick Links',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFooterLink('Home', onTap: () {}),
+                    _buildFooterLink('All Categories', onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.allCategoriesScreen);
+                    }),
+                    _buildFooterLink('Nearby Shops', onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.allCategoriesScreen);
+                    }),
+                    _buildFooterLink('Invite Friends', onTap: () {
+                      ShareWidgets.showShareSheet(context, title: "Share LocalConnect", text: "Download LocalConnect!");
+                    }),
+                  ],
+                ),
+              ),
+
+              // My Account Column
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'My Account',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFooterLink('My Orders', onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.orderManagementScreen);
+                    }),
+                    _buildFooterLink('My Bookings', onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.orderManagementScreen);
+                    }),
+                    _buildFooterLink('My Quotations', onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.customerQuotationBookingsScreen);
+                    }),
+                    _buildFooterLink('My Dashboard', onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.customerProfileScreen);
+                    }),
+                  ],
+                ),
+              ),
+
+              // Legal Column
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Legal',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFooterLink('Terms of Service', onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.legalScreen, arguments: {'tab': 1});
+                    }),
+                    _buildFooterLink('Privacy Policy', onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.legalScreen, arguments: {'tab': 0});
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 48),
+          const Divider(color: Colors.white12),
+          const SizedBox(height: 24),
+          Text(
+            '© ${DateTime.now().year} LocalConnect. All rights reserved.',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              color: Colors.white38,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooterLink(String label, {VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            color: Colors.white.withOpacity(0.6),
+          ),
+        ),
       ),
     );
   }
