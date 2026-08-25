@@ -312,11 +312,15 @@ class _LoginScreenState extends State<LoginScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFEEF2FF),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            children: [
-              SizedBox(height: 4.h),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  SizedBox(height: 4.h),
               FadeTransition(
                 opacity: _fadeAnim,
                 child: SlideTransition(
@@ -394,8 +398,9 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildBranding() {
     return Column(
@@ -554,19 +559,43 @@ class _LoginScreenState extends State<LoginScreen>
         TextFormField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 11.sp,
+            color: const Color(0xFF1D1B20),
+          ),
+          decoration: InputDecoration(
             hintText: 'Enter your email',
+            hintStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF74777F),
+            ),
             labelText: 'Email Address',
-            prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primary),
+            labelStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF44474E),
+            ),
+            prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.primary),
           ),
         ),
         SizedBox(height: 1.5.h),
         TextFormField(
           controller: _passwordController,
           obscureText: _obscurePassword,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 11.sp,
+            color: const Color(0xFF1D1B20),
+          ),
           decoration: InputDecoration(
             hintText: 'Enter your password',
+            hintStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF74777F),
+            ),
             labelText: 'Password',
+            labelStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF44474E),
+            ),
             prefixIcon: const Icon(
               Icons.lock_outline_rounded,
               color: AppTheme.primary,
