@@ -27,9 +27,6 @@ flutter config --enable-web
 echo "=== Verifying Flutter Toolchain ==="
 flutter doctor
 
-echo "=== Transitioning to Web Project Folder ==="
-cd web_version
-
 echo "=== Generating env.json dynamically for compilation ==="
 cat <<EOF > env.json
 {
@@ -58,7 +55,6 @@ echo "=== Building Flutter Web Application ==="
 flutter build web --release --dart-define-from-file=env.json
 
 echo "=== Clean Up ==="
-cd ..
 rm -f flutter_linux_${FLUTTER_VERSION}-stable.tar.xz
 
 echo "=== Build Completed Successfully ==="
