@@ -94,14 +94,8 @@ class _MyAppState extends State<MyApp> {
           navigatorKey: NotificationService.navigatorKey,
           // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
           builder: (context, child) {
-            final mediaQuery = MediaQuery.of(context);
-            double textScale = 1.0;
-            if (kIsWeb && mediaQuery.size.width > 600) {
-              textScale = 420.0 / mediaQuery.size.width;
-              if (textScale < 0.25) textScale = 0.25;
-            }
             return MediaQuery(
-              data: mediaQuery.copyWith(textScaler: TextScaler.linear(textScale)),
+              data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.0)),
               child: child!,
             );
           },

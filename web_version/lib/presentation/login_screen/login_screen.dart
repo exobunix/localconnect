@@ -789,24 +789,25 @@ class _LoginScreenState extends State<LoginScreen>
         Center(
           child: GestureDetector(
             onTap: () => Navigator.pushNamed(context, AppRoutes.signupScreen),
-            child: RichText(
-              text: TextSpan(
-                text: "Don't have an account? ",
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11.sp,
-                  color: const Color(0xFF74777F),
-                ),
-                children: [
-                  TextSpan(
-                    text: 'Sign Up',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.primary,
-                    ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "Don't have an account? ",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.sp,
+                    color: const Color(0xFF74777F),
                   ),
-                ],
-              ),
+                ),
+                Text(
+                  'Sign Up',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

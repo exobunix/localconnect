@@ -23,6 +23,25 @@ class AuthLeftBanner extends StatelessWidget {
               painter: _AuthBannerPainter(),
             ),
           ),
+          // Proper real app logo icon overlayed inside pin cutout
+          Align(
+            alignment: const Alignment(0, -0.28),
+            child: Container(
+              width: 82,
+              height: 82,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF020916),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/localconnect_app_icon.png',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
           Positioned(
             bottom: 80,
             left: 20,
@@ -138,21 +157,7 @@ class _AuthBannerPainter extends CustomPainter {
     final cutoutPaint = Paint()..color = const Color(0xFF020916);
     canvas.drawCircle(pinCenter, cutoutRadius, cutoutPaint);
 
-    // 4. Draw service icons inside cutout
-    final iconPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    // Draw a small wrench/hammer schematic
-    final iconCenter = pinCenter;
-    canvas.drawCircle(iconCenter, 6, Paint()..color = Colors.white.withOpacity(0.1));
-    canvas.drawLine(Offset(iconCenter.dx - 12, iconCenter.dy - 12), Offset(iconCenter.dx + 12, iconCenter.dy + 12), iconPaint);
-    canvas.drawLine(Offset(iconCenter.dx + 12, iconCenter.dy - 12), Offset(iconCenter.dx - 12, iconCenter.dy + 12), iconPaint);
-    canvas.drawCircle(Offset(iconCenter.dx - 12, iconCenter.dy - 12), 4, iconPaint);
-    canvas.drawCircle(Offset(iconCenter.dx + 12, iconCenter.dy + 12), 4, iconPaint);
-    canvas.drawCircle(Offset(iconCenter.dx + 12, iconCenter.dy - 12), 4, iconPaint);
-    canvas.drawCircle(Offset(iconCenter.dx - 12, iconCenter.dy + 12), 4, iconPaint);
+    // Wrench icon removed as Image.asset overlay is used now.
 
     // 5. Draw city silhouette / roadmap at bottom
     final roadPaint = Paint()

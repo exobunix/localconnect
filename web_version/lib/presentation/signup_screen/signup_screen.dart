@@ -881,24 +881,25 @@ class _SignupScreenState extends State<SignupScreen>
         Center(
           child: GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: RichText(
-              text: TextSpan(
-                text: 'Already have an account? ',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11.sp,
-                  color: const Color(0xFF74777F),
-                ),
-                children: [
-                  TextSpan(
-                    text: 'Sign In',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.primary,
-                    ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Already have an account? ',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.sp,
+                    color: const Color(0xFF74777F),
                   ),
-                ],
-              ),
+                ),
+                Text(
+                  'Sign In',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

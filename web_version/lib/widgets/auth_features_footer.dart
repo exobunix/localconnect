@@ -63,7 +63,7 @@ class AuthFeaturesFooter extends StatelessWidget {
                     'By continuing, you agree to our\nTerms of Service and Privacy Policy',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
+                      fontSize: 12,
                       color: const Color(0xFF74777F),
                       height: 1.4,
                     ),
@@ -86,7 +86,7 @@ class AuthFeaturesFooter extends StatelessWidget {
                   'By continuing, you agree to our Terms of Service and Privacy Policy',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
+                    fontSize: 11,
                     color: const Color(0xFF74777F),
                   ),
                 ),
@@ -120,7 +120,7 @@ class AuthFeaturesFooter extends StatelessWidget {
               Text(
                 title,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: const Color(0xFF1D1B20),
                 ),
@@ -129,7 +129,7 @@ class AuthFeaturesFooter extends StatelessWidget {
               Text(
                 subtitle,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 9.5,
+                  fontSize: 11.5,
                   color: const Color(0xFF74777F),
                   height: 1.3,
                 ),
