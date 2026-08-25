@@ -13,6 +13,8 @@ import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 import '../signup_screen/signup_screen.dart';
+import '../../widgets/auth_left_banner.dart';
+import '../../widgets/auth_features_footer.dart';
 
 // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -309,99 +311,143 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width > 800;
+
     return Scaffold(
       backgroundColor: const Color(0xFFEEF2FF),
       body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 900),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                children: [
-                  SizedBox(height: 4.h),
-              FadeTransition(
-                opacity: _fadeAnim,
-                child: SlideTransition(
-                  position: _slideAnim,
-                  child: _buildBranding(),
-                ),
-              ),
-              SizedBox(height: 3.h),
-              FadeTransition(
-                opacity: _fadeAnim,
-                child: SlideTransition(
-                  position: _slideAnim,
-                  child: _buildLoginCard(),
-                ),
-              ),
-              SizedBox(height: 3.h),
-              FadeTransition(
-                opacity: _fadeAnim,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 3.h),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'By continuing, you agree to our ',
-                        style: GoogleFonts.inter(
-                          fontSize: 9.sp,
-                          color: const Color(0xFF90A4AE),
+        child: Center(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1050),
+                child: Column(
+                  children: [
+                    if (isWide) ...[
+                      // Split Screen Card for Desktop
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 24,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
                         ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          AppRoutes.legalScreen,
-                          arguments: {'tab': 1},
-                        ),
-                        child: Text(
-                          'Terms',
-                          style: GoogleFonts.inter(
-                            fontSize: 9.sp,
-                            color: const Color(0xFF1A237E),
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.underline,
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const AuthLeftBanner(),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(40.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Welcome Back!',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFF1A1C1E),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Login to your account',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 14,
+                                          color: const Color(0xFF74777F),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      _buildRoleSelector(),
+                                      const SizedBox(height: 16),
+                                      _buildEmailPasswordForm(),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                      Text(
-                        ' & ',
-                        style: GoogleFonts.inter(
-                          fontSize: 9.sp,
-                          color: const Color(0xFF90A4AE),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          AppRoutes.legalScreen,
-                          arguments: {'tab': 0},
-                        ),
-                        child: Text(
-                          'Privacy Policy',
-                          style: GoogleFonts.inter(
-                            fontSize: 9.sp,
-                            color: const Color(0xFF1A237E),
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.underline,
+                    ] else ...[
+                      // Mobile View
+                      SizedBox(height: 2.h),
+                      _buildBranding(),
+                      SizedBox(height: 3.h),
+                      _buildLoginCard(),
+                      SizedBox(height: 3.h),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'By continuing, you agree to our ',
+                            style: GoogleFonts.inter(
+                              fontSize: 9.sp,
+                              color: const Color(0xFF90A4AE),
+                            ),
                           ),
-                        ),
+                          GestureDetector(
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.legalScreen,
+                              arguments: {'tab': 1},
+                            ),
+                            child: Text(
+                              'Terms',
+                              style: GoogleFonts.inter(
+                                fontSize: 9.sp,
+                                color: const Color(0xFF1A237E),
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            ' & ',
+                            style: GoogleFonts.inter(
+                              fontSize: 9.sp,
+                              color: const Color(0xFF90A4AE),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.legalScreen,
+                              arguments: {'tab': 0},
+                            ),
+                            child: Text(
+                              'Privacy Policy',
+                              style: GoogleFonts.inter(
+                                fontSize: 9.sp,
+                                color: const Color(0xFF1A237E),
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
+                    const AuthFeaturesFooter(),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
-    ),
-  ),
-);
-}
+    );
+  }
 
   Widget _buildBranding() {
     return Column(

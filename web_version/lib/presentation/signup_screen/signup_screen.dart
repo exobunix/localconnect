@@ -11,6 +11,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/auth_left_banner.dart';
+import '../../widgets/auth_features_footer.dart';
 
 /// Signup steps:
 /// 0 = Basic Info (name, email, role, password)
@@ -493,131 +495,179 @@ class _SignupScreenState extends State<SignupScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFEEF2FF),
-      body: SafeArea(
-        child: Column(
+    final isWide = MediaQuery.of(context).size.width > 800;
+
+    Widget buildHeader() {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16.0),
+        child: Row(
           children: [
-            // Top bar
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (_step > 0) {
-                        setState(() {
-                          _step--;
-                          _errorMessage = null;
-                        });
-                        _animateToNextStep();
-                      } else {
-                        Navigator.pop(context);
-                      }
-                    },
-                    child: Container(
-                      width: 10.w,
-                      height: 10.w,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12.0),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_rounded,
-                        color: Color(0xFF1A1C1E),
-                        size: 20,
-                      ),
+            GestureDetector(
+              onTap: () {
+                if (_step > 0) {
+                  setState(() {
+                    _step--;
+                    _errorMessage = null;
+                  });
+                  _animateToNextStep();
+                } else {
+                  Navigator.pop(context);
+                }
+              },
+              child: Container(
+                width: isWide ? 40 : 10.w,
+                height: isWide ? 40 : 10.w,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                  ),
-                  SizedBox(width: 3.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Create Account',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1A1C1E),
-                          ),
-                        ),
-                        Text(
-                          _stepLabel(),
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 9.5.sp,
-                            color: const Color(0xFF74777F),
-                          ),
-                        ),
-                      ],
+                  ],
+                ),
+                child: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: Color(0xFF1A1C1E),
+                  size: 20,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Create Account',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: isWide ? 22 : 14.sp,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1A1C1E),
                     ),
                   ),
                   Text(
-                    'Step ${_step + 1}/2',
+                    _stepLabel(),
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primary,
+                      fontSize: isWide ? 12 : 9.5.sp,
+                      color: const Color(0xFF74777F),
                     ),
                   ),
                 ],
               ),
             ),
-
-            // Progress bar
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4.w),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4.0),
-                child: LinearProgressIndicator(
-                  value: (_step + 1) / 2,
-                  backgroundColor: const Color(0xFFE0E0E0),
-                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
-                  minHeight: 4,
-                ),
+            Text(
+              'Step ${_step + 1}/3',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: isWide ? 12 : 10.sp,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primary,
               ),
             ),
+          ],
+        ),
+      );
+    }
 
-            SizedBox(height: 2.h),
+    Widget buildProgressBar() {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4.0),
+        child: LinearProgressIndicator(
+          value: (_step + 1) / 3,
+          backgroundColor: const Color(0xFFE0E0E0),
+          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+          minHeight: 4,
+        ),
+      );
+    }
 
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4.w),
-                  child: FadeTransition(
-                    opacity: _fadeAnim,
-                    child: SlideTransition(
-                      position: _slideAnim,
-                      child: Container(
+    return Scaffold(
+      backgroundColor: const Color(0xFFEEF2FF),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1050),
+                child: Column(
+                  children: [
+                    if (isWide) ...[
+                      // Split Screen Layout for Desktop
+                      Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(24.0),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.07),
+                              color: Colors.black.withOpacity(0.06),
                               blurRadius: 24,
                               offset: const Offset(0, 6),
                             ),
                           ],
                         ),
-                        padding: EdgeInsets.all(5.w),
-                        child: _buildCurrentStep(),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const AuthLeftBanner(),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(40.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      buildHeader(),
+                                      const SizedBox(height: 8),
+                                      buildProgressBar(),
+                                      const SizedBox(height: 24),
+                                      _buildCurrentStep(),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    ] else ...[
+                      // Mobile Layout
+                      buildHeader(),
+                      const SizedBox(height: 8),
+                      buildProgressBar(),
+                      const SizedBox(height: 16),
+                      FadeTransition(
+                        opacity: _fadeAnim,
+                        child: SlideTransition(
+                          position: _slideAnim,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24.0),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.07),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            padding: EdgeInsets.all(5.w),
+                            child: _buildCurrentStep(),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const AuthFeaturesFooter(),
+                  ],
                 ),
               ),
             ),
-            SizedBox(height: 2.h),
-          ],
+          ),
         ),
       ),
     );
@@ -699,10 +749,22 @@ class _SignupScreenState extends State<SignupScreen>
         TextFormField(
           controller: _nameController,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 11.sp,
+            color: const Color(0xFF1D1B20),
+          ),
+          decoration: InputDecoration(
             hintText: 'Enter your full name',
+            hintStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF74777F),
+            ),
             labelText: 'Full Name',
-            prefixIcon: Icon(
+            labelStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF44474E),
+            ),
+            prefixIcon: const Icon(
               Icons.person_outline_rounded,
               color: AppTheme.primary,
             ),
@@ -712,19 +774,43 @@ class _SignupScreenState extends State<SignupScreen>
         TextFormField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 11.sp,
+            color: const Color(0xFF1D1B20),
+          ),
+          decoration: InputDecoration(
             hintText: 'Enter your email address',
+            hintStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF74777F),
+            ),
             labelText: 'Email Address',
-            prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primary),
+            labelStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF44474E),
+            ),
+            prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.primary),
           ),
         ),
         SizedBox(height: 1.5.h),
         TextFormField(
           controller: _passwordController,
           obscureText: _obscurePassword,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 11.sp,
+            color: const Color(0xFF1D1B20),
+          ),
           decoration: InputDecoration(
             hintText: 'Minimum 8 characters',
+            hintStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF74777F),
+            ),
             labelText: 'Password',
+            labelStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF44474E),
+            ),
             prefixIcon: const Icon(
               Icons.lock_outline_rounded,
               color: AppTheme.primary,
@@ -745,9 +831,21 @@ class _SignupScreenState extends State<SignupScreen>
         TextFormField(
           controller: _confirmPasswordController,
           obscureText: _obscureConfirm,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 11.sp,
+            color: const Color(0xFF1D1B20),
+          ),
           decoration: InputDecoration(
             hintText: 'Re-enter your password',
+            hintStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF74777F),
+            ),
             labelText: 'Confirm Password',
+            labelStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF44474E),
+            ),
             prefixIcon: const Icon(
               Icons.lock_outline_rounded,
               color: AppTheme.primary,
