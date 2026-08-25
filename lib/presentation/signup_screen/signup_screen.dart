@@ -440,16 +440,49 @@ class _SignupScreenState extends State<SignupScreen>
     }
   }
 
-  void _navigateAfterAuth() {
+  Future<void> _navigateAfterAuth() async {
     final user = SupabaseService.instance.currentUser;
+    final userId = user?.id;
     final role = user?.userMetadata?['role'] as String? ?? 'customer';
-    if (role == 'provider') {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.providerOnboardingScreen,
-        (route) => false,
-      );
-    } else {
+    
+    if (role == 'provider' && userId != null) {
+      final onboardingDone = await SupabaseService.instance
+          .isProviderOnboardingComplete(userId);
+      if (!mounted) return;
+      if (!onboardingDone) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.providerOnboardingScreen,
+          (route) => false,
+        );
+        return;
+      }
+      final regStatus = await SupabaseService.instance
+          .getProviderRegistrationStatus(userId);
+      if (!mounted) return;
+      if (regStatus == 'approved') {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.providerDashboardScreen,
+          (route) => false,
+        );
+      } else if (regStatus == 'pending_approval' || regStatus == 'rejected') {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.providerPendingApprovalScreen,
+          (route) => false,
+        );
+      } else {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.homeScreen,
+          (route) => false,
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
       Navigator.pushNamedAndRemoveUntil(
         context,
         AppRoutes.homeScreen,

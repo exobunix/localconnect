@@ -94,11 +94,40 @@ class _MyAppState extends State<MyApp> {
           navigatorKey: NotificationService.navigatorKey,
           // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
           builder: (context, child) {
+            final mediaQuery = MediaQuery.of(context);
+            final isWide = mediaQuery.size.width > 600;
+
+            Widget appWidget = child!;
+            if (isWide && kIsWeb) {
+              appWidget = Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: child,
+                    ),
+                  ),
+                ),
+              );
+            }
+
             return MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(1.0)),
-              child: child!,
+              data: mediaQuery.copyWith(textScaler: const TextScaler.linear(1.0)),
+              child: Scaffold(
+                backgroundColor: isWide && kIsWeb ? const Color(0xFFF3F4F6) : null,
+                body: appWidget,
+              ),
             );
           },
           // 🚨 END CRITICAL SECTION

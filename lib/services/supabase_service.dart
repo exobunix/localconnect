@@ -60,15 +60,58 @@ class SupabaseService {
     // SECURITY: Never allow 'admin' role to be set from client signup.
     // Clamp to 'customer' or 'provider' only.
     final safeRole = (role == 'provider') ? 'provider' : 'customer';
-    return await client.auth.signUp(
-      email: email,
-      password: password,
-      data: {
-        'full_name': fullName,
-        'role': safeRole,
-        if (phone.isNotEmpty) 'phone': phone,
-      },
-    );
+
+    // Mask email for safe logging
+    String maskedEmail = '***';
+    final parts = email.split('@');
+    if (parts.length == 2) {
+      final name = parts[0];
+      final domain = parts[1];
+      if (name.length <= 2) {
+        maskedEmail = '${name.substring(0, 1)}***@$domain';
+      } else {
+        maskedEmail = '${name.substring(0, 1)}***${name.substring(name.length - 1)}@$domain';
+      }
+    }
+
+    print('[AUTH SIGNUP] started');
+    print('[AUTH SIGNUP] email: $maskedEmail');
+
+    try {
+      final response = await client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'full_name': fullName,
+          'role': safeRole,
+          if (phone.isNotEmpty) 'phone': phone,
+        },
+      );
+
+      print('[AUTH SIGNUP] userId: ${response.user?.id ?? "null"}');
+      print('[AUTH SIGNUP] session: ${response.session != null}');
+      print('[AUTH SIGNUP] success');
+
+      return response;
+    } on AuthException catch (e) {
+      print('[AUTH SIGNUP ERROR]');
+      // Avoid referencing e.code if the compiler doesn't have it on the AuthException class in this version,
+      // but standard supabase AuthException has a 'statusCode' and 'message'. Let's log message, statusCode, and code safely.
+      String? errorCode;
+      try {
+        errorCode = (e as dynamic).code;
+      } catch (_) {}
+      print('code: ${errorCode ?? "null"}');
+      print('statusCode: ${e.statusCode ?? "null"}');
+      print('message: ${e.message}');
+      print('name: AuthException');
+      rethrow;
+    } catch (e) {
+      print('[AUTH SIGNUP ERROR]');
+      print('message: $e');
+      print('name: GeneralException');
+      rethrow;
+    }
   }
 
   /// Signs in with Google OAuth using an ID token (native mobile).

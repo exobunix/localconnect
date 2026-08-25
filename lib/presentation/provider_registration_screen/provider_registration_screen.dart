@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -27,6 +29,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     with SingleTickerProviderStateMixin {
   int _currentStep = 0;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   String? _errorMessage;
 
   late AnimationController _animController;
@@ -106,7 +109,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     'Other',
   ];
 
-  final int _totalSteps = 7;
+  final int _totalSteps = 6;
 
   @override
   void initState() {
@@ -159,18 +162,14 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     for (final c in _otpControllers) {
       c.dispose();
     }
-    for (final f in _otpFocusNodes) {
-      f.dispose();
-    }
-    _resendTimer?.cancel();
     super.dispose();
   }
 
   void _nextStep() {
     if (!_validateCurrentStep()) return;
     if (_currentStep == 3) {
-      // Moving from Location to OTP step — auto-send OTP
-      _goToOtpStep();
+      // Moving from Location to Document step — let's sign up the user (create user account) here!
+      _goToDocumentStep();
       return;
     }
     if (_currentStep < _totalSteps - 1) {
@@ -185,206 +184,17 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     }
   }
 
-  Future<void> _goToOtpStep() async {
+  Future<void> _goToDocumentStep() async {
     setState(() {
-      _isLoading = true;
+      _currentStep = 4; // Step 4 is now Document Upload
       _errorMessage = null;
     });
-
-    final emailText = _emailController.text.trim();
-    bool existsInDb = false;
-    try {
-      final dbResult = await SupabaseService.instance.client
-          .from('user_profiles')
-          .select('id')
-          .eq('email', emailText)
-          .maybeSingle();
-      existsInDb = dbResult != null;
-    } catch (_) {
-      // Fallback if query fails
-    }
-
-    try {
-      await SupabaseService.instance.signUpWithEmail(
-        email: emailText,
-        password: _passwordController.text.trim(),
-        fullName: _ownerNameController.text.trim(),
-        role: 'provider',
-        phone: _phoneController.text.trim(),
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _currentStep = 4;
-        _isLoading = false;
-        _otpSent = true;
-      });
-      _startResendTimer();
-      _animController.reset();
-      _animController.forward();
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      if (existsInDb && (e.message.contains('already registered') || e.message.contains('already exists'))) {
-        setState(() {
-          _currentStep = 4;
-          _isLoading = false;
-          _otpSent = true;
-          _errorMessage = 'Account already exists. Please verify the code sent to your email.';
-        });
-        _startResendTimer();
-        _animController.reset();
-        _animController.forward();
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.message;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to send verification code. Please try again.';
-      });
-    }
-  }
-
-  String get _formattedPhone {
-    final digits = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
-    if (digits.startsWith('91') && digits.length == 12) return '+$digits';
-    if (digits.length == 10) return '+91$digits';
-    return '+$digits';
-  }
-
-  void _startResendTimer() {
-    _resendSeconds = 60;
-    _canResend = false;
-    _resendTimer?.cancel();
-    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        if (_resendSeconds > 0) {
-          _resendSeconds--;
-        } else {
-          _canResend = true;
-          timer.cancel();
-        }
-      });
-    });
-  }
-
-  Future<void> _resendOtp() async {
-    if (!_canResend) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      for (final c in _otpControllers) {
-        c.clear();
-      }
-    });
-
-    try {
-      await SupabaseService.instance.signUpWithEmail(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-        fullName: _ownerNameController.text.trim(),
-        role: 'provider',
-        phone: _phoneController.text.trim(),
-      );
-    } catch (_) {}
-
-    setState(() {
-      _isLoading = false;
-    });
-    _startResendTimer();
-    if (mounted) _otpFocusNodes[0].requestFocus();
-  }
-
-  Future<void> _verifyOtp() async {
-    final otp = _otpControllers.map((c) => c.text).join();
-    if (otp.length < 6) {
-      setState(() => _errorMessage = 'Please enter the complete 6-digit code.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await SupabaseService.instance.client.auth.verifyOTP(
-        email: _emailController.text.trim(),
-        token: otp,
-        type: OtpType.signup,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _phoneVerified = true;
-        _currentStep = 5;
-        _isLoading = false;
-        _errorMessage = null;
-      });
-      _animController.reset();
-      _animController.forward();
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = e.message.contains('expired') || e.message.contains('invalid')
-            ? 'Invalid or expired code. Please try again.'
-            : e.message;
-        _isLoading = false;
-        for (final c in _otpControllers) {
-          c.clear();
-        }
-      });
-      Future.delayed(const Duration(milliseconds: 200), () {
-        if (mounted) _otpFocusNodes[0].requestFocus();
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Verification failed. Please try again.';
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _onOtpChanged(int index, String value) {
-    if (value.length == 1 && index < 5) {
-      _otpFocusNodes[index + 1].requestFocus();
-    } else if (value.isEmpty && index > 0) {
-      _otpFocusNodes[index - 1].requestFocus();
-    }
-    final otp = _otpControllers.map((c) => c.text).join();
-    if (otp.length == 6) {
-      _verifyOtp();
-    }
+    _animController.reset();
+    _animController.forward();
   }
 
   void _prevStep() {
     if (_currentStep > 0) {
-      // If on OTP step, go back to Location step and reset OTP state
-      if (_currentStep == 4) {
-        setState(() {
-          _currentStep = 3;
-          _errorMessage = null;
-          _otpSent = false;
-          for (final c in _otpControllers) {
-            c.clear();
-          }
-        });
-        _resendTimer?.cancel();
-        _animController.reset();
-        _animController.forward();
-        return;
-      }
       setState(() {
         _currentStep--;
         _errorMessage = null;
@@ -396,25 +206,118 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isGoogleLoading = true;
+      _errorMessage = null;
+    });
+
+    GoogleSignInAccount? googleUser;
+    try {
+      if (kIsWeb) {
+        final realClient = SupabaseClient(
+          'https://ckyopijftlasebanhhqm.supabase.co',
+          'sb_publishable_pztyR-WMEHV-T7k2MUgrlg_0KkpC75H',
+        );
+        await realClient.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: Uri.base.toString(),
+          queryParams: {
+            'role': 'provider',
+          },
+        );
+        return;
+      }
+
+      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
+      final googleSignIn = GoogleSignIn(
+        clientId: kIsWeb ? (webClientId.isEmpty ? '78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com' : webClientId) : null,
+        serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com' : webClientId),
+      );
+      googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        if (mounted) setState(() => _isGoogleLoading = false);
+        return;
+      }
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken ?? googleUser.id;
+      final accessToken = googleAuth.accessToken;
+
+      await SupabaseService.instance.signInWithGoogleIdToken(
+        idToken: idToken,
+        accessToken: accessToken,
+        email: googleUser.email,
+        name: googleUser.displayName,
+      );
+
+      if (!mounted) return;
+
+      final user = SupabaseService.instance.currentUser;
+      if (user != null) {
+        final existingRole = user.userMetadata?['role'] as String?;
+        if (existingRole == null || existingRole.isEmpty) {
+          await SupabaseService.instance.client.auth.updateUser(
+            UserAttributes(data: {'role': 'provider'}),
+          );
+        }
+      }
+
+      final userId = user?.id;
+      if (userId != null) {
+        final onboardingDone = await SupabaseService.instance
+            .isProviderOnboardingComplete(userId);
+        if (!mounted) return;
+        if (onboardingDone) {
+          final regStatus = await SupabaseService.instance
+              .getProviderRegistrationStatus(userId);
+          if (!mounted) return;
+          if (regStatus == 'approved') {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.providerDashboardScreen,
+              (route) => false,
+            );
+          } else if (regStatus == 'pending_approval' || regStatus == 'rejected') {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.providerPendingApprovalScreen,
+              (route) => false,
+            );
+          } else {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.homeScreen,
+              (route) => false,
+            );
+          }
+          return;
+        }
+      }
+
+      // Prefill fields and advance to Step 1
+      setState(() {
+        _emailController.text = googleUser?.email ?? '';
+        _ownerNameController.text = googleUser?.displayName ?? '';
+        _isGoogleLoading = false;
+        _currentStep = 1;
+      });
+      _animController.reset();
+      _animController.forward();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Google Sign-In failed: $e';
+          _isGoogleLoading = false;
+        });
+      }
+    }
+  }
+
   bool _validateCurrentStep() {
     switch (_currentStep) {
       case 0:
-        if (_emailController.text.trim().isEmpty) {
-          setState(() => _errorMessage = 'Please enter your email address.');
-          return false;
-        }
-        if (!_emailController.text.contains('@')) {
-          setState(() => _errorMessage = 'Please enter a valid email address.');
-          return false;
-        }
-        if (_passwordController.text.length < 6) {
-          setState(
-            () => _errorMessage = 'Password must be at least 6 characters.',
-          );
-          return false;
-        }
-        if (_passwordController.text != _confirmPasswordController.text) {
-          setState(() => _errorMessage = 'Passwords do not match.');
+        if (SupabaseService.instance.currentUser == null) {
+          setState(() => _errorMessage = 'Please sign in with Google to continue.');
           return false;
         }
         break;
@@ -459,13 +362,6 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
         }
         break;
       case 4:
-        // OTP step — handled by _verifyOtp
-        if (!_phoneVerified) {
-          setState(() => _errorMessage = 'Please verify the OTP code before continuing.');
-          return false;
-        }
-        break;
-      case 5:
         // Document upload — at least identity doc required
         if (_identityDocFile == null &&
             _identityDocNumberController.text.trim().isEmpty) {
@@ -478,7 +374,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
         // Sync documents list for submission
         _syncDocumentsForSubmission();
         break;
-      case 6:
+      case 5:
         // Final confirmation — no extra validation needed
         break;
     }
@@ -589,9 +485,10 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     } on AuthException catch (e) {
       setState(() => _errorMessage = e.message);
     } catch (e) {
+      print('[ProviderRegistration ERROR] Registration failed: $e');
       setState(
         () => _errorMessage =
-            'Registration failed. Please check your details and try again.',
+            'Registration failed ($e). Please try again.',
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -768,10 +665,8 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
       case 3:
         return _buildStep3Location();
       case 4:
-        return _buildStep4PhoneOtp();
-      case 5:
         return _buildStep5DocumentUpload();
-      case 6:
+      case 5:
         return _buildStep6Confirmation();
       default:
         return const SizedBox();
@@ -781,61 +676,63 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   Widget _buildStep0Account() {
     return _buildCard(
       icon: Icons.person_add_rounded,
-      title: 'Create Your Account',
+      title: 'Register as a Provider',
       child: Column(
         children: [
           _buildInfoBanner(
             icon: Icons.info_outline_rounded,
             color: AppTheme.primary,
             message:
-                'Register as a provider to offer your services on LocalConnect. Your account will be reviewed before you can access the dashboard.',
+                'Register as a provider to offer your services on LocalConnect. Please sign in with Google to begin your application.',
           ),
-          SizedBox(height: 2.h),
-          _buildTextField(
-            controller: _emailController,
-            label: 'Email Address',
-            hint: 'your@email.com',
-            icon: Icons.email_rounded,
-            keyboardType: TextInputType.emailAddress,
-          ),
-          SizedBox(height: 2.h),
-          _buildTextField(
-            controller: _passwordController,
-            label: 'Password',
-            hint: 'Minimum 6 characters',
-            icon: Icons.lock_rounded,
-            obscureText: _obscurePassword,
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePassword
-                    ? Icons.visibility_off_rounded
-                    : Icons.visibility_rounded,
-                color: const Color(0xFF90A4AE),
-                size: 20,
+          SizedBox(height: 4.h),
+          GestureDetector(
+            onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
+            child: Container(
+              width: double.infinity,
+              height: 6.5.h,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14.0),
+                border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              onPressed: () =>
-                  setState(() => _obscurePassword = !_obscurePassword),
+              child: Center(
+                child: _isGoogleLoading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.g_mobiledata_rounded,
+                            size: 28,
+                            color: Color(0xFF4285F4),
+                          ),
+                          SizedBox(width: 2.w),
+                          Text(
+                            'Continue with Google',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF1A1C1E),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
           ),
           SizedBox(height: 2.h),
-          _buildTextField(
-            controller: _confirmPasswordController,
-            label: 'Confirm Password',
-            hint: 'Re-enter your password',
-            icon: Icons.lock_outline_rounded,
-            obscureText: _obscureConfirm,
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscureConfirm
-                    ? Icons.visibility_off_rounded
-                    : Icons.visibility_rounded,
-                color: const Color(0xFF90A4AE),
-                size: 20,
-              ),
-              onPressed: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
-            ),
-          ),
         ],
       ),
     );
@@ -1103,156 +1000,6 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
             hint: 'Same as phone or different',
             icon: Icons.chat_rounded,
             keyboardType: TextInputType.phone,
-          ),
-          SizedBox(height: 2.h),
-          _buildInfoBanner(
-            icon: Icons.verified_rounded,
-            color: AppTheme.secondary,
-            message:
-                'Your phone number will be verified via OTP in the next step.',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStep4PhoneOtp() {
-    final emailText = _emailController.text.trim();
-
-    return _buildCard(
-      icon: Icons.mark_email_read_rounded,
-      title: 'Verify Email Address',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildInfoBanner(
-            icon: Icons.email_rounded,
-            color: AppTheme.primary,
-            message:
-                'A 6-digit OTP has been sent to $emailText via email. Enter it below to verify your account.',
-          ),
-          SizedBox(height: 3.h),
-          Text(
-            'Enter OTP',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF44474E),
-            ),
-          ),
-          SizedBox(height: 1.5.h),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(6, (index) {
-              return SizedBox(
-                width: 12.w,
-                height: 7.h,
-                child: TextFormField(
-                  controller: _otpControllers[index],
-                  focusNode: _otpFocusNodes[index],
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 1,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.primary,
-                  ),
-                  decoration: InputDecoration(
-                    counterText: '',
-                    filled: true,
-                    fillColor: const Color(0xFFF0F4FF),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: BorderSide(color: AppTheme.primary, width: 2),
-                    ),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  onChanged: (value) => _onOtpChanged(index, value),
-                ),
-              );
-            }),
-          ),
-          SizedBox(height: 2.5.h),
-          Center(
-            child: _canResend
-                ? GestureDetector(
-                    onTap: _resendOtp,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 4.w,
-                        vertical: 1.2.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10.0),
-                        border: Border.all(
-                          color: AppTheme.primary.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.refresh_rounded,
-                            color: AppTheme.primary,
-                            size: 16,
-                          ),
-                          SizedBox(width: 1.5.w),
-                          Text(
-                            'Resend OTP',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 10.sp,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : Text(
-                    'Resend OTP in ${_resendSeconds}s',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10.sp,
-                      color: const Color(0xFF90A4AE),
-                    ),
-                  ),
-          ),
-          SizedBox(height: 1.5.h),
-          Center(
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _currentStep = 0;
-                  _errorMessage = null;
-                  _otpSent = false;
-                  for (final c in _otpControllers) {
-                    c.clear();
-                  }
-                });
-                _resendTimer?.cancel();
-                _animController.reset();
-                _animController.forward();
-              },
-              child: Text(
-                'Change email address',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10.sp,
-                  color: const Color(0xFF74777F),
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-            ),
           ),
         ],
       ),
@@ -1563,9 +1310,9 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
                 _cityController.text.isNotEmpty ? _cityController.text : '—',
               ),
               _buildSummaryRow(
-                Icons.verified_rounded,
+                Icons.phone_rounded,
                 'Phone',
-                '$_formattedPhone ✓ Verified',
+                _phoneController.text.trim(),
               ),
             ],
           ),
@@ -1789,15 +1536,8 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   }
 
   Widget _buildBottomBar() {
-    final isOtpStep = _currentStep == 4;
     final isLastStep = _currentStep == _totalSteps - 1;
-    final buttonLabel = isOtpStep
-        ? 'Verify OTP'
-        : isLastStep
-        ? 'Submit Registration'
-        : _currentStep == 3
-        ? 'Send OTP & Continue'
-        : 'Continue';
+    final buttonLabel = isLastStep ? 'Submit Registration' : 'Continue';
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
@@ -1833,7 +1573,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
                   SizedBox(width: 2.w),
                   Expanded(
                     child: Text(
-                      _errorMessage!,
+                       _errorMessage!,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 9.5.sp,
                         color: Colors.red,
@@ -1846,15 +1586,9 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _isLoading
-                  ? null
-                  : (isOtpStep && !_phoneVerified)
-                  ? _verifyOtp
-                  : _nextStep,
+              onPressed: _isLoading ? null : _nextStep,
               style: ElevatedButton.styleFrom(
-                backgroundColor: isOtpStep
-                    ? AppTheme.secondary
-                    : isLastStep
+                backgroundColor: isLastStep
                     ? const Color(0xFF2E7D32)
                     : AppTheme.primary,
                 foregroundColor: Colors.white,
@@ -1876,14 +1610,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        if (isOtpStep) ...[
-                          const Icon(
-                            Icons.verified_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: 2.w),
-                        ] else if (isLastStep) ...[
+                        if (isLastStep) ...[
                           const Icon(
                             Icons.send_rounded,
                             size: 18,
