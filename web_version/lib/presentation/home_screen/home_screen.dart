@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -903,7 +904,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.pushNamed(context, AppRoutes.allCategoriesScreen);
                       }),
                       _buildHeaderLink('Invite Friends', onTap: () {
-                        ShareWidgets.showShareSheet(context, title: "Share LocalConnect", text: "Download LocalConnect to book services!");
+                        Navigator.pushNamed(context, AppRoutes.inviteFriendsScreen);
                       }),
                     ],
                   ),
@@ -1163,7 +1164,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.pushNamed(context, AppRoutes.allCategoriesScreen);
                     }),
                     _buildFooterLink('Invite Friends', onTap: () {
-                      ShareWidgets.showShareSheet(context, title: "Share LocalConnect", text: "Download LocalConnect!");
+                      Navigator.pushNamed(context, AppRoutes.inviteFriendsScreen);
                     }),
                   ],
                 ),
