@@ -312,85 +312,91 @@ class _LoginScreenState extends State<LoginScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFEEF2FF),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            children: [
-              SizedBox(height: 4.h),
-              FadeTransition(
-                opacity: _fadeAnim,
-                child: SlideTransition(
-                  position: _slideAnim,
-                  child: _buildBranding(),
-                ),
-              ),
-              SizedBox(height: 3.h),
-              FadeTransition(
-                opacity: _fadeAnim,
-                child: SlideTransition(
-                  position: _slideAnim,
-                  child: _buildLoginCard(),
-                ),
-              ),
-              SizedBox(height: 3.h),
-              FadeTransition(
-                opacity: _fadeAnim,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 3.h),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'By continuing, you agree to our ',
-                        style: GoogleFonts.inter(
-                          fontSize: 9.sp,
-                          color: const Color(0xFF90A4AE),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          AppRoutes.legalScreen,
-                          arguments: {'tab': 1},
-                        ),
-                        child: Text(
-                          'Terms',
-                          style: GoogleFonts.inter(
-                            fontSize: 9.sp,
-                            color: const Color(0xFF1A237E),
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        ' & ',
-                        style: GoogleFonts.inter(
-                          fontSize: 9.sp,
-                          color: const Color(0xFF90A4AE),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          AppRoutes.legalScreen,
-                          arguments: {'tab': 0},
-                        ),
-                        child: Text(
-                          'Privacy Policy',
-                          style: GoogleFonts.inter(
-                            fontSize: 9.sp,
-                            color: const Color(0xFF1A237E),
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ],
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 550),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  SizedBox(height: 4.h),
+                  FadeTransition(
+                    opacity: _fadeAnim,
+                    child: SlideTransition(
+                      position: _slideAnim,
+                      child: _buildBranding(),
+                    ),
                   ),
-                ),
+                  SizedBox(height: 3.h),
+                  FadeTransition(
+                    opacity: _fadeAnim,
+                    child: SlideTransition(
+                      position: _slideAnim,
+                      child: _buildLoginCard(),
+                    ),
+                  ),
+                  SizedBox(height: 3.h),
+                  FadeTransition(
+                    opacity: _fadeAnim,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 3.h),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'By continuing, you agree to our ',
+                            style: GoogleFonts.inter(
+                              fontSize: 9.sp,
+                              color: const Color(0xFF90A4AE),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.legalScreen,
+                              arguments: {'tab': 1},
+                            ),
+                            child: Text(
+                              'Terms',
+                              style: GoogleFonts.inter(
+                                fontSize: 9.sp,
+                                color: const Color(0xFF1A237E),
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            ' & ',
+                            style: GoogleFonts.inter(
+                              fontSize: 9.sp,
+                              color: const Color(0xFF90A4AE),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.legalScreen,
+                              arguments: {'tab': 0},
+                            ),
+                            child: Text(
+                              'Privacy Policy',
+                              style: GoogleFonts.inter(
+                                fontSize: 9.sp,
+                                color: const Color(0xFF1A237E),
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

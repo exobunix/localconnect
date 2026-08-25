@@ -526,7 +526,13 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
-                  child: _buildCurrentStep(),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 600),
+                      child: _buildCurrentStep(),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -564,73 +570,79 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
           end: Alignment.bottomRight,
         ),
       ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: _prevStep,
-            child: Container(
-              width: 9.w,
-              height: 9.w,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.arrow_back_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ),
-          SizedBox(width: 3.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  titles[_currentStep],
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w800,
+      child: Align(
+        alignment: Alignment.center,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: _prevStep,
+                child: Container(
+                  width: 9.w,
+                  height: 9.w,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
                     color: Colors.white,
+                    size: 20,
                   ),
                 ),
-                Text(
-                  subtitles[_currentStep],
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10.sp,
-                    color: Colors.white.withValues(alpha: 0.85),
-                  ),
+              ),
+              SizedBox(width: 3.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      titles[_currentStep],
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      subtitles[_currentStep],
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10.sp,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '${_currentStep + 1}/$_totalSteps',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+              ),
+              if (SupabaseService.instance.currentUser != null) ...[
+                SizedBox(width: 2.w),
+                IconButton(
+                  icon: const Icon(Icons.logout_rounded, color: Colors.white),
+                  tooltip: 'Logout',
+                  onPressed: () async {
+                    await SupabaseService.instance.signOut();
+                    if (context.mounted) {
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        AppRoutes.loginScreen,
+                        (route) => false,
+                      );
+                    }
+                  },
                 ),
               ],
-            ),
+            ],
           ),
-          Text(
-            '${_currentStep + 1}/$_totalSteps',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10.sp,
-              fontWeight: FontWeight.w700,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
-          ),
-          if (SupabaseService.instance.currentUser != null) ...[
-            SizedBox(width: 2.w),
-            IconButton(
-              icon: const Icon(Icons.logout_rounded, color: Colors.white),
-              tooltip: 'Logout',
-              onPressed: () async {
-                await SupabaseService.instance.signOut();
-                if (context.mounted) {
-                  Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    AppRoutes.loginScreen,
-                    (route) => false,
-                  );
-                }
-              },
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -639,32 +651,38 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     return Container(
       color: Colors.white,
       padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
-      child: Row(
-        children: List.generate(_totalSteps, (index) {
-          final isCompleted = index < _currentStep;
-          final isActive = index == _currentStep;
-          return Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? AppTheme.secondary
-                          : isActive
-                          ? AppTheme.primary
-                          : const Color(0xFFE0E0E0),
-                      borderRadius: BorderRadius.circular(2),
+      child: Align(
+        alignment: Alignment.center,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Row(
+            children: List.generate(_totalSteps, (index) {
+              final isCompleted = index < _currentStep;
+              final isActive = index == _currentStep;
+              return Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: isCompleted
+                              ? AppTheme.secondary
+                              : isActive
+                              ? AppTheme.primary
+                              : const Color(0xFFE0E0E0),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
-                  ),
+                    if (index < _totalSteps - 1) SizedBox(width: 1.w),
+                  ],
                 ),
-                if (index < _totalSteps - 1) SizedBox(width: 1.w),
-              ],
-            ),
-          );
-        }),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }
@@ -1566,85 +1584,91 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
           ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_errorMessage != null)
-            Container(
-              margin: EdgeInsets.only(bottom: 1.5.h),
-              padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8.0),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.error_outline_rounded,
-                    color: Colors.red,
-                    size: 16,
+      child: Align(
+        alignment: Alignment.center,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_errorMessage != null)
+                Container(
+                  margin: EdgeInsets.only(bottom: 1.5.h),
+                  padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8.0),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                   ),
-                  SizedBox(width: 2.w),
-                  Expanded(
-                    child: Text(
-                       _errorMessage!,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 9.5.sp,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
                         color: Colors.red,
+                        size: 16,
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _nextStep,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isLastStep
-                    ? const Color(0xFF2E7D32)
-                    : AppTheme.primary,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 1.8.h),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                elevation: 0,
-              ),
-              child: _isLoading
-                  ? SizedBox(
-                      width: 5.w,
-                      height: 5.w,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (isLastStep) ...[
-                          const Icon(
-                            Icons.send_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: 2.w),
-                        ],
-                        Text(
-                          buttonLabel,
+                      SizedBox(width: 2.w),
+                      Expanded(
+                        child: Text(
+                           _errorMessage!,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 9.5.sp,
+                            color: Colors.red,
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _nextStep,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isLastStep
+                        ? const Color(0xFF2E7D32)
+                        : AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 1.8.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.0),
                     ),
-            ),
+                    elevation: 0,
+                  ),
+                  child: _isLoading
+                      ? SizedBox(
+                          width: 5.w,
+                          height: 5.w,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (isLastStep) ...[
+                              const Icon(
+                                Icons.send_rounded,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                              SizedBox(width: 2.w),
+                            ],
+                            Text(
+                              buttonLabel,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

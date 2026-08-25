@@ -232,7 +232,13 @@ class _ProviderOnboardingScreenState extends State<ProviderOnboardingScreen>
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
-                  child: _buildCurrentStep(),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 600),
+                      child: _buildCurrentStep(),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -268,68 +274,74 @@ class _ProviderOnboardingScreenState extends State<ProviderOnboardingScreen>
           end: Alignment.bottomRight,
         ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 10.w,
-            height: 10.w,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.handyman_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-          SizedBox(width: 3.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  stepTitles[_currentStep],
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
+      child: Align(
+        alignment: Alignment.center,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Row(
+            children: [
+              Container(
+                width: 10.w,
+                height: 10.w,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
                 ),
-                Text(
-                  stepSubtitles[_currentStep],
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10.sp,
-                    color: Colors.white.withValues(alpha: 0.85),
-                  ),
+                child: const Icon(
+                  Icons.handyman_rounded,
+                  color: Colors.white,
+                  size: 22,
                 ),
-              ],
-            ),
+              ),
+              SizedBox(width: 3.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      stepTitles[_currentStep],
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      stepSubtitles[_currentStep],
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10.sp,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                'Step ${_currentStep + 1}/5',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+              ),
+              SizedBox(width: 3.w),
+              IconButton(
+                icon: const Icon(Icons.logout_rounded, color: Colors.white),
+                tooltip: 'Logout',
+                onPressed: () async {
+                  await SupabaseService.instance.signOut();
+                  if (context.mounted) {
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      AppRoutes.loginScreen,
+                      (route) => false,
+                    );
+                  }
+                },
+              ),
+            ],
           ),
-          Text(
-            'Step ${_currentStep + 1}/5',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10.sp,
-              fontWeight: FontWeight.w700,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
-          ),
-          SizedBox(width: 3.w),
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.white),
-            tooltip: 'Logout',
-            onPressed: () async {
-              await SupabaseService.instance.signOut();
-              if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  AppRoutes.loginScreen,
-                  (route) => false,
-                );
-              }
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -338,32 +350,38 @@ class _ProviderOnboardingScreenState extends State<ProviderOnboardingScreen>
     return Container(
       color: Colors.white,
       padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
-      child: Row(
-        children: List.generate(5, (index) {
-          final isCompleted = index < _currentStep;
-          final isActive = index == _currentStep;
-          return Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? AppTheme.secondary
-                          : isActive
-                          ? AppTheme.primary
-                          : const Color(0xFFE0E0E0),
-                      borderRadius: BorderRadius.circular(2),
+      child: Align(
+        alignment: Alignment.center,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Row(
+            children: List.generate(5, (index) {
+              final isCompleted = index < _currentStep;
+              final isActive = index == _currentStep;
+              return Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: isCompleted
+                              ? AppTheme.secondary
+                              : isActive
+                              ? AppTheme.primary
+                              : const Color(0xFFE0E0E0),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
-                  ),
+                    if (index < 4) SizedBox(width: 1.w),
+                  ],
                 ),
-                if (index < 4) SizedBox(width: 1.w),
-              ],
-            ),
-          );
-        }),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }
@@ -912,148 +930,154 @@ class _ProviderOnboardingScreenState extends State<ProviderOnboardingScreen>
           ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_errorMessage != null) ...[
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
-              margin: EdgeInsets.only(bottom: 1.5.h),
-              decoration: BoxDecoration(
-                color: AppTheme.errorContainer,
-                borderRadius: BorderRadius.circular(10.0),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.error_outline_rounded,
-                    color: AppTheme.error,
-                    size: 16,
+      child: Align(
+        alignment: Alignment.center,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_errorMessage != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
+                  margin: EdgeInsets.only(bottom: 1.5.h),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorContainer,
+                    borderRadius: BorderRadius.circular(10.0),
                   ),
-                  SizedBox(width: 2.w),
-                  Expanded(
-                    child: Text(
-                      _errorMessage!,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10.sp,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
                         color: AppTheme.error,
+                        size: 16,
+                      ),
+                      SizedBox(width: 2.w),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.sp,
+                            color: AppTheme.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              Row(
+                children: [
+                  if (_currentStep > 0) ...[
+                    Expanded(
+                      flex: 1,
+                      child: GestureDetector(
+                        onTap: _prevStep,
+                        child: Container(
+                          height: 6.h,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F7FF),
+                            borderRadius: BorderRadius.circular(14.0),
+                            border: Border.all(color: const Color(0xFFE0E0E0)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.arrow_back_rounded,
+                                color: Color(0xFF44474E),
+                                size: 18,
+                              ),
+                              SizedBox(width: 1.w),
+                              Text(
+                                'Back',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF44474E),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 3.w),
+                  ],
+                  Expanded(
+                    flex: 2,
+                    child: GestureDetector(
+                      onTap: _isLoading ? null : _nextStep,
+                      child: Container(
+                        height: 6.h,
+                        decoration: BoxDecoration(
+                          gradient: AppTheme.primaryGradient,
+                          borderRadius: BorderRadius.circular(14.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primary.withValues(alpha: 0.35),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _currentStep == 4
+                                          ? 'Complete Setup'
+                                          : 'Continue',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 12.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(width: 2.w),
+                                    Icon(
+                                      _currentStep == 4
+                                          ? Icons.check_circle_rounded
+                                          : Icons.arrow_forward_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ],
+                                ),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
-          Row(
-            children: [
-              if (_currentStep > 0) ...[
-                Expanded(
-                  flex: 1,
-                  child: GestureDetector(
-                    onTap: _prevStep,
-                    child: Container(
-                      height: 6.h,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F7FF),
-                        borderRadius: BorderRadius.circular(14.0),
-                        border: Border.all(color: const Color(0xFFE0E0E0)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.arrow_back_rounded,
-                            color: Color(0xFF44474E),
-                            size: 18,
-                          ),
-                          SizedBox(width: 1.w),
-                          Text(
-                            'Back',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11.sp,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF44474E),
-                            ),
-                          ),
-                        ],
-                      ),
+              if (_currentStep == 4) ...[
+                SizedBox(height: 1.h),
+                GestureDetector(
+                  onTap: _isLoading ? null : _submitOnboarding,
+                  child: Text(
+                    'Skip for now',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10.sp,
+                      color: const Color(0xFF74777F),
+                      decoration: TextDecoration.underline,
                     ),
                   ),
                 ),
-                SizedBox(width: 3.w),
               ],
-              Expanded(
-                flex: 2,
-                child: GestureDetector(
-                  onTap: _isLoading ? null : _nextStep,
-                  child: Container(
-                    height: 6.h,
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(14.0),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primary.withValues(alpha: 0.35),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  _currentStep == 4
-                                      ? 'Complete Setup'
-                                      : 'Continue',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12.sp,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                SizedBox(width: 2.w),
-                                Icon(
-                                  _currentStep == 4
-                                      ? Icons.check_circle_rounded
-                                      : Icons.arrow_forward_rounded,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
-          if (_currentStep == 4) ...[
-            SizedBox(height: 1.h),
-            GestureDetector(
-              onTap: _isLoading ? null : _submitOnboarding,
-              child: Text(
-                'Skip for now',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10.sp,
-                  color: const Color(0xFF74777F),
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }

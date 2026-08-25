@@ -161,6 +161,17 @@ class _SplashScreenState extends State<SplashScreen>
           .isProviderOnboardingComplete(userId);
 
       if (!onboardingDone) {
+        if (kIsWeb) {
+          await SupabaseService.instance.signOut();
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.loginScreen,
+              (route) => false,
+            );
+          }
+          return;
+        }
         if (mounted) {
           Navigator.pushNamedAndRemoveUntil(
             context,
