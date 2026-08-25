@@ -1421,7 +1421,7 @@ class _SubcategoryTab extends StatelessWidget {
                       crossAxisCount: 2,
                       crossAxisSpacing: 16,
                       mainAxisSpacing: 16,
-                      childAspectRatio: 1.45,
+                      childAspectRatio: 1.85,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (_, i) => _ProviderCard(

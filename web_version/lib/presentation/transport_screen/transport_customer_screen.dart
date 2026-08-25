@@ -830,7 +830,7 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
           crossAxisCount: 2,
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
-          childAspectRatio: 1.6,
+          childAspectRatio: 2.8,
         ),
         itemCount: providers.length,
         itemBuilder: (context, i) => _buildProviderCard(providers[i]),

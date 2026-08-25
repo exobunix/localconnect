@@ -1664,7 +1664,7 @@ class _HomeMaintenanceCustomerScreenState
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 16,
                                 mainAxisSpacing: 16,
-                                childAspectRatio: 1.45,
+                                childAspectRatio: 2.2,
                               ),
                               itemCount: providers.length,
                               itemBuilder: (_, i) => _ProviderCard(
