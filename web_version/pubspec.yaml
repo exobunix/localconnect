@@ -45,6 +45,8 @@ dependencies:
 dependency_overrides:
   permission_handler_html: ^0.1.4+1
   url_launcher: ^6.3.2
+  sizer:
+    path: ./sizer_override
 
 dev_dependencies:
   flutter_test:    # CRITICAL: Required for Flutter project testing - DO NOT REMOVE

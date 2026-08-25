@@ -1,0 +1,11 @@
+name: sizer
+description: A local override package for sizer to cap web scaling dimensions.
+version: 2.0.15
+homepage: https://github.com/exobunix/localconnect
+
+environment:
+  sdk: ">=2.17.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
