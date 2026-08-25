@@ -1546,133 +1546,172 @@ class _HomeMaintenanceCustomerScreenState
             ),
           ),
         ),
-        body: Column(
-          children: [
-            // Search bar
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12.0),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (v) => setState(() => _searchQuery = v),
-                        decoration: InputDecoration(
-                          hintText: 'Search ${activeSub['label']} providers...',
-                          hintStyle: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            color: Colors.grey[400],
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final isDesktop = MediaQuery.of(context).size.width > 800;
+            Widget content = Column(
+              children: [
+                // Search bar
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12.0),
                           ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            size: 18,
-                            color: Colors.grey[400],
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 12,
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (v) => setState(() => _searchQuery = v),
+                            decoration: InputDecoration(
+                              hintText: 'Search ${activeSub['label']} providers...',
+                              hintStyle: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                color: Colors.grey[400],
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search_rounded,
+                                size: 18,
+                                color: Colors.grey[400],
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            // Results count
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${providers.length} providers found',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (_verifiedOnly || _emergencyOnly || !_availableOnly)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: activeColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6.0),
-                      ),
-                      child: Text(
-                        'Filtered',
+                ),
+                // Results count
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${providers.length} providers found',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          color: activeColor,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ),
-            // Provider list
-            Expanded(
-              child: providers.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            activeSub['icon'] as IconData,
-                            size: 56,
-                            color: Colors.grey[300],
+                      if (_verifiedOnly || _emergencyOnly || !_availableOnly)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No providers found',
+                          decoration: BoxDecoration(
+                            color: activeColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6.0),
+                          ),
+                          child: Text(
+                            'Filtered',
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              color: Colors.grey[500],
+                              fontSize: 11,
+                              color: activeColor,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Try adjusting your filters',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              color: Colors.grey[400],
-                            ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Provider list
+                Expanded(
+                  child: providers.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                activeSub['icon'] as IconData,
+                                size: 56,
+                                color: Colors.grey[300],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No providers found',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 16,
+                                  color: Colors.grey[500],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Try adjusting your filters',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                      itemCount: providers.length,
-                      itemBuilder: (_, i) => _ProviderCard(
-                        provider: providers[i],
-                        activeColor: activeColor,
-                        isFavourite: _favourites.contains(providers[i]['id']),
-                        onFavourite: () => setState(() {
-                          final id = providers[i]['id'] as String;
-                          _favourites.contains(id)
-                              ? _favourites.remove(id)
-                              : _favourites.add(id);
-                        }),
-                        onTap: () => _showProviderDetail(providers[i]),
-                        onBook: () => _showBookingSheet(providers[i]),
-                      ),
-                    ),
-            ),
-          ],
+                        )
+                      : isDesktop
+                          ? GridView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                                childAspectRatio: 1.45,
+                              ),
+                              itemCount: providers.length,
+                              itemBuilder: (_, i) => _ProviderCard(
+                                provider: providers[i],
+                                activeColor: activeColor,
+                                isFavourite: _favourites.contains(providers[i]['id']),
+                                onFavourite: () => setState(() {
+                                  final id = providers[i]['id'] as String;
+                                  _favourites.contains(id)
+                                      ? _favourites.remove(id)
+                                      : _favourites.add(id);
+                                }),
+                                onTap: () => _showProviderDetail(providers[i]),
+                                onBook: () => _showBookingSheet(providers[i]),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                              itemCount: providers.length,
+                              itemBuilder: (_, i) => _ProviderCard(
+                                provider: providers[i],
+                                activeColor: activeColor,
+                                isFavourite: _favourites.contains(providers[i]['id']),
+                                onFavourite: () => setState(() {
+                                  final id = providers[i]['id'] as String;
+                                  _favourites.contains(id)
+                                      ? _favourites.remove(id)
+                                      : _favourites.add(id);
+                                }),
+                                onTap: () => _showProviderDetail(providers[i]),
+                                onBook: () => _showBookingSheet(providers[i]),
+                              ),
+                            ),
+                ),
+              ],
+            );
+
+            if (isDesktop) {
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: content,
+                ),
+              );
+            }
+            return content;
+          },
         ),
       ),
     );

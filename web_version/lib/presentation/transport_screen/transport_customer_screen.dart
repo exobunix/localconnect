@@ -821,18 +821,44 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
         ),
       );
     }
-    return Column(
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+    Widget listWidget;
+    if (isDesktop) {
+      listWidget = GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 1.6,
+        ),
+        itemCount: providers.length,
+        itemBuilder: (context, i) => _buildProviderCard(providers[i]),
+      );
+    } else {
+      listWidget = ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        itemCount: providers.length,
+        itemBuilder: (context, i) => _buildProviderCard(providers[i]),
+      );
+    }
+
+    Widget content = Column(
       children: [
         _buildSortBar(),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-            itemCount: providers.length,
-            itemBuilder: (context, i) => _buildProviderCard(providers[i]),
-          ),
-        ),
+        Expanded(child: listWidget),
       ],
     );
+
+    if (isDesktop) {
+      content = Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: content,
+        ),
+      );
+    }
+    return content;
   }
 
   Widget _buildSortBar() {

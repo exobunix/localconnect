@@ -1257,8 +1257,9 @@ class _SubcategoryTab extends StatelessWidget {
     final subFeatured = featuredProviders
         .where((p) => (p['subcategory'] as Map)['id'] == subcategory['id'])
         .toList();
+    final isDesktop = MediaQuery.of(context).size.width > 800;
 
-    return CustomScrollView(
+    Widget scrollView = CustomScrollView(
       slivers: [
         // Featured Providers Carousel
         if (subFeatured.isNotEmpty) ...[
@@ -1273,10 +1274,10 @@ class _SubcategoryTab extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [
-                          const Color(0xFFFFB300),
-                          const Color(0xFFFF8F00),
+                          Color(0xFFFFB300),
+                          Color(0xFFFF8F00),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(6),
@@ -1414,23 +1415,53 @@ class _SubcategoryTab extends StatelessWidget {
                   ),
                 ),
               )
-            : SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => _ProviderCard(
-                    provider: providers[i],
-                    color: color,
-                    isDark: isDark,
-                    isFavourite: favourites.contains(providers[i]['id']),
-                    onFavourite: () =>
-                        onFavouriteToggle(providers[i]['id'] as String),
-                    onTap: () => onProviderTap(providers[i]),
+            : isDesktop
+                ? SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.45,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => _ProviderCard(
+                        provider: providers[i],
+                        color: color,
+                        isDark: isDark,
+                        isFavourite: favourites.contains(providers[i]['id']),
+                        onFavourite: () => onFavouriteToggle(providers[i]['id'] as String),
+                        onTap: () => onProviderTap(providers[i]),
+                      ),
+                      childCount: providers.length,
+                    ),
+                  )
+                : SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => _ProviderCard(
+                        provider: providers[i],
+                        color: color,
+                        isDark: isDark,
+                        isFavourite: favourites.contains(providers[i]['id']),
+                        onFavourite: () =>
+                            onFavouriteToggle(providers[i]['id'] as String),
+                        onTap: () => onProviderTap(providers[i]),
+                      ),
+                      childCount: providers.length,
+                    ),
                   ),
-                  childCount: providers.length,
-                ),
-              ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
+
+    if (isDesktop) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: scrollView,
+        ),
+      );
+    }
+    return scrollView;
   }
 }
 
