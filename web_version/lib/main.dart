@@ -84,7 +84,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return Sizer(
+    Widget sizerWidget = Sizer(
       builder: (context, orientation, screenType) {
         return MaterialApp(
           title: 'LocalConnect',
@@ -106,6 +106,20 @@ class _MyAppState extends State<MyApp> {
         );
       },
     );
+
+    if (kIsWeb) {
+      return Container(
+        color: const Color(0xFFEEF2FF),
+        child: Align(
+          alignment: Alignment.center,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: sizerWidget,
+          ),
+        ),
+      );
+    }
+    return sizerWidget;
   }
 }
 
