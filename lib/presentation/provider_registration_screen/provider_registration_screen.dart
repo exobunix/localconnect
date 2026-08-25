@@ -539,11 +539,10 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
 
   Widget _buildHeader() {
     final titles = [
-      'Create Account',
+      'Register',
       'Business Info',
       'Service Category',
       'Location & Contact',
-      'Verify Email',
       'Upload Documents',
       'Confirm & Submit',
     ];
@@ -552,7 +551,6 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
       'Tell us about your business',
       'Request category approval',
       'Where customers can find you',
-      'Confirm your email address',
       'Identity & business license',
       'Review and complete registration',
     ];
@@ -615,6 +613,23 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
               color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
+          if (SupabaseService.instance.currentUser != null) ...[
+            SizedBox(width: 2.w),
+            IconButton(
+              icon: const Icon(Icons.logout_rounded, color: Colors.white),
+              tooltip: 'Logout',
+              onPressed: () async {
+                await SupabaseService.instance.signOut();
+                if (context.mounted) {
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    AppRoutes.loginScreen,
+                    (route) => false,
+                  );
+                }
+              },
+            ),
+          ],
         ],
       ),
     );

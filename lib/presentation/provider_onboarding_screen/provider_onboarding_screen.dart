@@ -314,6 +314,21 @@ class _ProviderOnboardingScreenState extends State<ProviderOnboardingScreen>
               color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
+          SizedBox(width: 3.w),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
+            tooltip: 'Logout',
+            onPressed: () async {
+              await SupabaseService.instance.signOut();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  AppRoutes.loginScreen,
+                  (route) => false,
+                );
+              }
+            },
+          ),
         ],
       ),
     );

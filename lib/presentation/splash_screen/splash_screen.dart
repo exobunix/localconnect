@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -91,7 +92,7 @@ class _SplashScreenState extends State<SplashScreen>
       // Check if first-time user — show onboarding
       final prefs = await SharedPreferences.getInstance();
       final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
-      if (!onboardingDone) {
+      if (!onboardingDone && !kIsWeb) {
         if (mounted) {
           Navigator.pushNamedAndRemoveUntil(
             context,
