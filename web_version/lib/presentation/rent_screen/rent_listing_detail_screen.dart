@@ -264,11 +264,10 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
     final color = widget.color;
     final isAvailable = listing['available'] as bool;
     final amenities = List<String>.from(listing['amenities'] as List);
+    final isDesktop = MediaQuery.of(context).size.width > 800;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: CustomScrollView(
-        slivers: [
+    Widget bodyContent = CustomScrollView(
+      slivers: [
           // Image gallery app bar
           SliverAppBar(
             expandedHeight: 280,
@@ -703,8 +702,28 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
             ),
           ),
         ],
-      ),
-      bottomNavigationBar: _buildBottomBar(isAvailable, color),
+      );
+
+    if (isDesktop) {
+      bodyContent = Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: bodyContent,
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      body: bodyContent,
+      bottomNavigationBar: isDesktop
+          ? Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: _buildBottomBar(isAvailable, color),
+              ),
+            )
+          : _buildBottomBar(isAvailable, color),
     );
   }
 
@@ -975,15 +994,16 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
         break;
     }
     if (details.isEmpty) return const SizedBox.shrink();
+    final isDesktop = MediaQuery.of(context).size.width > 800;
     return _buildSection(
       '${widget.subcategory[0].toUpperCase()}${widget.subcategory.substring(1)} Details',
       GridView.count(
-        crossAxisCount: 2,
+        crossAxisCount: isDesktop ? 4 : 2,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
-        childAspectRatio: 2.8,
+        childAspectRatio: isDesktop ? 4.0 : 2.8,
         children: details
             .map(
               (d) => Container(
