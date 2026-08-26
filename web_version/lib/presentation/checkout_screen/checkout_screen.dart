@@ -91,6 +91,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.initState();
     _loadSavedAddresses();
     _loadSavedCards();
+    _addressController.addListener(() => setState(() {}));
+    _cityController.addListener(() => setState(() {}));
+    _pincodeController.addListener(() => setState(() {}));
   }
 
   Future<void> _loadSavedCards() async {
@@ -1089,44 +1092,53 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Expanded(
                   child: SizedBox(
                     height: 52,
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting
-                          ? null
-                          : () => _submitOrder(args),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.check_circle_outline_rounded,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Place Order',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
+                    child: Builder(
+                      builder: (context) {
+                        final bool hasAddress = _useManualAddress
+                            ? (_addressController.text.trim().isNotEmpty &&
+                                _cityController.text.trim().isNotEmpty &&
+                                _pincodeController.text.trim().isNotEmpty)
+                            : (_selectedAddressId != null);
+                        return ElevatedButton(
+                          onPressed: (_isSubmitting || !hasAddress)
+                              ? null
+                              : () => _submitOrder(args),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
                             ),
+                            elevation: 0,
+                          ),
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle_outline_rounded,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Place Order',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        );
+                      },
                     ),
                   ),
                 ),

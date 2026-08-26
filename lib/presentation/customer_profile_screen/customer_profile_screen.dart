@@ -1073,6 +1073,24 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
                 ),
                 const Divider(height: 1),
                 _actionRow(
+                  icon: Icons.request_quote_outlined,
+                  label: 'My Quotations',
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    AppRoutes.customerQuotationBookingsScreen,
+                  ),
+                ),
+                const Divider(height: 1),
+                _actionRow(
+                  icon: Icons.storefront_outlined,
+                  label: 'Nearby Shops',
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    AppRoutes.allCategoriesScreen,
+                  ),
+                ),
+                const Divider(height: 1),
+                _actionRow(
                   icon: Icons.share_rounded,
                   label: 'Share & Invite Friends',
                   onTap: () async {

@@ -39,6 +39,15 @@ class _ServiceAreaValidationWidgetState
   Future<void> _validate() async {
     setState(() => _isChecking = true);
 
+    final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+    if (!uuidRegex.hasMatch(widget.providerId)) {
+      setState(() {
+        _isEligible = true;
+        _isChecking = false;
+      });
+      return;
+    }
+
     final customerLoc = await LocationService.instance.getCustomerLocation();
     if (customerLoc == null || customerLoc.latitude == 0) {
       // No location set — allow booking but suggest setting location

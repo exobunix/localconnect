@@ -885,29 +885,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 // Middle Menu Links
                 Expanded(
-                  child: Row(
-                    children: [
-                      _buildHeaderLink('Home', isActive: true, onTap: () {}),
-                      _buildHeaderLink('All Categories', onTap: () {
-                        Navigator.pushNamed(context, AppRoutes.allCategoriesScreen);
-                      }),
-                      _buildHeaderLink('My Bookings', onTap: () {
-                        Navigator.pushNamed(context, AppRoutes.orderManagementScreen);
-                      }),
-                      _buildHeaderLink('My Quotations', onTap: () {
-                        Navigator.pushNamed(context, AppRoutes.customerQuotationBookingsScreen);
-                      }),
-                      if (_userRole == 'provider')
-                        _buildHeaderLink('My Dashboard', onTap: () {
-                          Navigator.pushNamed(context, AppRoutes.providerDashboardScreen);
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildHeaderLink('Home', isActive: true, onTap: () {}),
+                        _buildHeaderLink('All Categories', onTap: () {
+                          Navigator.pushNamed(context, AppRoutes.allCategoriesScreen);
                         }),
-                      _buildHeaderLink('Nearby Shops', onTap: () {
-                        Navigator.pushNamed(context, AppRoutes.allCategoriesScreen);
-                      }),
-                      _buildHeaderLink('Invite Friends', onTap: () {
-                        Navigator.pushNamed(context, AppRoutes.inviteFriendsScreen);
-                      }),
-                    ],
+                        _buildHeaderLink('My Bookings', onTap: () {
+                          Navigator.pushNamed(context, AppRoutes.orderManagementScreen);
+                        }),
+                        if (_userRole == 'provider')
+                          _buildHeaderLink('My Dashboard', onTap: () {
+                            Navigator.pushNamed(context, AppRoutes.providerDashboardScreen);
+                          }),
+                      ],
+                    ),
                   ),
                 ),
 

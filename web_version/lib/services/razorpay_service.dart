@@ -200,6 +200,67 @@ class RazorpayService {
     }
   }
 
+  void _runCheckoutJS(
+    String keyId,
+    int amountPaise,
+    String description,
+    String customerName,
+    String customerEmail,
+    String customerPhone,
+    String orderId,
+  ) {
+    final script = html.ScriptElement()
+      ..text = """
+        (function() {
+          var options = {
+            "key": "$keyId",
+            "amount": $amountPaise,
+            "currency": "INR",
+            "name": "LocalConnect",
+            "description": "$description",
+            "prefill": {
+              "name": "$customerName",
+              "email": "$customerEmail",
+              "contact": "$customerPhone"
+            },
+            "theme": {
+              "color": "#1565C0"
+            },
+            "handler": function (response) {
+              window.postMessage({
+                type: 'razorpay_success',
+                payment_id: response.razorpay_payment_id,
+                order_id: response.razorpay_order_id || "",
+                signature: response.razorpay_signature || ""
+              }, '*');
+            },
+            "modal": {
+              "ondismiss": function() {
+                window.postMessage({
+                  type: 'razorpay_failure',
+                  error: "Payment cancelled by user"
+                }, '*');
+              }
+            }
+          };
+          if ("$orderId" !== "") {
+            options.order_id = "$orderId";
+          }
+          if (typeof Razorpay !== 'undefined') {
+            var rzp = new Razorpay(options);
+            rzp.open();
+          } else {
+            window.postMessage({
+              type: 'razorpay_failure',
+              error: "Razorpay SDK not loaded in browser window scope"
+            }, '*');
+          }
+        })();
+      """;
+    html.document.body?.append(script);
+    script.remove();
+  }
+
   /// Open Razorpay standard checkout popup on Web platform.
   void openRazorpayWeb({
     required double amount,
@@ -239,51 +300,27 @@ class RazorpayService {
       }
     });
 
-    // Invoke Razorpay checkout JS via script injection
     final amountPaise = (amount * 100).toInt();
-    final script = html.ScriptElement()
-      ..text = """
-        (function() {
-          var options = {
-            "key": "$keyId",
-            "amount": $amountPaise,
-            "currency": "INR",
-            "name": "LocalConnect",
-            "description": "$description",
-            "prefill": {
-              "name": "$customerName",
-              "email": "$customerEmail",
-              "contact": "$customerPhone"
-            },
-            "theme": {
-              "color": "#1565C0"
-            },
-            "handler": function (response) {
-              window.postMessage({
-                type: 'razorpay_success',
-                payment_id: response.razorpay_payment_id,
-                order_id: response.razorpay_order_id || "",
-                signature: response.razorpay_signature || ""
-              }, '*');
-            },
-            "modal": {
-              "ondismiss": function() {
-                window.postMessage({
-                  type: 'razorpay_failure',
-                  error: "Payment cancelled by user"
-                }, '*');
-              }
-            }
-          };
-          if ("$orderId" !== "") {
-            options.order_id = "$orderId";
-          }
-          var rzp = new Razorpay(options);
-          rzp.open();
-        })();
-      """;
-    html.document.body?.append(script);
-    script.remove(); // Clean up script tag
+
+    final scriptSelector = html.document.querySelector('script[src*="checkout.razorpay.com"]');
+    if (scriptSelector == null) {
+      final scriptTag = html.ScriptElement()
+        ..src = "https://checkout.razorpay.com/v1/checkout.js"
+        ..async = true;
+      
+      scriptTag.onLoad.listen((_) {
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _runCheckoutJS(keyId, amountPaise, description, customerName, customerEmail, customerPhone, orderId);
+        });
+      });
+      scriptTag.onError.listen((_) {
+        sub.cancel();
+        onFailure('Failed to load Razorpay SDK script dynamically.');
+      });
+      html.document.head?.append(scriptTag);
+    } else {
+      _runCheckoutJS(keyId, amountPaise, description, customerName, customerEmail, customerPhone, orderId);
+    }
   }
 
   /// Show web-not-supported dialog
