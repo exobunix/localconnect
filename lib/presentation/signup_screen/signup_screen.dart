@@ -19,7 +19,8 @@ import '../../theme/app_theme.dart';
 /// 2 = Email verification (check inbox for Supabase confirmation link/OTP)
 class SignupScreen extends StatefulWidget {
   final String? initialEmail;
-  const SignupScreen({super.key, this.initialEmail});
+  final String? initialFullName;
+  const SignupScreen({super.key, this.initialEmail, this.initialFullName});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -70,8 +71,11 @@ class _SignupScreenState extends State<SignupScreen>
   @override
   void initState() {
     super.initState();
-    if (widget.initialEmail != null) {
+    if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty) {
       _emailController.text = widget.initialEmail!;
+    }
+    if (widget.initialFullName != null && widget.initialFullName!.isNotEmpty) {
+      _nameController.text = widget.initialFullName!;
     }
     _fadeController = AnimationController(
       vsync: this,

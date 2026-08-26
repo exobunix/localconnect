@@ -448,7 +448,8 @@ class AppRoutes {
       signupScreen: (context) {
         final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         final email = args?['email'] as String?;
-        return SignupScreen(initialEmail: email);
+        final fullName = args?['fullName'] as String?;
+        return SignupScreen(initialEmail: email, initialFullName: fullName);
       },
       adminLoginScreen: (context) => const AdminLoginScreen(),
       // ── Customer-only routes ──────────────────────────────────────────────,
@@ -852,7 +853,11 @@ class AppRoutes {
       providerRegistrationScreen: (context) {
         final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         final email = args?['email'] as String?;
-        return ProviderRegistrationScreen(initialEmail: email);
+        final ownerName = args?['ownerName'] as String?;
+        return ProviderRegistrationScreen(
+          initialEmail: email,
+          initialOwnerName: ownerName,
+        );
       },
       providerPendingApprovalScreen: (context) =>
           const ProviderPendingApprovalScreen(),

@@ -117,13 +117,14 @@ class _LoginScreenState extends State<LoginScreen>
         final profile = await SupabaseService.instance.getUserProfile(user.id);
         if (profile == null) {
           final email = user.email;
+          final name = user.userMetadata?['full_name'] as String? ?? '';
           await SupabaseService.instance.signOut();
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,
               AppRoutes.signupScreen,
               (route) => false,
-              arguments: {'email': email},
+              arguments: {'email': email, 'fullName': name},
             );
           }
           return;
@@ -141,13 +142,14 @@ class _LoginScreenState extends State<LoginScreen>
         final status = await SupabaseService.instance.getProviderRegistrationStatus(user.id);
         if (status == null) {
           final email = user.email;
+          final name = user.userMetadata?['full_name'] as String? ?? '';
           await SupabaseService.instance.signOut();
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,
               AppRoutes.providerRegistrationScreen,
               (route) => false,
-              arguments: {'email': email},
+              arguments: {'email': email, 'ownerName': name},
             );
           }
           return;
@@ -371,6 +373,7 @@ class _LoginScreenState extends State<LoginScreen>
           final profile = await SupabaseService.instance.getUserProfile(user.id);
           if (profile == null) {
             final email = user.email;
+            final name = user.userMetadata?['full_name'] as String? ?? '';
             await SupabaseService.instance.signOut();
             if (mounted) {
               setState(() {
@@ -379,7 +382,7 @@ class _LoginScreenState extends State<LoginScreen>
               Navigator.pushNamed(
                 context,
                 AppRoutes.signupScreen,
-                arguments: {'email': email},
+                arguments: {'email': email, 'fullName': name},
               );
             }
             return;
@@ -388,6 +391,7 @@ class _LoginScreenState extends State<LoginScreen>
           final status = await SupabaseService.instance.getProviderRegistrationStatus(user.id);
           if (status == null) {
             final email = user.email;
+            final name = user.userMetadata?['full_name'] as String? ?? '';
             await SupabaseService.instance.signOut();
             if (mounted) {
               setState(() {
@@ -396,7 +400,7 @@ class _LoginScreenState extends State<LoginScreen>
               Navigator.pushNamed(
                 context,
                 AppRoutes.providerRegistrationScreen,
-                arguments: {'email': email},
+                arguments: {'email': email, 'ownerName': name},
               );
             }
             return;

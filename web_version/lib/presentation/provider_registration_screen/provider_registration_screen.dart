@@ -20,7 +20,12 @@ import '../../theme/app_theme.dart';
 
 class ProviderRegistrationScreen extends StatefulWidget {
   final String? initialEmail;
-  const ProviderRegistrationScreen({super.key, this.initialEmail});
+  final String? initialOwnerName;
+  const ProviderRegistrationScreen({
+    super.key,
+    this.initialEmail,
+    this.initialOwnerName,
+  });
 
   @override
   State<ProviderRegistrationScreen> createState() =>
@@ -37,31 +42,30 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
 
-  // Step 0 - Account
+  // Step 0 - Business Info & Email
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
 
-  // Step 1 - Business Info
   final _shopNameController = TextEditingController();
   final _ownerNameController = TextEditingController();
 
-  // Step 2 - Category
+  // Step 1 - Category
   String? _selectedCategory;
   String? _selectedSubcategory;
   final _approvalReasonController = TextEditingController();
   List<DynamicCategory> _activeCategories = [];
   bool _categoriesLoaded = false;
 
-  // Step 3 - Location & Contact
+  // Step 2 - Location & Contact
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
   final _phoneController = TextEditingController();
   final _whatsappController = TextEditingController();
 
-  // Step 4 - Phone OTP Verification
+  // Phone OTP controllers (kept for backwards compatibility)
   final List<TextEditingController> _otpControllers = List.generate(
     6,
     (_) => TextEditingController(),
@@ -73,7 +77,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   bool _canResend = false;
   bool _otpSent = false;
 
-  // Step 5 - Document Upload
+  // Step 3 - Document Upload
   XFile? _identityDocFile;
   String _identityDocType = 'Aadhar Card';
   final _identityDocNumberController = TextEditingController();
@@ -98,7 +102,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     'Other',
   ];
 
-  // Step 5 legacy doc list (kept for submission compatibility)
+  // Document list for submission
   final List<Map<String, String>> _documents = [];
   final _docNameController = TextEditingController();
   final String _selectedDocType = 'Aadhar Card';
@@ -111,13 +115,22 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     'Other',
   ];
 
-  final int _totalSteps = 6;
+  final int _totalSteps = 5;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialEmail != null) {
+    final currentU = SupabaseService.instance.currentUser;
+    if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty) {
       _emailController.text = widget.initialEmail!;
+    } else if (currentU?.email != null && currentU!.email!.isNotEmpty) {
+      _emailController.text = currentU.email!;
+    }
+    if (widget.initialOwnerName != null && widget.initialOwnerName!.isNotEmpty) {
+      _ownerNameController.text = widget.initialOwnerName!;
+    } else if (currentU?.userMetadata?['full_name'] != null) {
+      _ownerNameController.text =
+          currentU!.userMetadata!['full_name'].toString();
     }
     _animController = AnimationController(
       vsync: this,
@@ -172,11 +185,6 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
 
   void _nextStep() {
     if (!_validateCurrentStep()) return;
-    if (_currentStep == 3) {
-      // Moving from Location to Document step — let's sign up the user (create user account) here!
-      _goToDocumentStep();
-      return;
-    }
     if (_currentStep < _totalSteps - 1) {
       setState(() {
         _currentStep++;
@@ -187,15 +195,6 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     } else {
       _submitRegistration();
     }
-  }
-
-  Future<void> _goToDocumentStep() async {
-    setState(() {
-      _currentStep = 4; // Step 4 is now Document Upload
-      _errorMessage = null;
-    });
-    _animController.reset();
-    _animController.forward();
   }
 
   void _prevStep() {
@@ -211,121 +210,9 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     }
   }
 
-  Future<void> _handleGoogleSignIn() async {
-    setState(() {
-      _isGoogleLoading = true;
-      _errorMessage = null;
-    });
-
-    GoogleSignInAccount? googleUser;
-    try {
-      if (kIsWeb) {
-        try {
-          html.window.localStorage['google_signin_role'] = 'provider';
-        } catch (_) {}
-        await SupabaseService.instance.client.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: '${Uri.base.origin}/',
-          queryParams: {
-            'role': 'provider',
-          },
-        );
-        return;
-      }
-
-      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
-      final googleSignIn = GoogleSignIn(
-        clientId: kIsWeb ? (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId) : null,
-        serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId),
-      );
-      googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        if (mounted) setState(() => _isGoogleLoading = false);
-        return;
-      }
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken ?? googleUser.id;
-      final accessToken = googleAuth.accessToken;
-
-      await SupabaseService.instance.signInWithGoogleIdToken(
-        idToken: idToken,
-        accessToken: accessToken,
-        email: googleUser.email,
-        name: googleUser.displayName,
-      );
-
-      if (!mounted) return;
-
-      final user = SupabaseService.instance.currentUser;
-      if (user != null) {
-        final existingRole = user.userMetadata?['role'] as String?;
-        if (existingRole == null || existingRole.isEmpty) {
-          await SupabaseService.instance.client.auth.updateUser(
-            UserAttributes(data: {'role': 'provider'}),
-          );
-        }
-      }
-
-      final userId = user?.id;
-      if (userId != null) {
-        final onboardingDone = await SupabaseService.instance
-            .isProviderOnboardingComplete(userId);
-        if (!mounted) return;
-        if (onboardingDone) {
-          final regStatus = await SupabaseService.instance
-              .getProviderRegistrationStatus(userId);
-          if (!mounted) return;
-          if (regStatus == 'approved') {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              AppRoutes.providerDashboardScreen,
-              (route) => false,
-            );
-          } else if (regStatus == 'pending_approval' || regStatus == 'rejected') {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              AppRoutes.providerPendingApprovalScreen,
-              (route) => false,
-            );
-          } else {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              AppRoutes.homeScreen,
-              (route) => false,
-            );
-          }
-          return;
-        }
-      }
-
-      // Prefill fields and advance to Step 1
-      setState(() {
-        _emailController.text = googleUser?.email ?? '';
-        _ownerNameController.text = googleUser?.displayName ?? '';
-        _isGoogleLoading = false;
-        _currentStep = 1;
-      });
-      _animController.reset();
-      _animController.forward();
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Google Sign-In failed: $e';
-          _isGoogleLoading = false;
-        });
-      }
-    }
-  }
-
   bool _validateCurrentStep() {
     switch (_currentStep) {
       case 0:
-        if (SupabaseService.instance.currentUser == null) {
-          setState(() => _errorMessage = 'Please sign in with Google to continue.');
-          return false;
-        }
-        break;
-      case 1:
         if (_shopNameController.text.trim().isEmpty) {
           setState(
             () => _errorMessage = 'Please enter your shop/business name.',
@@ -336,8 +223,13 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
           setState(() => _errorMessage = 'Please enter the owner name.');
           return false;
         }
+        if (_emailController.text.trim().isNotEmpty &&
+            !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(_emailController.text.trim())) {
+          setState(() => _errorMessage = 'Please enter a valid email address.');
+          return false;
+        }
         break;
-      case 2:
+      case 1:
         if (_selectedCategory == null) {
           setState(() => _errorMessage = 'Please select a service category.');
           return false;
@@ -350,7 +242,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
           return false;
         }
         break;
-      case 3:
+      case 2:
         if (_addressController.text.trim().isEmpty) {
           setState(() => _errorMessage = 'Please enter your business address.');
           return false;
@@ -361,11 +253,11 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
         }
         if (_phoneController.text.trim().replaceAll(RegExp(r'\D'), '').length <
             10) {
-          setState(() => _errorMessage = 'Please enter a valid phone number.');
+          setState(() => _errorMessage = 'Please enter a valid 10-digit phone number.');
           return false;
         }
         break;
-      case 4:
+      case 3:
         // Document upload — at least identity doc required
         if (_identityDocFile == null &&
             _identityDocNumberController.text.trim().isEmpty) {
@@ -378,7 +270,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
         // Sync documents list for submission
         _syncDocumentsForSubmission();
         break;
-      case 5:
+      case 4:
         // Final confirmation — no extra validation needed
         break;
     }
@@ -580,7 +472,6 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
 
   Widget _buildHeader() {
     final titles = [
-      'Register',
       'Business Info',
       'Service Category',
       'Location & Contact',
@@ -588,7 +479,6 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
       'Confirm & Submit',
     ];
     final subtitles = [
-      'Set up your provider account',
       'Tell us about your business',
       'Request category approval',
       'Where customers can find you',
@@ -725,88 +615,21 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   Widget _buildCurrentStep() {
     switch (_currentStep) {
       case 0:
-        return _buildStep0Account();
+        return _buildStepBusiness();
       case 1:
-        return _buildStep1Business();
-      case 2:
         return _buildStep2Category();
-      case 3:
+      case 2:
         return _buildStep3Location();
-      case 4:
+      case 3:
         return _buildStep5DocumentUpload();
-      case 5:
+      case 4:
         return _buildStep6Confirmation();
       default:
         return const SizedBox();
     }
   }
 
-  Widget _buildStep0Account() {
-    return _buildCard(
-      icon: Icons.person_add_rounded,
-      title: 'Register as a Provider',
-      child: Column(
-        children: [
-          _buildInfoBanner(
-            icon: Icons.info_outline_rounded,
-            color: AppTheme.primary,
-            message:
-                'Register as a provider to offer your services on LocalConnect. Please sign in with Google to begin your application.',
-          ),
-          SizedBox(height: 4.h),
-          GestureDetector(
-            onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
-            child: Container(
-              width: double.infinity,
-              height: 6.5.h,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14.0),
-                border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: _isGoogleLoading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.g_mobiledata_rounded,
-                            size: 28,
-                            color: Color(0xFF4285F4),
-                          ),
-                          SizedBox(width: 2.w),
-                          Text(
-                            'Continue with Google',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF1A1C1E),
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ),
-          SizedBox(height: 2.h),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStep1Business() {
+  Widget _buildStepBusiness() {
     return _buildCard(
       icon: Icons.storefront_rounded,
       title: 'Business Details',
@@ -826,8 +649,16 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
             icon: Icons.person_rounded,
           ),
           SizedBox(height: 2.h),
+          _buildTextField(
+            controller: _emailController,
+            label: 'Email Address',
+            hint: 'business@example.com',
+            icon: Icons.email_rounded,
+            keyboardType: TextInputType.emailAddress,
+          ),
+          SizedBox(height: 2.h),
           _buildInfoTip(
-            'Your business name will be visible to customers searching for services in your area.',
+            'Your business name and contact details will be visible to customers searching for services in your area.',
           ),
         ],
       ),
@@ -1074,24 +905,24 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     );
   }
 
-  // ─── Step 5: Document Upload ───────────────────────────────────────────────
+  // ─── Step 3: Document Upload ───────────────────────────────────────────────
 
   Widget _buildStep5DocumentUpload() {
     final emailText = _emailController.text.trim();
     return Column(
       children: [
-        // Email verified banner
-        _buildCard(
-          icon: Icons.check_circle_rounded,
-          title: 'Email Verified ✓',
-          child: _buildInfoBanner(
-            icon: Icons.verified_rounded,
-            color: AppTheme.secondary,
-            message:
-                'Your email address $emailText has been successfully verified.',
+        if (emailText.isNotEmpty) ...[
+          _buildCard(
+            icon: Icons.account_circle_rounded,
+            title: 'Provider Account',
+            child: _buildInfoBanner(
+              icon: Icons.email_rounded,
+              color: AppTheme.primary,
+              message: 'Registering provider profile for $emailText',
+            ),
           ),
-        ),
-        SizedBox(height: 2.h),
+          SizedBox(height: 2.h),
+        ],
 
         // Identity Document
         _buildCard(
@@ -1381,6 +1212,13 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
                 Icons.phone_rounded,
                 'Phone',
                 _phoneController.text.trim(),
+              ),
+              _buildSummaryRow(
+                Icons.email_rounded,
+                'Email',
+                _emailController.text.trim().isNotEmpty
+                    ? _emailController.text.trim()
+                    : (SupabaseService.instance.currentUser?.email ?? '—'),
               ),
             ],
           ),

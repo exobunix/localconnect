@@ -140,15 +140,16 @@ class _SplashScreenState extends State<SplashScreen>
         final profile = await SupabaseService.instance.getUserProfile(userId);
         if (profile == null) {
           // Customer does NOT exist in DB!
-          // Sign out of auth and redirect to signup pre-filled with email!
+          // Sign out of auth and redirect to signup pre-filled with email & name!
           final email = user?.email;
+          final name = user?.userMetadata?['full_name'] as String? ?? '';
           await SupabaseService.instance.signOut();
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,
               AppRoutes.signupScreen,
               (route) => false,
-              arguments: {'email': email},
+              arguments: {'email': email, 'fullName': name},
             );
           }
           return;
@@ -157,15 +158,16 @@ class _SplashScreenState extends State<SplashScreen>
         final status = await SupabaseService.instance.getProviderRegistrationStatus(userId);
         if (status == null) {
           // Provider does NOT exist in DB!
-          // Sign out of auth and redirect to provider registration pre-filled with email!
+          // Sign out of auth and redirect to provider registration pre-filled with email & name!
           final email = user?.email;
+          final name = user?.userMetadata?['full_name'] as String? ?? '';
           await SupabaseService.instance.signOut();
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,
               AppRoutes.providerRegistrationScreen,
               (route) => false,
-              arguments: {'email': email},
+              arguments: {'email': email, 'ownerName': name},
             );
           }
           return;
