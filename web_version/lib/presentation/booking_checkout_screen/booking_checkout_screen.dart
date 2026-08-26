@@ -538,7 +538,10 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
         isConfirming: _isConfirming,
         selectedPaymentId:
             _paymentMethods[_selectedPaymentIndex]['id'] as String,
-        onConfirm: () => _confirmBooking(args),
+        onConfirm: (_selectedAddress != null ||
+                (args['address'] as String? ?? '').trim().isNotEmpty)
+            ? () => _confirmBooking(args)
+            : null,
       ),
     );
   }
@@ -1209,7 +1212,7 @@ class _ConfirmBottomBar extends StatelessWidget {
   final String amount;
   final bool isConfirming;
   final String selectedPaymentId;
-  final VoidCallback onConfirm;
+  final VoidCallback? onConfirm;
 
   const _ConfirmBottomBar({
     required this.amount,

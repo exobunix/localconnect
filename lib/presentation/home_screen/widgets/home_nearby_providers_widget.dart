@@ -72,11 +72,11 @@ class _HomeNearbyProvidersWidgetState extends State<HomeNearbyProvidersWidget> {
 
     setState(() => _isLoading = true);
     try {
-      // 1. Fetch all active providers from database (no limit)
+      // 1. Fetch all approved providers from database (no limit)
       final response = await SupabaseService.instance.client
           .from('service_providers')
           .select()
-          .eq('is_active', true);
+          .eq('registration_status', 'approved');
       
       List<Map<String, dynamic>> allProviders = List<Map<String, dynamic>>.from(response);
 
