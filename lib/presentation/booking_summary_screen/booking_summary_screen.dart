@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:universal_html/html.dart' as html;
 
 import '../../core/app_export.dart';
+import '../../services/supabase_service.dart';
 
 class BookingSummaryScreen extends StatelessWidget {
   const BookingSummaryScreen({super.key});

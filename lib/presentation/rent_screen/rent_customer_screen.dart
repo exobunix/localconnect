@@ -1651,7 +1651,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                             ),
                           ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.center,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const Icon(Icons.send_rounded, size: 11),
                               const SizedBox(width: 3),
@@ -1685,7 +1685,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                             ),
                           ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.center,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const Icon(
                                 Icons.shopping_bag_rounded,

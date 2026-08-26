@@ -48,11 +48,11 @@ cat <<EOF > env.json
 }
 EOF
 
-echo "=== Configuring Web Platform in Project ==="
-flutter create --platforms=web .
+echo "=== Installing Dependencies ==="
+flutter pub get
 
 echo "=== Building Flutter Web Application ==="
-flutter build web --release --dart-define-from-file=env.json
+flutter build web --release --dart-define-from-file=env.json --no-tree-shake-icons
 
 echo "=== Clean Up ==="
 rm -f flutter_linux_${FLUTTER_VERSION}-stable.tar.xz
