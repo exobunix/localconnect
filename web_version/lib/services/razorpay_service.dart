@@ -243,7 +243,7 @@ class RazorpayService {
               }
             }
           };
-          if ("$orderId" !== "") {
+          if ("$orderId" !== "" && "$orderId".indexOf("order_") === 0) {
             options.order_id = "$orderId";
           }
           if (typeof Razorpay !== 'undefined') {
