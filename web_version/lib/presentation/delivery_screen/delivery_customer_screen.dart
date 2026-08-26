@@ -119,30 +119,7 @@ class _DeliveryCustomerScreenState extends State<DeliveryCustomerScreen>
     },
   ];
 
-  final List<Map<String, dynamic>> _activeOrders = [
-    {
-      'id': 'ORD001',
-      'type': 'Food Delivery',
-      'from': 'Sharma Restaurant',
-      'to': 'Home',
-      'status': 'picked_up',
-      'rider': 'Ravi Kumar',
-      'eta': '12 min',
-      'amount': 65,
-      'color': const Color(0xFFFF6B35),
-    },
-    {
-      'id': 'ORD002',
-      'type': 'Medicine',
-      'from': 'City Pharmacy',
-      'to': 'Home',
-      'status': 'on_way',
-      'rider': 'Suresh Patil',
-      'eta': '8 min',
-      'amount': 45,
-      'color': const Color(0xFF3498DB),
-    },
-  ];
+  final List<Map<String, dynamic>> _activeOrders = [];
 
   final Map<String, List<Map<String, dynamic>>> _providersBySubcategory = {
     'food': [
@@ -928,43 +905,83 @@ class _DeliveryCustomerScreenState extends State<DeliveryCustomerScreen>
 
     final providers = _providersBySubcategory[sub['id'] as String] ?? [];
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(4.w, 16, 4.w, 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${sub['name']} Providers',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF1A1A2E),
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final int crossAxisCount;
+        if (width >= 1200) {
+          crossAxisCount = 4;
+        } else if (width >= 850) {
+          crossAxisCount = 3;
+        } else if (width >= 550) {
+          crossAxisCount = 2;
+        } else {
+          crossAxisCount = 1;
+        }
+
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1400),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(4.w, 16, 4.w, 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${sub['name']} Providers',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF1A1A2E),
+                        ),
+                      ),
+                      Text(
+                        '${providers.length} available',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  crossAxisCount > 1
+                      ? GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                            mainAxisExtent: 250,
+                          ),
+                          itemCount: providers.length,
+                          itemBuilder: (ctx, i) =>
+                              _buildProviderCard(providers[i], isGrid: true),
+                        )
+                      : Column(
+                          children: providers
+                              .map((p) => _buildProviderCard(p, isGrid: false))
+                              .toList(),
+                        ),
+                ],
               ),
-              Text(
-                '${providers.length} available',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          ...providers.map((p) => _buildProviderCard(p)),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildProviderCard(Map<String, dynamic> provider) {
+  Widget _buildProviderCard(Map<String, dynamic> provider, {bool isGrid = false}) {
     return GestureDetector(
       onTap: () => _showDeliveryRequestSheet(provider),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: EdgeInsets.only(bottom: isGrid ? 0 : 12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -977,13 +994,14 @@ class _DeliveryCustomerScreenState extends State<DeliveryCustomerScreen>
           ],
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),
               ),
               child: SizedBox(
-                height: 140,
+                height: 130,
                 width: double.infinity,
                 child: CustomImageWidget(
                   imageUrl: provider['image'] as String,
@@ -993,111 +1011,95 @@ class _DeliveryCustomerScreenState extends State<DeliveryCustomerScreen>
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              provider['name'] as String,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF1A1A2E),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _currentColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                provider['tag'] as String,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: _currentColor,
-                                ),
-                              ),
-                            ),
-                          ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          provider['name'] as String,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF1A1A2E),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.star_rounded,
-                              color: Colors.amber,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${provider['rating']}',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF1A1A2E),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Icon(
-                              Icons.location_on_rounded,
-                              color: Colors.grey[500],
-                              size: 12,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              provider['distance'] as String,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Icon(
-                              Icons.access_time_rounded,
-                              color: Colors.grey[500],
-                              size: 12,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              provider['time'] as String,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _currentColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'Order',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
                       ),
-                    ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _currentColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          provider['tag'] as String,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: _currentColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${provider['rating']}',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1A1A2E),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.location_on_rounded,
+                        color: Colors.grey[500],
+                        size: 12,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        provider['distance'] as String,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.access_time_rounded,
+                        color: Colors.grey[500],
+                        size: 12,
+                      ),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          provider['time'] as String,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

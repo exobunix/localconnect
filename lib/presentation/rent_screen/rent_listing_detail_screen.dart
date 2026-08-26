@@ -265,9 +265,9 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
     final isAvailable = listing['available'] as bool;
     final amenities = List<String>.from(listing['amenities'] as List);
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: CustomScrollView(
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+
+    Widget bodyContent = CustomScrollView(
         slivers: [
           // Image gallery app bar
           SliverAppBar(
@@ -703,8 +703,26 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
             ),
           ),
         ],
+      );
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: SizedBox.expand(
+            child: bodyContent,
+          ),
+        ),
       ),
-      bottomNavigationBar: _buildBottomBar(isAvailable, color),
+      bottomNavigationBar: isDesktop
+          ? Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: _buildBottomBar(isAvailable, color),
+              ),
+            )
+          : _buildBottomBar(isAvailable, color),
     );
   }
 

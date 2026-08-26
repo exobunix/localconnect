@@ -687,51 +687,96 @@ class _VegetablesOrderingScreenState extends State<VegetablesOrderingScreen>
   // ── Shop Tab ────────────────────────────────────────────────────────────────
   Widget _buildShopTab() {
     final items = _filtered;
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(child: _buildCategoryFilter()),
-        if (_showSeasonalOnly)
-          SliverToBoxAdapter(child: _buildSeasonalBanner()),
-        items.isEmpty
-            ? SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.eco_outlined,
-                        size: 56,
-                        color: Colors.grey[400],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No vegetables found',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: Colors.grey[600],
-                          fontSize: 15,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final int crossAxisCount;
+        if (width >= 1200) {
+          crossAxisCount = 4;
+        } else if (width >= 850) {
+          crossAxisCount = 3;
+        } else if (width >= 550) {
+          crossAxisCount = 2;
+        } else {
+          crossAxisCount = 1;
+        }
+
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1400),
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(child: _buildCategoryFilter()),
+                if (_showSeasonalOnly)
+                  SliverToBoxAdapter(child: _buildSeasonalBanner()),
+                items.isEmpty
+                    ? SliverFillRemaining(
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.eco_outlined,
+                                size: 56,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No vegetables found',
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: Colors.grey[600],
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                      )
+                    : SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                        sliver: crossAxisCount > 1
+                            ? SliverGrid(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, i) => _VegetableCard(
+                                    item: items[i],
+                                    tiers: _tiersFor(items[i]),
+                                    cartEntry: _cart[items[i].id],
+                                    onAdd: (tier, {double? customQty}) =>
+                                        _addToCart(items[i], tier, customQty: customQty),
+                                    onRemove: () => _removeFromCart(items[i].id),
+                                  ),
+                                  childCount: items.length,
+                                ),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                  mainAxisExtent: 490,
+                                ),
+                              )
+                            : SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, i) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 14),
+                                    child: _VegetableCard(
+                                      item: items[i],
+                                      tiers: _tiersFor(items[i]),
+                                      cartEntry: _cart[items[i].id],
+                                      onAdd: (tier, {double? customQty}) =>
+                                          _addToCart(items[i], tier, customQty: customQty),
+                                      onRemove: () => _removeFromCart(items[i].id),
+                                    ),
+                                  ),
+                                  childCount: items.length,
+                                ),
+                              ),
                       ),
-                    ],
-                  ),
-                ),
-              )
-            : SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => _VegetableCard(
-                      item: items[i],
-                      tiers: _tiersFor(items[i]),
-                      cartEntry: _cart[items[i].id],
-                      onAdd: (tier, {double? customQty}) =>
-                          _addToCart(items[i], tier, customQty: customQty),
-                      onRemove: () => _removeFromCart(items[i].id),
-                    ),
-                    childCount: items.length,
-                  ),
-                ),
-              ),
-      ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1257,7 +1302,6 @@ class _VegetableCardState extends State<_VegetableCard> {
     final cartQty = widget.cartEntry?['qty'] as int? ?? 0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),

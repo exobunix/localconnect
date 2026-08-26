@@ -704,19 +704,16 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
         ],
       );
 
-    if (isDesktop) {
-      bodyContent = Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
-          child: bodyContent,
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: bodyContent,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: SizedBox.expand(
+            child: bodyContent,
+          ),
+        ),
+      ),
       bottomNavigationBar: isDesktop
           ? Center(
               child: ConstrainedBox(

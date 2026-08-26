@@ -854,143 +854,186 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
   Widget _buildSubcategoryTab(String sub, Color color) {
     final listings = _filteredListings(sub);
     final featured = listings.where((l) => l['isFeatured'] == true).toList();
-    final regular = listings.where((l) => l['isFeatured'] != true).toList();
 
-    return RefreshIndicator(
-      color: color,
-      onRefresh: () async => setState(() {}),
-      child: CustomScrollView(
-        slivers: [
-          // Sort bar
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: _buildSortBar(listings.length, color),
-            ),
-          ),
-          // Featured listings
-          if (featured.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFFF9A825),
-                            const Color(0xFFFF8F00),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final int crossAxisCount;
+        if (width >= 1200) {
+          crossAxisCount = 4;
+        } else if (width >= 850) {
+          crossAxisCount = 3;
+        } else if (width >= 580) {
+          crossAxisCount = 2;
+        } else {
+          crossAxisCount = 1;
+        }
+
+        return RefreshIndicator(
+          color: color,
+          onRefresh: () async => setState(() {}),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1400),
+              child: CustomScrollView(
+                slivers: [
+                  // Sort bar
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: _buildSortBar(listings.length, color),
+                    ),
+                  ),
+                  // Featured listings
+                  if (featured.isNotEmpty) ...[
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFF9A825),
+                                    Color(0xFFFF8F00),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'Featured',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Top Picks',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            color: Colors.white,
-                            size: 12,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            'Featured',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Top Picks',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: 240,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: featured.length,
+                          itemBuilder: (_, i) =>
+                              _buildFeaturedCard(featured[i], color),
+                        ),
                       ),
                     ),
                   ],
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 240,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: featured.length,
-                  itemBuilder: (_, i) => _buildFeaturedCard(featured[i], color),
-                ),
-              ),
-            ),
-          ],
-          // All listings header
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                'All Listings',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
+                  // All listings header
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Text(
+                        'All Listings',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Regular listings
+                  if (listings.isEmpty)
+                    SliverFillRemaining(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off_rounded,
+                              size: 56,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No listings found',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Try adjusting your filters',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      sliver: crossAxisCount > 1
+                          ? SliverGrid(
+                              delegate: SliverChildBuilderDelegate(
+                                (_, i) => _buildListingCard(
+                                  listings[i],
+                                  color,
+                                  isGrid: true,
+                                ),
+                                childCount: listings.length,
+                              ),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                                mainAxisExtent: 440,
+                              ),
+                            )
+                          : SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (_, i) => _buildListingCard(
+                                  listings[i],
+                                  color,
+                                  isGrid: false,
+                                ),
+                                childCount: listings.length,
+                              ),
+                            ),
+                    ),
+                ],
               ),
             ),
           ),
-          // Regular listings
-          if (listings.isEmpty)
-            SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.search_off_rounded,
-                      size: 56,
-                      color: Colors.grey.shade400,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No listings found',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Try adjusting your filters',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => _buildListingCard(listings[i], color),
-                  childCount: listings.length,
-                ),
-              ),
-            ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1250,7 +1293,11 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
     );
   }
 
-  Widget _buildListingCard(Map<String, dynamic> listing, Color color) {
+  Widget _buildListingCard(
+    Map<String, dynamic> listing,
+    Color color, {
+    bool isGrid = false,
+  }) {
     final isFav = _favourites.contains(listing['id']);
     final isAvailable = listing['available'] as bool;
     return GestureDetector(
@@ -1265,7 +1312,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
         ),
       ),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
+        margin: EdgeInsets.only(bottom: isGrid ? 0 : 14),
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(16),
@@ -1288,11 +1335,11 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                   ),
                   child: CachedNetworkImage(
                     imageUrl: listing['image'] as String,
-                    height: 180,
+                    height: 160,
                     width: double.infinity,
                     fit: BoxFit.cover,
                     errorWidget: (_, __, ___) => Container(
-                      height: 180,
+                      height: 160,
                       color: color.withValues(alpha: 0.1),
                       child: Icon(Icons.image_rounded, color: color, size: 40),
                     ),
@@ -1463,7 +1510,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
               ],
             ),
             Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1473,7 +1520,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                         child: Text(
                           listing['title'] as String,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 15,
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
                           ),
                           maxLines: 1,
@@ -1482,8 +1529,8 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
+                          horizontal: 6,
+                          vertical: 2,
                         ),
                         decoration: BoxDecoration(
                           color: Colors.amber.shade50,
@@ -1494,14 +1541,14 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                           children: [
                             Icon(
                               Icons.star_rounded,
-                              size: 13,
+                              size: 12,
                               color: Colors.amber.shade700,
                             ),
                             const SizedBox(width: 2),
                             Text(
                               '${listing['rating']}',
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.amber.shade800,
                               ),
@@ -1509,7 +1556,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                             Text(
                               ' (${listing['reviews']})',
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11,
+                                fontSize: 10,
                                 color: Colors.grey.shade500,
                               ),
                             ),
@@ -1518,12 +1565,12 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Icon(
                         Icons.location_on_rounded,
-                        size: 13,
+                        size: 12,
                         color: Colors.grey.shade500,
                       ),
                       const SizedBox(width: 3),
@@ -1531,7 +1578,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                         child: Text(
                           listing['location'] as String,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: Colors.grey.shade500,
                           ),
                           maxLines: 1,
@@ -1540,18 +1587,18 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   // Amenity chips
                   Wrap(
-                    spacing: 6,
+                    spacing: 4,
                     runSpacing: 4,
                     children: (listing['amenities'] as List)
-                        .take(4)
+                        .take(3)
                         .map(
                           (a) => Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
+                              horizontal: 6,
+                              vertical: 2,
                             ),
                             decoration: BoxDecoration(
                               color: color.withValues(alpha: 0.08),
@@ -1560,7 +1607,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                             child: Text(
                               a as String,
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 10,
+                                fontSize: 9,
                                 fontWeight: FontWeight.w600,
                                 color: color,
                               ),
@@ -1569,58 +1616,63 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                         )
                         .toList(),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                '₹${_formatPrice(listing['price'] as num)}',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: color,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  '₹${_formatPrice(listing['price'] as num)}',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: color,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                listing['priceUnit'] as String,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade500,
+                                Text(
+                                  listing['priceUnit'] as String,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade500,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          if ((listing['deposit'] as num) > 0)
-                            Text(
-                              'Deposit: ₹${_formatPrice(listing['deposit'] as num)}',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11,
-                                color: Colors.grey.shade500,
-                              ),
+                              ],
                             ),
-                        ],
-                      ),
-                      const Spacer(),
-                      // Contact actions
-                      _buildContactBtn(
-                        Icons.chat_bubble_rounded,
-                        color,
-                        () => Navigator.pushNamed(
-                          context,
-                          AppRoutes.chatDetailScreen,
+                            if ((listing['deposit'] as num) > 0)
+                              Text(
+                                'Deposit: ₹${_formatPrice(listing['deposit'] as num)}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      _buildContactBtn(
-                        Icons.phone_rounded,
-                        Colors.green.shade600,
-                        () {},
-                      ),
-                      const SizedBox(width: 8),
+                      if (!isGrid) ...[
+                        _buildContactBtn(
+                          Icons.chat_bubble_rounded,
+                          color,
+                          () => Navigator.pushNamed(
+                            context,
+                            AppRoutes.chatDetailScreen,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _buildContactBtn(
+                          Icons.phone_rounded,
+                          Colors.green.shade600,
+                          () {},
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       ElevatedButton(
                         onPressed: isAvailable
                             ? () => Navigator.push(
@@ -1638,7 +1690,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                           backgroundColor: color,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
+                            horizontal: 12,
                             vertical: 8,
                           ),
                           shape: RoundedRectangleBorder(
