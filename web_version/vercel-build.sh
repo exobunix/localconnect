@@ -36,7 +36,7 @@ cat <<EOF > env.json
   "GEMINI_API_KEY": "${GEMINI_API_KEY:-your-gemini-api-key-here}",
   "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY:-your-anthropic-api-key-here}",
   "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY:-your-perplexity-api-key-here}",
-  "GOOGLE_WEB_CLIENT_ID": "${GOOGLE_WEB_CLIENT_ID:-78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com}",
+  "GOOGLE_WEB_CLIENT_ID": "${GOOGLE_WEB_CLIENT_ID:-1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com}",
   "RAZORPAY_KEY_ID": "${RAZORPAY_KEY_ID:-rzp_live_TUJq20NaHDggTH}",
   "RAZORPAY_WEBHOOK_SECRET": "${RAZORPAY_WEBHOOK_SECRET:-%%RAZORPAY_WEBHOOK_SECRET%%}",
   "TWILIO_ACCOUNT_SID": "${TWILIO_ACCOUNT_SID:-%%TWILIO_ACCOUNT_SID%%}",
