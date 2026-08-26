@@ -218,6 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: HomeNearbyProvidersWidget(
                       key: ValueKey(_selectedCity),
                       isOnline: _isOnline,
+                      city: _selectedCity,
                       onProviderTap: (id) => Navigator.pushNamed(
                         context,
                         AppRoutes.providerProfileScreen,

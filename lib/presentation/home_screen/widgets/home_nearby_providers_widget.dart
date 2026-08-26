@@ -13,11 +13,13 @@ import '../../../routes/app_routes.dart';
 class HomeNearbyProvidersWidget extends StatefulWidget {
   final ValueChanged<String> onProviderTap;
   final bool isOnline;
+  final String? city;
 
   const HomeNearbyProvidersWidget({
     super.key,
     required this.onProviderTap,
     this.isOnline = true,
+    this.city,
   });
 
   @override
@@ -70,13 +72,46 @@ class _HomeNearbyProvidersWidgetState extends State<HomeNearbyProvidersWidget> {
 
     setState(() => _isLoading = true);
     try {
-      final data = await SupabaseService.instance.getNearbyProviders(limit: 12);
+      List<Map<String, dynamic>> data = [];
+      String? expansionMsg;
+
+      // 1. Try GPS location first
+      try {
+        final location = await LocationService.instance.getCurrentPosition();
+        if (location != null) {
+          final result = await LocationService.instance.getNearbyProvidersSmart(
+            lat: location.latitude,
+            lng: location.longitude,
+            limit: 12,
+          );
+          data = result.providers;
+          expansionMsg = result.expansionMessage;
+        }
+      } catch (e) {
+        debugPrint('[HomeNearbyProviders] GPS load error: $e');
+      }
+
+      // 2. Fallback to Selected City
+      if (data.isEmpty && widget.city != null && widget.city!.isNotEmpty) {
+        data = await SupabaseService.instance.getNearbyProviders(
+          city: widget.city,
+          limit: 12,
+        );
+      }
+
+      // 3. Fallback to ALL active providers in DB
+      if (data.isEmpty) {
+        data = await SupabaseService.instance.getNearbyProviders(
+          limit: 12,
+        );
+      }
+
       if (mounted) {
         setState(() {
           _providers = data;
           _isLoading = false;
           _cacheAge = null;
-          _expansionMessage = null;
+          _expansionMessage = expansionMsg;
         });
         await ConnectivityService.instance.cacheData(_cacheKey, data);
       }

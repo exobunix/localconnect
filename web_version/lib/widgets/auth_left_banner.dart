@@ -23,18 +23,24 @@ class AuthLeftBanner extends StatelessWidget {
               painter: _AuthBannerPainter(),
             ),
           ),
-          // Proper real app logo icon overlayed inside pin cutout
+          // Proper real app logo icon centered and larger
           Align(
-            alignment: const Alignment(0, -0.28),
+            alignment: const Alignment(0, -0.32),
             child: Container(
-              width: 82,
-              height: 82,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF020916),
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-              padding: const EdgeInsets.all(4),
-              child: ClipOval(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
                 child: Image.asset(
                   'assets/images/localconnect_app_icon.png',
                   fit: BoxFit.cover,
@@ -114,50 +120,6 @@ class _AuthBannerPainter extends CustomPainter {
       }
       canvas.drawPath(path, mandalaPaint);
     }
-
-    // 2. Draw Teardrop Location Pin
-    final pinPath = Path();
-    final pinWidth = size.width * 0.55;
-    final pinHeight = pinWidth * 1.35;
-    final pinCenter = Offset(center.dx, center.dy + 10);
-
-    // Teardrop shape starting from bottom tip
-    pinPath.moveTo(pinCenter.dx, pinCenter.dy + pinHeight / 2);
-    pinPath.cubicTo(
-      pinCenter.dx - pinWidth / 2, pinCenter.dy + pinHeight / 6,
-      pinCenter.dx - pinWidth / 2, pinCenter.dy - pinHeight / 3,
-      pinCenter.dx, pinCenter.dy - pinHeight / 2,
-    );
-    pinPath.cubicTo(
-      pinCenter.dx + pinWidth / 2, pinCenter.dy - pinHeight / 3,
-      pinCenter.dx + pinWidth / 2, pinCenter.dy + pinHeight / 6,
-      pinCenter.dx, pinCenter.dy + pinHeight / 2,
-    );
-    pinPath.close();
-
-    final pinPaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFFFF9E00), Color(0xFFE52E71), Color(0xFF8A2387)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ).createShader(Rect.fromCenter(
-          center: pinCenter, width: pinWidth, height: pinHeight));
-    
-    // Draw shadow
-    canvas.drawPath(
-      pinPath,
-      Paint()
-        ..color = Colors.black.withOpacity(0.3)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
-    );
-    canvas.drawPath(pinPath, pinPaint);
-
-    // 3. Draw circular cutout inside pin
-    final cutoutRadius = pinWidth * 0.35;
-    final cutoutPaint = Paint()..color = const Color(0xFF020916);
-    canvas.drawCircle(pinCenter, cutoutRadius, cutoutPaint);
-
-    // Wrench icon removed as Image.asset overlay is used now.
 
     // 5. Draw city silhouette / roadmap at bottom
     final roadPaint = Paint()
