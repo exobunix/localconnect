@@ -102,11 +102,19 @@ class _SplashScreenState extends State<SplashScreen>
         }
         return;
       }
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.loginScreen,
-        (route) => false,
-      );
+      if (kIsWeb) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.homeScreen,
+          (route) => false,
+        );
+      } else {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.loginScreen,
+          (route) => false,
+        );
+      }
       return;
     }
 

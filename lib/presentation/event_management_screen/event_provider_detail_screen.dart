@@ -2089,55 +2089,32 @@ class _InquirySheetState extends State<_InquirySheet> {
                           return;
                         }
 
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (ctx) => const Center(child: CircularProgressIndicator()),
-                        );
+                        final dateStr = _eventDate != null
+                            ? '${_eventDate!.day}/${_eventDate!.month}/${_eventDate!.year}'
+                            : DateTime.now().toString().split(' ').first;
+                        
+                        final startingPrice = widget.provider['starting_price']?.toString() ?? '15000';
+                        final formattedPrice = startingPrice.startsWith('₹') ? startingPrice : '₹$startingPrice';
 
-                        try {
-                          final dateStr = _eventDate != null
-                              ? '${_eventDate!.day}/${_eventDate!.month}/${_eventDate!.year}'
-                              : DateTime.now().toString().split(' ').first;
-                          
-                          final startingPrice = widget.provider['starting_price']?.toString() ?? '15000';
-
-                          final res = await SupabaseService.instance.createOrder(
-                            providerName: widget.provider['name'] as String? ?? 'Event Partner',
-                            providerId: widget.provider['id'] as String?,
-                            service: widget.provider['speciality'] as String? ?? 'Event Management',
-                            category: 'event_management',
-                            scheduledDate: dateStr,
-                            scheduledTime: 'On Demand',
-                            amount: startingPrice.startsWith('₹') ? startingPrice : '₹$startingPrice',
-                            paymentMethod: 'cash',
-                            notes: _msgCtrl.text.trim().isNotEmpty 
+                        Navigator.pop(context); // Pop sheet/modal
+                        Navigator.pushNamed(
+                          context,
+                          AppRoutes.bookingCheckoutScreen,
+                          arguments: {
+                            'providerId': widget.provider['id'] as String?,
+                            'providerName': widget.provider['name'] as String? ?? 'Event Partner',
+                            'providerImage': widget.provider['avatar_url'] as String? ?? '',
+                            'providerRating': widget.provider['rating'] as double? ?? 4.8,
+                            'service': widget.provider['speciality'] as String? ?? 'Event Management',
+                            'category': 'event_management',
+                            'scheduledDate': dateStr,
+                            'scheduledTime': 'On Demand',
+                            'amount': formattedPrice,
+                            'notes': _msgCtrl.text.trim().isNotEmpty 
                                 ? 'Contact info: $name ($phone), Method: $_contactMethod | ${_msgCtrl.text.trim()}'
                                 : 'Contact info: $name ($phone), Method: $_contactMethod',
-                          );
-
-                          if (context.mounted) Navigator.pop(context); // Pop loading dialog
-
-                          if (res != null) {
-                            setState(() => _submitted = true);
-                          } else {
-                            if (mounted) {
-                              final errorMsg = SupabaseService.instance.lastOrderError != null
-                                  ? 'Failed to send inquiry: ${SupabaseService.instance.lastOrderError}'
-                                  : 'Failed to send inquiry. Please try again.';
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(errorMsg)),
-                              );
-                            }
-                          }
-                        } catch (e) {
-                          if (context.mounted) Navigator.pop(context);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e')),
-                            );
-                          }
-                        }
+                          },
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: widget.color,

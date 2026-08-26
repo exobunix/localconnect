@@ -1357,86 +1357,22 @@ class _HomeMaintenanceCustomerScreenState
                           ? '${selectedTime!.hour}:${selectedTime!.minute.toString().padLeft(2, "0")}'
                           : 'On Demand';
 
-                      // Show loading indicator
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (ctx) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
+                      Navigator.pop(context); // Pop booking sheet
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.bookingCheckoutScreen,
+                        arguments: {
+                          'providerId': provider['id'] as String?,
+                          'providerName': provider['name'] as String? ?? 'Provider',
+                          'providerImage': provider['avatar_url'] as String? ?? '',
+                          'providerRating': provider['rating'] as double? ?? 4.8,
+                          'service': provider['speciality'] as String? ?? 'Home Maintenance',
+                          'category': 'home_maintenance',
+                          'scheduledDate': dateStr,
+                          'scheduledTime': timeStr,
+                          'amount': provider['charge'] != null ? '₹${provider['charge']}' : '₹300',
+                        },
                       );
-
-                      try {
-                        final result = await SupabaseService.instance.createOrder(
-                          providerName: provider['name'] as String? ?? 'Provider',
-                          service: provider['speciality'] as String? ?? 'Home Maintenance',
-                          category: 'home_maintenance',
-                          scheduledDate: dateStr,
-                          scheduledTime: timeStr,
-                          amount: provider['charge'] != null ? '₹${provider['charge']}' : '₹300',
-                          providerId: provider['id'] as String?,
-                          paymentMethod: 'cash',
-                        );
-
-                        if (context.mounted) {
-                          Navigator.pop(context); // Pop loading dialog
-                          Navigator.pop(context); // Pop booking sheet
-                        }
-
-                        if (result != null) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Booking request sent to ${provider['name']}!',
-                                  style: GoogleFonts.plusJakartaSans(),
-                                ),
-                                backgroundColor: _activeColor,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
-                                ),
-                              ),
-                            );
-                          }
-                        } else {
-                          if (context.mounted) {
-                            final errorMsg = SupabaseService.instance.lastOrderError != null
-                                ? 'Failed to create order: ${SupabaseService.instance.lastOrderError}'
-                                : 'Failed to create order. Please try again.';
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  errorMsg,
-                                  style: GoogleFonts.plusJakartaSans(),
-                                ),
-                                backgroundColor: AppTheme.error,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
-                                ),
-                              ),
-                            );
-                          }
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          Navigator.pop(context); // Pop loading dialog
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'An error occurred: $e',
-                                style: GoogleFonts.plusJakartaSans(),
-                              ),
-                              backgroundColor: AppTheme.error,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
-                              ),
-                            ),
-                          );
-                        }
-                      }
                     },
                     child: Text(
                       'Confirm Booking',

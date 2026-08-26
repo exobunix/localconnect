@@ -1007,7 +1007,8 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
     );
 
     if (isDesktop) {
-      scrollView = Center(
+      scrollView = Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
           child: scrollView,

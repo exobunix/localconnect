@@ -110,11 +110,6 @@ class _RazorpayPaymentWidgetState extends State<RazorpayPaymentWidget> {
   }
 
   void _openRazorpay() {
-    if (kIsWeb) {
-      RazorpayService.showWebNotSupportedDialog(context);
-      return;
-    }
-
     final keyId = RazorpayService.instance.keyId;
     if (keyId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -134,6 +129,56 @@ class _RazorpayPaymentWidgetState extends State<RazorpayPaymentWidget> {
     final email = user?.email ?? '';
     final phone = user?.userMetadata?['phone'] as String? ?? '';
     final name = user?.userMetadata?['full_name'] as String? ?? 'Customer';
+
+    if (kIsWeb) {
+      setState(() => _isProcessing = true);
+      RazorpayService.instance.openRazorpayWeb(
+        amount: widget.amount,
+        description: widget.description,
+        orderId: widget.orderId ?? '',
+        customerName: name,
+        customerEmail: email,
+        customerPhone: phone,
+        notes: widget.notes ?? {},
+        onSuccess: (paymentId, orderId, signature) async {
+          if (!mounted) return;
+          
+          await RazorpayService.instance.recordTransaction(
+            razorpayPaymentId: paymentId,
+            amount: widget.amount,
+            paymentType: widget.paymentType,
+            description: widget.description,
+            razorpayOrderId: orderId,
+            razorpaySignature: signature,
+            orderId: widget.orderId,
+            providerId: widget.providerId,
+            planId: widget.planId,
+            metadata: widget.notes,
+          );
+
+          if (widget.orderId != null && widget.orderId!.isNotEmpty) {
+            await RazorpayService.instance.updateOrderPaymentStatus(
+              orderId: widget.orderId!,
+              razorpayPaymentId: paymentId,
+              amountPaid: widget.amount,
+              razorpayOrderId: orderId,
+            );
+          }
+
+          if (mounted) {
+            setState(() => _isProcessing = false);
+            widget.onPaymentSuccess?.call();
+          }
+        },
+        onFailure: (error) {
+          if (mounted) {
+            setState(() => _isProcessing = false);
+            widget.onPaymentFailed?.call(error);
+          }
+        },
+      );
+      return;
+    }
 
     final options = {
       'key': keyId,
@@ -203,9 +248,7 @@ class _RazorpayPaymentWidgetState extends State<RazorpayPaymentWidget> {
                   const Icon(Icons.payment_rounded, size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    kIsWeb
-                        ? 'Pay via Razorpay (App Only)'
-                        : 'Pay ₹${widget.amount.toStringAsFixed(widget.amount == widget.amount.truncateToDouble() ? 0 : 2)} via Razorpay',
+                    'Pay ₹${widget.amount.toStringAsFixed(widget.amount == widget.amount.truncateToDouble() ? 0 : 2)} via Razorpay',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,

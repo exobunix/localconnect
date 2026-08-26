@@ -454,7 +454,8 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     );
 
     if (isDesktop) {
-      bodyContent = Center(
+      bodyContent = Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
           child: bodyContent,

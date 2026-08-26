@@ -29,7 +29,6 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
   String? _pendingOrderId;
   double _pendingAmount = 0;
   Map<String, dynamic> _pendingArgs = {};
-
   final List<Map<String, dynamic>> _paymentMethods = [
     {
       'id': 'cash',
@@ -40,17 +39,10 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
     },
     {
       'id': 'razorpay',
-      'label': 'Razorpay',
-      'subtitle': 'Cards, UPI, Wallets & more',
+      'label': 'Pay Online',
+      'subtitle': 'Cards, UPI, Netbanking & more',
       'icon': Icons.payment_rounded,
       'color': Color(0xFF3395FF),
-    },
-    {
-      'id': 'upi',
-      'label': 'UPI / QR Code',
-      'subtitle': 'PhonePe, GPay, Paytm',
-      'icon': Icons.qr_code_rounded,
-      'color': Color(0xFF6A1B9A),
     },
   ];
 
@@ -79,12 +71,6 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
 
   // ── Razorpay payment sheet ───────────────────────────────────────────────
   void _openRazorpaySheet({required bool upiPreferred}) {
-    if (kIsWeb) {
-      RazorpayService.showWebNotSupportedDialog(context);
-      if (mounted) setState(() => _isConfirming = false);
-      return;
-    }
-
     final keyId = RazorpayService.instance.keyId;
     if (keyId.isEmpty) {
       _showError('Razorpay Key ID not configured.');
@@ -97,6 +83,65 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
     final phone = user?.userMetadata?['phone'] as String? ?? '';
     final name = user?.userMetadata?['full_name'] as String? ?? 'Customer';
 
+    if (kIsWeb) {
+      RazorpayService.instance.openRazorpayWeb(
+        amount: _pendingAmount,
+        description: _pendingArgs['service'] as String? ??
+            _pendingArgs['serviceName'] as String? ??
+            'Service Booking',
+        orderId: _pendingOrderId ?? '',
+        customerName: name,
+        customerEmail: email,
+        customerPhone: phone,
+        notes: {
+          'service': _pendingArgs['service'] ?? '',
+          'provider': _pendingArgs['providerName'] ?? '',
+          'category': _pendingArgs['category'] ?? '',
+          if (_pendingOrderId != null) 'order_id': _pendingOrderId!,
+        },
+        onSuccess: (paymentId, orderId, signature) async {
+          if (!mounted) return;
+          
+          await RazorpayService.instance.recordTransaction(
+            razorpayPaymentId: paymentId,
+            amount: _pendingAmount,
+            paymentType: 'one_time',
+            description: _pendingArgs['service'] as String? ??
+                _pendingArgs['serviceName'] as String? ??
+                'Service Booking',
+            razorpayOrderId: orderId,
+            razorpaySignature: signature,
+            orderId: _pendingOrderId,
+            providerId: _pendingArgs['providerId'] as String?,
+          );
+
+          if (_pendingOrderId != null && _pendingOrderId!.isNotEmpty) {
+            await RazorpayService.instance.updateOrderPaymentStatus(
+              orderId: _pendingOrderId!,
+              razorpayPaymentId: paymentId,
+              amountPaid: _pendingAmount,
+              razorpayOrderId: orderId,
+            );
+          }
+
+          if (!mounted) return;
+          setState(() => _isConfirming = false);
+          _navigateToSummary(
+            args: _pendingArgs,
+            orderNumber: _pendingOrderId ?? 'ORD-000001',
+            paymentMethodId: _paymentMethods[_selectedPaymentIndex]['id'] as String,
+            paymentStatus: 'Paid',
+          );
+        },
+        onFailure: (error) {
+          if (!mounted) return;
+          setState(() => _isConfirming = false);
+          _showError(error);
+        },
+      );
+      return;
+    }
+
     final options = <String, dynamic>{
       'key': keyId,
       'amount': (_pendingAmount * 100).toInt(),
@@ -106,22 +151,12 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
           _pendingArgs['service'] as String? ??
           _pendingArgs['serviceName'] as String? ??
           'Service Booking',
-      'order_id': '', // will be set if server-side order was created
+      'order_id': '', 
       'prefill': {'name': name, 'email': email, 'contact': phone},
       'theme': {'color': '#1565C0'},
       'retry': {'enabled': true, 'max_count': 3},
       'redirect': {'return_url': 'localconnect://razorpay'},
     };
-
-    // For UPI, restrict payment methods to UPI only
-    if (upiPreferred) {
-      options['method'] = {
-        'upi': true,
-        'card': false,
-        'netbanking': false,
-        'wallet': false,
-      };
-    }
 
     try {
       _razorpay?.open(options);

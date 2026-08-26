@@ -1454,7 +1454,8 @@ class _SubcategoryTab extends StatelessWidget {
     );
 
     if (isDesktop) {
-      return Center(
+      return Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
           child: scrollView,

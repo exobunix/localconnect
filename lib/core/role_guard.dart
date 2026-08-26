@@ -118,6 +118,36 @@ class _RoleGuardState extends State<RoleGuard> {
   }
 
   Future<void> _loadRole() async {
+    final isLoggedIn = SupabaseService.instance.isLoggedIn;
+    final currentRoute = ModalRoute.of(context)?.settings.name;
+
+    // Define public routes that guests can access
+    const publicRoutes = {
+      AppRoutes.initial,
+      AppRoutes.splashScreen,
+      AppRoutes.onboardingScreen,
+      AppRoutes.loginScreen,
+      AppRoutes.signupScreen,
+      AppRoutes.adminLoginScreen,
+      AppRoutes.homeScreen,
+      AppRoutes.allCategoriesScreen,
+      AppRoutes.categoryDetailScreen,
+      AppRoutes.rentCustomerScreen,
+      AppRoutes.rentListingDetailScreen,
+      AppRoutes.eventManagementCustomerScreen,
+      AppRoutes.eventProviderDetailScreen,
+      AppRoutes.legalScreen,
+    };
+
+    if (!isLoggedIn && !publicRoutes.contains(currentRoute)) {
+      // User is not logged in and attempting to access a private route — redirect to login!
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, AppRoutes.loginScreen, (r) => false);
+      });
+      return;
+    }
+
     final role = await _fetchRoleFromDb();
     if (!mounted) return;
     setState(() {

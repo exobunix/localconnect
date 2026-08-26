@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../services/referral_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/supabase_service.dart';
 
 class HomeAppBarWidget extends StatelessWidget {
   final String selectedCity;
@@ -98,89 +99,113 @@ class HomeAppBarWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // Notification
-          Stack(
-            children: [
-              IconButton(
-                onPressed: onNotificationTap,
-                icon: const Icon(
-                  Icons.notifications_outlined,
-                  color: Colors.white,
-                  size: 24,
+          // Profile Avatar or Login Button
+          if (SupabaseService.instance.isLoggedIn) ...[
+            // Notification
+            Stack(
+              children: [
+                IconButton(
+                  onPressed: onNotificationTap,
+                  icon: const Icon(
+                    Icons.notifications_outlined,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(),
                 ),
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(),
-              ),
-              if (unreadNotificationCount > 0)
-                Positioned(
-                  top: 2,
-                  right: 2,
-                  child: Container(
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 3,
-                      vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.secondary,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white, width: 1.5),
-                    ),
-                    child: Text(
-                      unreadNotificationCount > 99
-                          ? '99+'
-                          : '$unreadNotificationCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
+                if (unreadNotificationCount > 0)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
                       ),
-                      textAlign: TextAlign.center,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 3,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondary,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        unreadNotificationCount > 99
+                            ? '99+'
+                            : '$unreadNotificationCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+                else
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
                     ),
                   ),
-                )
-              else
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: AppTheme.secondary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
+              ],
+            ),
+            const SizedBox(width: 8),
+            // Profile Avatar
+            GestureDetector(
+              onTap: onProfileTap,
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    width: 2,
+                  ),
+                  image: const DecorationImage(
+                    image: NetworkImage(
+                      'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg',
                     ),
+                    fit: BoxFit.cover,
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 8),
-          // Profile Avatar
-          GestureDetector(
-            onTap: onProfileTap,
-            child: Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  width: 2,
-                ),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg',
-                  ),
-                  fit: BoxFit.cover,
                 ),
               ),
             ),
-          ),
+          ] else ...[
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, AppRoutes.loginScreen);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppTheme.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: Text(
+                'Login',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
+import 'package:universal_html/html.dart' as html;
 
 import '../core/app_export.dart';
 import './supabase_service.dart';
@@ -195,6 +198,92 @@ class RazorpayService {
       debugPrint('Get transactions error: $e');
       return [];
     }
+  }
+
+  /// Open Razorpay standard checkout popup on Web platform.
+  void openRazorpayWeb({
+    required double amount,
+    required String description,
+    required String orderId,
+    required String customerName,
+    required String customerEmail,
+    required String customerPhone,
+    required Map<String, dynamic> notes,
+    required Function(String paymentId, String orderId, String signature) onSuccess,
+    required Function(String error) onFailure,
+  }) {
+    if (!kIsWeb) return;
+
+    final keyId = RazorpayService.instance.keyId;
+    if (keyId.isEmpty) {
+      onFailure('Razorpay Key ID not configured.');
+      return;
+    }
+
+    // Set up a one-time message listener
+    late StreamSubscription sub;
+    sub = html.window.onMessage.listen((event) {
+      final data = event.data;
+      if (data is Map) {
+        if (data['type'] == 'razorpay_success') {
+          sub.cancel();
+          onSuccess(
+            data['payment_id'] as String? ?? '',
+            data['order_id'] as String? ?? '',
+            data['signature'] as String? ?? '',
+          );
+        } else if (data['type'] == 'razorpay_failure') {
+          sub.cancel();
+          onFailure(data['error'] as String? ?? 'Payment failed');
+        }
+      }
+    });
+
+    // Invoke Razorpay checkout JS via script injection
+    final amountPaise = (amount * 100).toInt();
+    final script = html.ScriptElement()
+      ..text = """
+        (function() {
+          var options = {
+            "key": "$keyId",
+            "amount": $amountPaise,
+            "currency": "INR",
+            "name": "LocalConnect",
+            "description": "$description",
+            "prefill": {
+              "name": "$customerName",
+              "email": "$customerEmail",
+              "contact": "$customerPhone"
+            },
+            "theme": {
+              "color": "#1565C0"
+            },
+            "handler": function (response) {
+              window.postMessage({
+                type: 'razorpay_success',
+                payment_id: response.razorpay_payment_id,
+                order_id: response.razorpay_order_id || "",
+                signature: response.razorpay_signature || ""
+              }, '*');
+            },
+            "modal": {
+              "ondismiss": function() {
+                window.postMessage({
+                  type: 'razorpay_failure',
+                  error: "Payment cancelled by user"
+                }, '*');
+              }
+            }
+          };
+          if ("$orderId" !== "") {
+            options.order_id = "$orderId";
+          }
+          var rzp = new Razorpay(options);
+          rzp.open();
+        })();
+      """;
+    html.document.body?.append(script);
+    script.remove(); // Clean up script tag
   }
 
   /// Show web-not-supported dialog

@@ -705,7 +705,8 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
       );
 
     if (isDesktop) {
-      bodyContent = Center(
+      bodyContent = Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
           child: bodyContent,
@@ -1515,11 +1516,10 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
         children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () =>
-                  Navigator.pushNamed(context, AppRoutes.chatDetailScreen),
-              icon: const Icon(Icons.chat_bubble_rounded, size: 16),
+              onPressed: isAvailable ? _showInquirySheet : null,
+              icon: const Icon(Icons.send_rounded, size: 16),
               label: Text(
-                'Chat',
+                'Inquiry',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -1539,10 +1539,26 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
           Expanded(
             flex: 2,
             child: ElevatedButton.icon(
-              onPressed: isAvailable ? _showInquirySheet : null,
-              icon: const Icon(Icons.send_rounded, size: 16),
+              onPressed: isAvailable ? () {
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.bookingCheckoutScreen,
+                  arguments: {
+                    'providerId': widget.listing['provider_id'] as String?,
+                    'providerName': widget.listing['provider'] as String? ?? 'Provider',
+                    'providerImage': widget.listing['provider_avatar'] as String? ?? '',
+                    'providerRating': widget.listing['rating'] as double? ?? 4.8,
+                    'service': widget.listing['title'] as String? ?? 'Rent Booking',
+                    'category': 'rent',
+                    'scheduledDate': 'Now',
+                    'scheduledTime': 'Flexible',
+                    'amount': widget.listing['price'] != null ? '₹${widget.listing['price']}' : '₹2000',
+                  },
+                );
+              } : null,
+              icon: const Icon(Icons.shopping_bag_rounded, size: 16),
               label: Text(
-                'Send Inquiry',
+                'Book Now',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
