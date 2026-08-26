@@ -1014,7 +1014,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                                 crossAxisCount: crossAxisCount,
                                 crossAxisSpacing: 16,
                                 mainAxisSpacing: 16,
-                                mainAxisExtent: 440,
+                                mainAxisExtent: 330,
                               ),
                             )
                           : SliverList(
@@ -1319,8 +1319,8 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 3),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -1335,34 +1335,34 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                   ),
                   child: CachedNetworkImage(
                     imageUrl: listing['image'] as String,
-                    height: 160,
+                    height: 140,
                     width: double.infinity,
                     fit: BoxFit.cover,
                     errorWidget: (_, __, ___) => Container(
-                      height: 160,
+                      height: 140,
                       color: color.withValues(alpha: 0.1),
-                      child: Icon(Icons.image_rounded, color: color, size: 40),
+                      child: Icon(Icons.image_rounded, color: color, size: 36),
                     ),
                   ),
                 ),
                 // Badges row
                 Positioned(
-                  top: 10,
-                  left: 10,
+                  top: 8,
+                  left: 8,
                   child: Row(
                     children: [
                       if (listing['isFeatured'] == true)
                         Container(
-                          margin: const EdgeInsets.only(right: 6),
+                          margin: const EdgeInsets.only(right: 5),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 3,
+                            horizontal: 6,
+                            vertical: 2,
                           ),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [Color(0xFFF9A825), Color(0xFFFF8F00)],
                             ),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(5),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1387,12 +1387,12 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                       if (listing['isVerified'] == true)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 3,
+                            horizontal: 6,
+                            vertical: 2,
                           ),
                           decoration: BoxDecoration(
                             color: Colors.blue.shade600,
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(5),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1428,7 +1428,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                           : _favourites.add(listing['id'] as String),
                     ),
                     child: Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.9),
                         shape: BoxShape.circle,
@@ -1437,7 +1437,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                         isFav
                             ? Icons.favorite_rounded
                             : Icons.favorite_border_rounded,
-                        size: 18,
+                        size: 16,
                         color: isFav ? Colors.red : Colors.grey.shade600,
                       ),
                     ),
@@ -1454,17 +1454,17 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                         alignment: Alignment.center,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 5,
+                            horizontal: 10,
+                            vertical: 4,
                           ),
                           decoration: BoxDecoration(
                             color: Colors.red.shade700,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             'Not Available',
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
+                              fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
                             ),
@@ -1475,16 +1475,16 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                   ),
                 // Distance
                 Positioned(
-                  bottom: 8,
-                  right: 8,
+                  bottom: 6,
+                  right: 6,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
+                      horizontal: 6,
+                      vertical: 2,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1492,13 +1492,13 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                         const Icon(
                           Icons.near_me_rounded,
                           color: Colors.white,
-                          size: 10,
+                          size: 9,
                         ),
                         const SizedBox(width: 2),
                         Text(
                           '${listing['distance']} km',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10,
+                            fontSize: 9,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
@@ -1510,7 +1510,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
               ],
             ),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1520,7 +1520,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                         child: Text(
                           listing['title'] as String,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
                           maxLines: 1,
@@ -1529,35 +1529,28 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
+                          horizontal: 5,
+                          vertical: 1,
                         ),
                         decoration: BoxDecoration(
                           color: Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.star_rounded,
-                              size: 12,
+                              size: 11,
                               color: Colors.amber.shade700,
                             ),
                             const SizedBox(width: 2),
                             Text(
                               '${listing['rating']}',
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11,
+                                fontSize: 10,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.amber.shade800,
-                              ),
-                            ),
-                            Text(
-                              ' (${listing['reviews']})',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 10,
-                                color: Colors.grey.shade500,
                               ),
                             ),
                           ],
@@ -1565,20 +1558,20 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Row(
                     children: [
                       Icon(
                         Icons.location_on_rounded,
-                        size: 12,
+                        size: 11,
                         color: Colors.grey.shade500,
                       ),
-                      const SizedBox(width: 3),
+                      const SizedBox(width: 2),
                       Expanded(
                         child: Text(
                           listing['location'] as String,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             color: Colors.grey.shade500,
                           ),
                           maxLines: 1,
@@ -1587,27 +1580,27 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 5),
                   // Amenity chips
                   Wrap(
                     spacing: 4,
-                    runSpacing: 4,
+                    runSpacing: 2,
                     children: (listing['amenities'] as List)
                         .take(3)
                         .map(
                           (a) => Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
+                              horizontal: 5,
+                              vertical: 1,
                             ),
                             decoration: BoxDecoration(
                               color: color.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               a as String,
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 9,
+                                fontSize: 8.5,
                                 fontWeight: FontWeight.w600,
                                 color: color,
                               ),
@@ -1616,7 +1609,8 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                         )
                         .toList(),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
+                  // Price and View row
                   Row(
                     children: [
                       Expanded(
@@ -1628,7 +1622,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                                 Text(
                                   '₹${_formatPrice(listing['price'] as num)}',
                                   style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w800,
                                     color: color,
                                   ),
@@ -1636,7 +1630,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                                 Text(
                                   listing['priceUnit'] as String,
                                   style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     color: Colors.grey.shade500,
                                   ),
                                 ),
@@ -1646,7 +1640,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                               Text(
                                 'Deposit: ₹${_formatPrice(listing['deposit'] as num)}',
                                 style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11,
+                                  fontSize: 9.5,
                                   fontWeight: FontWeight.w500,
                                   color: Colors.grey.shade600,
                                 ),
@@ -1656,59 +1650,349 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                           ],
                         ),
                       ),
-                      if (!isGrid) ...[
-                        _buildContactBtn(
-                          Icons.chat_bubble_rounded,
-                          color,
-                          () => Navigator.pushNamed(
-                            context,
-                            AppRoutes.chatDetailScreen,
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RentListingDetailScreen(
+                              listing: listing,
+                              subcategory: _activeSubcategory,
+                              color: color,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        _buildContactBtn(
-                          Icons.phone_rounded,
-                          Colors.green.shade600,
-                          () {},
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'View',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: color,
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 6),
-                      ],
-                      ElevatedButton(
-                        onPressed: isAvailable
-                            ? () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => RentListingDetailScreen(
-                                    listing: listing,
-                                    subcategory: _activeSubcategory,
-                                    color: color,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  // Inquiry & Book Now on the main page inside the box!
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 30,
+                          child: OutlinedButton(
+                            onPressed: isAvailable
+                                ? () => _showInquirySheet(listing, color)
+                                : null,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: color,
+                              side: BorderSide(color: color, width: 1.1),
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.send_rounded, size: 11),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'Inquiry',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                              )
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: color,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
+                              ],
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          elevation: 0,
                         ),
-                        child: Text(
-                          'View',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: SizedBox(
+                          height: 30,
+                          child: ElevatedButton(
+                            onPressed: isAvailable
+                                ? () => _bookListing(listing)
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: color,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.zero,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.shopping_bag_rounded,
+                                  size: 11,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'Book Now',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _bookListing(Map<String, dynamic> listing) {
+    Navigator.pushNamed(
+      context,
+      AppRoutes.bookingCheckoutScreen,
+      arguments: {
+        'providerId': listing['provider_id'] as String?,
+        'providerName': listing['provider'] as String? ?? 'Provider',
+        'providerImage': listing['provider_avatar'] as String? ?? '',
+        'providerRating': listing['rating'] as double? ?? 4.8,
+        'service': listing['title'] as String? ?? 'Rent Booking',
+        'category': 'rent',
+        'scheduledDate': 'Now',
+        'scheduledTime': 'Flexible',
+        'amount':
+            listing['price'] != null ? '₹${listing['price']}' : '₹2000',
+      },
+    );
+  }
+
+  void _showInquirySheet(Map<String, dynamic> listing, Color color) {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final msgCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Text(
+                    'Send Inquiry',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Listing summary
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: CachedNetworkImage(
+                              imageUrl: listing['image'] as String,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => Container(
+                                width: 50,
+                                height: 50,
+                                color: color.withValues(alpha: 0.2),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  listing['title'] as String,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  '₹${_formatPrice(listing['price'] as num)}${listing['priceUnit'] ?? ''}',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    color: color,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Your Name',
+                        prefixIcon:
+                            const Icon(Icons.person_rounded, size: 20),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Phone Number',
+                        prefixIcon: const Icon(Icons.phone_rounded, size: 20),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: msgCtrl,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Message (optional)',
+                        prefixIcon:
+                            const Icon(Icons.message_rounded, size: 20),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Inquiry sent! Provider will contact you soon.',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: Colors.green.shade700,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: color,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          'Submit Inquiry',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
