@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:universal_html/html.dart' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -379,12 +380,14 @@ class _SignupScreenState extends State<SignupScreen>
 
     try {
       if (kIsWeb) {
-        final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
+        try {
+          html.window.localStorage['google_signin_role'] = 'customer';
+        } catch (_) {}
         await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: Uri.base.toString(),
+          redirectTo: '${Uri.base.origin}/',
           queryParams: {
-            'role': roleStr,
+            'role': 'customer',
           },
         );
         return;

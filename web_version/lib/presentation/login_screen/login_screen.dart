@@ -81,6 +81,102 @@ class _LoginScreenState extends State<LoginScreen>
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
     _loadSavedCredentials();
+    _checkPendingOAuthOrSession();
+  }
+
+  Future<void> _checkPendingOAuthOrSession() async {
+    // If returning from Google OAuth, wait briefly for auth session to register
+    if (!SupabaseService.instance.isLoggedIn) {
+      try {
+        await SupabaseService.instance.authStateChanges
+            .firstWhere(
+              (s) =>
+                  s.event == AuthChangeEvent.signedIn ||
+                  s.event == AuthChangeEvent.initialSession,
+            )
+            .timeout(const Duration(milliseconds: 1500));
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    final user = SupabaseService.instance.currentUser;
+    if (user == null) return;
+
+    String? googleSignInRole;
+    try {
+      googleSignInRole = html.window.localStorage['google_signin_role'];
+    } catch (_) {}
+
+    if (googleSignInRole != null && googleSignInRole.isNotEmpty) {
+      try {
+        html.window.localStorage.remove('google_signin_role');
+      } catch (_) {}
+
+      if (googleSignInRole == 'customer') {
+        final profile = await SupabaseService.instance.getUserProfile(user.id);
+        if (profile == null) {
+          final email = user.email;
+          await SupabaseService.instance.signOut();
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.signupScreen,
+              (route) => false,
+              arguments: {'email': email},
+            );
+          }
+          return;
+        } else {
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.homeScreen,
+              (route) => false,
+            );
+          }
+          return;
+        }
+      } else if (googleSignInRole == 'provider') {
+        final status = await SupabaseService.instance.getProviderRegistrationStatus(user.id);
+        if (status == null) {
+          final email = user.email;
+          await SupabaseService.instance.signOut();
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.providerRegistrationScreen,
+              (route) => false,
+              arguments: {'email': email},
+            );
+          }
+          return;
+        } else {
+          if (mounted) {
+            if (status == 'approved') {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.providerDashboardScreen,
+                (route) => false,
+              );
+            } else if (status == 'pending_approval' || status == 'rejected') {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.providerPendingApprovalScreen,
+                (route) => false,
+              );
+            } else {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.homeScreen,
+                (route) => false,
+              );
+            }
+          }
+          return;
+        }
+      }
+    }
   }
 
   Future<void> _loadSavedCredentials() async {
@@ -237,7 +333,7 @@ class _LoginScreenState extends State<LoginScreen>
         } catch (_) {}
         await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: Uri.base.toString(),
+          redirectTo: '${Uri.base.origin}/',
           queryParams: {
             'role': roleStr,
           },
@@ -905,7 +1001,7 @@ class _LoginScreenState extends State<LoginScreen>
             try {
               await SupabaseService.instance.resetPassword(
                 email,
-                redirectTo: kIsWeb ? Uri.base.toString() : null,
+                redirectTo: kIsWeb ? '${Uri.base.origin}/' : null,
               );
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(

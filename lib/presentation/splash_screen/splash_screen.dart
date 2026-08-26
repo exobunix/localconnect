@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:universal_html/html.dart' as html;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -120,7 +121,57 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Keep user logged in once authenticated.
 
-    final userId = SupabaseService.instance.currentUser?.id;
+    final user = SupabaseService.instance.currentUser;
+    final userId = user?.id;
+
+    // Check if there is a pending google sign in role
+    String? googleSignInRole;
+    try {
+      googleSignInRole = html.window.localStorage['google_signin_role'];
+    } catch (_) {}
+
+    if (userId != null && googleSignInRole != null && googleSignInRole.isNotEmpty) {
+      // Clear it so it doesn't run again on next app reload
+      try {
+        html.window.localStorage.remove('google_signin_role');
+      } catch (_) {}
+
+      if (googleSignInRole == 'customer') {
+        final profile = await SupabaseService.instance.getUserProfile(userId);
+        if (profile == null) {
+          // Customer does NOT exist in DB!
+          // Sign out of auth and redirect to signup pre-filled with email!
+          final email = user?.email;
+          await SupabaseService.instance.signOut();
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.signupScreen,
+              (route) => false,
+              arguments: {'email': email},
+            );
+          }
+          return;
+        }
+      } else if (googleSignInRole == 'provider') {
+        final status = await SupabaseService.instance.getProviderRegistrationStatus(userId);
+        if (status == null) {
+          // Provider does NOT exist in DB!
+          // Sign out of auth and redirect to provider registration pre-filled with email!
+          final email = user?.email;
+          await SupabaseService.instance.signOut();
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.providerRegistrationScreen,
+              (route) => false,
+              arguments: {'email': email},
+            );
+          }
+          return;
+        }
+      }
+    }
 
     // SECURITY: Always fetch role from DB (user_profiles), never from user metadata.
     // user_metadata is user-writable and can be spoofed. DB role is server-controlled.

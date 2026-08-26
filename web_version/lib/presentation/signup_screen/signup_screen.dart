@@ -387,7 +387,7 @@ class _SignupScreenState extends State<SignupScreen>
         } catch (_) {}
         await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: Uri.base.toString(),
+          redirectTo: '${Uri.base.origin}/',
           queryParams: {
             'role': 'customer',
           },

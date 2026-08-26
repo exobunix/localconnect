@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:universal_html/html.dart' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -219,9 +220,12 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     GoogleSignInAccount? googleUser;
     try {
       if (kIsWeb) {
+        try {
+          html.window.localStorage['google_signin_role'] = 'provider';
+        } catch (_) {}
         await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: Uri.base.toString(),
+          redirectTo: '${Uri.base.origin}/',
           queryParams: {
             'role': 'provider',
           },

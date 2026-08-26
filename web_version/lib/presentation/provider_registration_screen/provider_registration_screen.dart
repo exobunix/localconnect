@@ -225,7 +225,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
         } catch (_) {}
         await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: Uri.base.toString(),
+          redirectTo: '${Uri.base.origin}/',
           queryParams: {
             'role': 'provider',
           },

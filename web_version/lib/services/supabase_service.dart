@@ -6,7 +6,7 @@ class SupabaseService {
   static SupabaseService? _instance;
   static SupabaseService get instance => _instance ??= SupabaseService._();
 
-  String selectedCity = 'Pune';
+  String selectedCity = '';
   String? lastOrderError;
 
   SupabaseService._();

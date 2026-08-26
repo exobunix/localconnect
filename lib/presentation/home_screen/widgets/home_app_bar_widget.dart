@@ -77,17 +77,15 @@ class HomeAppBarWidget extends StatelessWidget {
                     color: Colors.white,
                     size: 14,
                   ),
-                  if (selectedCity.isNotEmpty) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      selectedCity,
-                      style: GoogleFonts.plusJakartaSans(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  const SizedBox(width: 4),
+                  Text(
+                    selectedCity.isNotEmpty ? selectedCity : 'Select Location',
+                    style: GoogleFonts.plusJakartaSans(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
+                  ),
                   const SizedBox(width: 2),
                   const Icon(
                     Icons.expand_more_rounded,

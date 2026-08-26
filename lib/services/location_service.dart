@@ -31,6 +31,14 @@ class LocationData {
     this.method = 'gps',
   });
 
+  String get displayCity {
+    if (city.isNotEmpty) return city;
+    if (district.isNotEmpty) return district;
+    if (village.isNotEmpty) return village;
+    if (taluka.isNotEmpty) return taluka;
+    return '';
+  }
+
   Map<String, dynamic> toMap() => {
     'latitude': latitude,
     'longitude': longitude,
@@ -114,32 +122,84 @@ class LocationService {
   static const List<double> _smartRadii = [5, 10, 20, 50];
   static const int _minProvidersThreshold = 3;
 
+  LocationData? _lastKnownLocation;
+  LocationData? get lastKnownLocation => _lastKnownLocation;
+
+  static const String _prefCachedLat = 'cached_user_lat';
+  static const String _prefCachedLng = 'cached_user_lng';
+  static const String _prefCachedCity = 'cached_user_city';
+  static const String _prefCachedDistrict = 'cached_user_district';
+  static const String _prefCachedAddress = 'cached_user_address';
+
+  Future<void> cacheLocationLocally(LocationData location) async {
+    _lastKnownLocation = location;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_prefCachedLat, location.latitude);
+      await prefs.setDouble(_prefCachedLng, location.longitude);
+      await prefs.setString(_prefCachedCity, location.city);
+      await prefs.setString(_prefCachedDistrict, location.district);
+      await prefs.setString(_prefCachedAddress, location.fullAddress);
+    } catch (_) {}
+  }
+
+  Future<LocationData?> getCachedLocalLocation() async {
+    if (_lastKnownLocation != null) return _lastKnownLocation;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lat = prefs.getDouble(_prefCachedLat);
+      final lng = prefs.getDouble(_prefCachedLng);
+      final city = prefs.getString(_prefCachedCity) ?? '';
+      final district = prefs.getString(_prefCachedDistrict) ?? '';
+      final addr = prefs.getString(_prefCachedAddress) ?? '';
+      if (lat != null && lng != null && (lat != 0 || lng != 0)) {
+        _lastKnownLocation = LocationData(
+          latitude: lat,
+          longitude: lng,
+          fullAddress: addr,
+          city: city,
+          district: district,
+          method: 'cached',
+        );
+        return _lastKnownLocation;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // ─── Permission & GPS ────────────────────────────────────────────────────
 
   Future<bool> requestPermission() async {
-    if (kIsWeb) return true;
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return false;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled && !kIsWeb) return false;
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      return permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always;
+    } catch (e) {
+      debugPrint('[LocationService] requestPermission error: $e');
+      return kIsWeb; // On web, browser will prompt on getCurrentPosition
     }
-    return permission == LocationPermission.whileInUse ||
-        permission == LocationPermission.always;
   }
 
-  Future<Position?> getCurrentPosition() async {
+  Future<Position?> getCurrentPosition({
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
     try {
       final granted = await requestPermission();
       if (!granted) return null;
       return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
+        locationSettings: LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: timeout,
         ),
       );
     } catch (e) {
+      debugPrint('[LocationService] getCurrentPosition error: $e');
       return null;
     }
   }
@@ -167,12 +227,15 @@ class LocationService {
         final village =
             addr['village'] as String? ??
             addr['hamlet'] as String? ??
+            addr['neighbourhood'] as String? ??
             addr['suburb'] as String? ??
             '';
         final city =
             addr['city'] as String? ??
             addr['town'] as String? ??
             addr['municipality'] as String? ??
+            addr['city_district'] as String? ??
+            addr['suburb'] as String? ??
             '';
         final taluka =
             addr['county'] as String? ??
@@ -180,6 +243,7 @@ class LocationService {
             '';
         final district =
             addr['state_district'] as String? ??
+            addr['district'] as String? ??
             addr['county'] as String? ??
             '';
         final state = addr['state'] as String? ?? 'Maharashtra';
@@ -206,11 +270,15 @@ class LocationService {
 
   // ─── GPS Location ─────────────────────────────────────────────────────────
 
-  Future<LocationData?> getGpsLocation() async {
-    final pos = await getCurrentPosition();
-    if (pos == null) return null;
+  Future<LocationData?> getGpsLocation({
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final pos = await getCurrentPosition(timeout: timeout);
+    if (pos == null) {
+      return await getCachedLocalLocation();
+    }
     final data = await reverseGeocode(pos.latitude, pos.longitude);
-    return data ??
+    final resolved = data ??
         LocationData(
           latitude: pos.latitude,
           longitude: pos.longitude,
@@ -218,6 +286,8 @@ class LocationService {
               '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}',
           method: 'gps',
         );
+    await cacheLocationLocally(resolved);
+    return resolved;
   }
 
   // ─── Save Location as Saved Address ──────────────────────────────────────

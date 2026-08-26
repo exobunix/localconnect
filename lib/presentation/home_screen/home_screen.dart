@@ -29,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedNavIndex = 0;
   bool _navVisible = true;
   final ScrollController _scrollController = ScrollController();
-  String _selectedCity = 'Pune';
+  String _selectedCity = '';
   String _userName = '';
   int _unreadMessageCount = 0;
   String _userRole = 'customer';
@@ -42,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedCity = SupabaseService.instance.selectedCity;
     _scrollController.addListener(_onScroll);
     _isOnline = ConnectivityService.instance.isOnline;
     ConnectivityService.instance.onConnectivityChanged.listen((online) {
@@ -51,11 +52,44 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
     _loadUserProfile();
+    _initLocation();
     _loadUnreadCount();
     _subscribeToMessageUpdates();
     // Initialize notification hub for badge counter
     NotificationHubService.instance.initialize();
     NotificationHubService.instance.addListener(_onNotificationHubUpdate);
+  }
+
+  Future<void> _initLocation() async {
+    // 1. Check local cache
+    final cached = await LocationService.instance.getCachedLocalLocation();
+    if (cached != null && cached.displayCity.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _selectedCity = cached.displayCity;
+          SupabaseService.instance.selectedCity = _selectedCity;
+        });
+      }
+    }
+
+    // 2. Request GPS location dynamically
+    try {
+      final loc = await LocationService.instance.getGpsLocation(
+        timeout: const Duration(seconds: 6),
+      );
+      if (loc != null && loc.displayCity.isNotEmpty && mounted) {
+        setState(() {
+          _selectedCity = loc.displayCity;
+          SupabaseService.instance.selectedCity = _selectedCity;
+        });
+        final userId = SupabaseService.instance.currentUser?.id;
+        if (userId != null) {
+          await LocationService.instance.saveCustomerLocation(loc);
+        }
+      }
+    } catch (e) {
+      debugPrint('[HomeScreen] GPS init error: $e');
+    }
   }
 
   void _onNotificationHubUpdate() {
@@ -75,8 +109,11 @@ class _HomeScreenState extends State<HomeScreen> {
         final ts = ConnectivityService.instance.getCachedTimestamp(cached);
         setState(() {
           _userName = data?['full_name'] as String? ?? '';
-          _selectedCity = data?['city'] as String? ?? 'Pune';
-          SupabaseService.instance.selectedCity = _selectedCity;
+          final city = data?['city'] as String? ?? '';
+          if (city.isNotEmpty) {
+            _selectedCity = city;
+            SupabaseService.instance.selectedCity = _selectedCity;
+          }
           _userRole = data?['role'] as String? ?? 'customer';
           _cacheAge = ConnectivityService.instance.formatCacheAge(ts);
         });
@@ -88,13 +125,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted && profile != null) {
       setState(() {
         _userName = profile['full_name'] as String? ?? '';
-        _selectedCity = profile['city'] as String? ?? 'Pune';
-        SupabaseService.instance.selectedCity = _selectedCity;
+        final city = profile['city'] as String? ?? '';
+        if (city.isNotEmpty) {
+          _selectedCity = city;
+          SupabaseService.instance.selectedCity = _selectedCity;
+        }
         _userRole = profile['role'] as String? ?? 'customer';
       });
       await ConnectivityService.instance.cacheData(_cacheKeyProfile, profile);
-      
-      // Auto prompt removed as per user request to avoid popup every time.
     }
   }
 

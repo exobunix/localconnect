@@ -72,25 +72,56 @@ class _HomeNearbyProvidersWidgetState extends State<HomeNearbyProvidersWidget> {
 
     setState(() => _isLoading = true);
     try {
-      // 1. Fetch all approved providers from database (no limit)
-      final response = await SupabaseService.instance.client
-          .from('service_providers')
-          .select()
-          .eq('registration_status', 'approved');
-      
-      List<Map<String, dynamic>> allProviders = List<Map<String, dynamic>>.from(response);
+      // 1. Fetch providers from database
+      List<Map<String, dynamic>> allProviders = [];
+      try {
+        final response = await SupabaseService.instance.client
+            .from('service_providers')
+            .select()
+            .or('is_active.eq.true,registration_status.eq.approved');
+        allProviders = List<Map<String, dynamic>>.from(response);
+      } catch (e) {
+        debugPrint('[HomeNearbyProviders] Filtered fetch fallback: $e');
+      }
+
+      if (allProviders.isEmpty) {
+        try {
+          final response = await SupabaseService.instance.client
+              .from('service_providers')
+              .select();
+          allProviders = List<Map<String, dynamic>>.from(response);
+        } catch (e) {
+          debugPrint('[HomeNearbyProviders] All providers fetch error: $e');
+        }
+      }
 
       // 2. Try GPS location to sort sequence-wise (nearest first)
       try {
-        final location = await LocationService.instance.getCurrentPosition();
-        if (location != null) {
+        LocationData? userLoc = LocationService.instance.lastKnownLocation;
+        userLoc ??= await LocationService.instance.getCachedLocalLocation();
+        if (userLoc == null) {
+          final pos = await LocationService.instance.getCurrentPosition(
+            timeout: const Duration(seconds: 3),
+          );
+          if (pos != null) {
+            userLoc = LocationData(
+              latitude: pos.latitude,
+              longitude: pos.longitude,
+              fullAddress: '',
+            );
+          }
+        }
+
+        if (userLoc != null && (userLoc.latitude != 0 || userLoc.longitude != 0)) {
           for (var p in allProviders) {
-            final pLat = (p['business_latitude'] as num?)?.toDouble();
-            final pLng = (p['business_longitude'] as num?)?.toDouble();
-            if (pLat != null && pLng != null) {
+            final pLat = (p['business_latitude'] as num?)?.toDouble() ??
+                (p['latitude'] as num?)?.toDouble();
+            final pLng = (p['business_longitude'] as num?)?.toDouble() ??
+                (p['longitude'] as num?)?.toDouble();
+            if (pLat != null && pLng != null && (pLat != 0 || pLng != 0)) {
               p['distance_km'] = LocationService.instance.calculateDistance(
-                location.latitude,
-                location.longitude,
+                userLoc.latitude,
+                userLoc.longitude,
                 pLat,
                 pLng,
               );
@@ -102,7 +133,10 @@ class _HomeNearbyProvidersWidgetState extends State<HomeNearbyProvidersWidget> {
           allProviders.sort((a, b) {
             final distA = (a['distance_km'] as num?)?.toDouble() ?? 999999.0;
             final distB = (b['distance_km'] as num?)?.toDouble() ?? 999999.0;
-            return distA.compareTo(distB);
+            if (distA != distB) return distA.compareTo(distB);
+            final ratingA = (a['rating'] as num?)?.toDouble() ?? 0.0;
+            final ratingB = (b['rating'] as num?)?.toDouble() ?? 0.0;
+            return ratingB.compareTo(ratingA);
           });
         } else {
           // If no GPS coordinates, sort by city matching selected city first, then by rating
@@ -111,10 +145,10 @@ class _HomeNearbyProvidersWidgetState extends State<HomeNearbyProvidersWidget> {
               final cityA = (a['city'] as String? ?? '').toLowerCase();
               final cityB = (b['city'] as String? ?? '').toLowerCase();
               final targetCity = widget.city!.toLowerCase();
-              
+
               if (cityA == targetCity && cityB != targetCity) return -1;
               if (cityB == targetCity && cityA != targetCity) return 1;
-              
+
               final ratingA = (a['rating'] as num?)?.toDouble() ?? 0.0;
               final ratingB = (b['rating'] as num?)?.toDouble() ?? 0.0;
               return ratingB.compareTo(ratingA); // higher rating first
@@ -137,7 +171,7 @@ class _HomeNearbyProvidersWidgetState extends State<HomeNearbyProvidersWidget> {
           _providers = allProviders;
           _isLoading = false;
           _cacheAge = null;
-          _expansionMessage = null; // Hide any radius warning banner
+          _expansionMessage = null;
         });
         await ConnectivityService.instance.cacheData(_cacheKey, allProviders);
       }
