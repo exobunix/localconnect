@@ -445,7 +445,11 @@ class AppRoutes {
       loginScreen: (context) => const LoginScreen(key: null),
       phoneAuthScreen: (context) => const PhoneAuthScreen(),
       phoneProfileSetupScreen: (context) => const PhoneProfileSetupScreen(),
-      signupScreen: (context) => const SignupScreen(),
+      signupScreen: (context) {
+        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final email = args?['email'] as String?;
+        return SignupScreen(initialEmail: email);
+      },
       adminLoginScreen: (context) => const AdminLoginScreen(),
       // ── Customer-only routes ──────────────────────────────────────────────,
       homeScreen: (context) =>
@@ -845,8 +849,11 @@ class AppRoutes {
       // ── Shared routes (accessible by multiple roles) ──────────────────────,
       providerProfileScreen: (context) => const ProviderProfileScreen(),
       providerOnboardingScreen: (context) => const ProviderOnboardingScreen(),
-      providerRegistrationScreen: (context) =>
-          const ProviderRegistrationScreen(),
+      providerRegistrationScreen: (context) {
+        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final email = args?['email'] as String?;
+        return ProviderRegistrationScreen(initialEmail: email);
+      },
       providerPendingApprovalScreen: (context) =>
           const ProviderPendingApprovalScreen(),
       orderManagementScreen: (context) => const OrderManagementScreen(),

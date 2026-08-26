@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,7 +19,8 @@ import '../../theme/app_theme.dart';
 // twilio_otp_service removed — phone OTP no longer used
 
 class ProviderRegistrationScreen extends StatefulWidget {
-  const ProviderRegistrationScreen({super.key});
+  final String? initialEmail;
+  const ProviderRegistrationScreen({super.key, this.initialEmail});
 
   @override
   State<ProviderRegistrationScreen> createState() =>
@@ -114,6 +116,9 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   @override
   void initState() {
     super.initState();
+    if (widget.initialEmail != null) {
+      _emailController.text = widget.initialEmail!;
+    }
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -215,6 +220,9 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     GoogleSignInAccount? googleUser;
     try {
       if (kIsWeb) {
+        try {
+          html.window.localStorage['google_signin_role'] = 'provider';
+        } catch (_) {}
         await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: Uri.base.toString(),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:html' as html;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -231,6 +232,9 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       if (kIsWeb) {
         final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
+        try {
+          html.window.localStorage['google_signin_role'] = roleStr;
+        } catch (_) {}
         await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: Uri.base.toString(),
@@ -266,9 +270,45 @@ class _LoginScreenState extends State<LoginScreen>
 
       final user = SupabaseService.instance.currentUser;
       if (user != null) {
+        final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
+        if (roleStr == 'customer') {
+          final profile = await SupabaseService.instance.getUserProfile(user.id);
+          if (profile == null) {
+            final email = user.email;
+            await SupabaseService.instance.signOut();
+            if (mounted) {
+              setState(() {
+                _isGoogleLoading = false;
+              });
+              Navigator.pushNamed(
+                context,
+                AppRoutes.signupScreen,
+                arguments: {'email': email},
+              );
+            }
+            return;
+          }
+        } else {
+          final status = await SupabaseService.instance.getProviderRegistrationStatus(user.id);
+          if (status == null) {
+            final email = user.email;
+            await SupabaseService.instance.signOut();
+            if (mounted) {
+              setState(() {
+                _isGoogleLoading = false;
+              });
+              Navigator.pushNamed(
+                context,
+                AppRoutes.providerRegistrationScreen,
+                arguments: {'email': email},
+              );
+            }
+            return;
+          }
+        }
+
         final existingRole = user.userMetadata?['role'] as String?;
         if (existingRole == null || existingRole.isEmpty) {
-          final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
           await SupabaseService.instance.client.auth.updateUser(
             UserAttributes(data: {'role': roleStr}),
           );

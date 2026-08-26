@@ -18,7 +18,8 @@ import '../../theme/app_theme.dart';
 // twilio_otp_service removed — phone OTP no longer used
 
 class ProviderRegistrationScreen extends StatefulWidget {
-  const ProviderRegistrationScreen({super.key});
+  final String? initialEmail;
+  const ProviderRegistrationScreen({super.key, this.initialEmail});
 
   @override
   State<ProviderRegistrationScreen> createState() =>
@@ -114,6 +115,9 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   @override
   void initState() {
     super.initState();
+    if (widget.initialEmail != null) {
+      _emailController.text = widget.initialEmail!;
+    }
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
