@@ -72,48 +72,74 @@ class _HomeNearbyProvidersWidgetState extends State<HomeNearbyProvidersWidget> {
 
     setState(() => _isLoading = true);
     try {
-      List<Map<String, dynamic>> data = [];
-      String? expansionMsg;
+      // 1. Fetch all active providers from database (no limit)
+      final response = await SupabaseService.instance.client
+          .from('service_providers')
+          .select()
+          .eq('is_active', true);
+      
+      List<Map<String, dynamic>> allProviders = List<Map<String, dynamic>>.from(response);
 
-      // 1. Try GPS location first
+      // 2. Try GPS location to sort sequence-wise (nearest first)
       try {
         final location = await LocationService.instance.getCurrentPosition();
         if (location != null) {
-          final result = await LocationService.instance.getNearbyProvidersSmart(
-            lat: location.latitude,
-            lng: location.longitude,
-            limit: 12,
-          );
-          data = result.providers;
-          expansionMsg = result.expansionMessage;
+          for (var p in allProviders) {
+            final pLat = (p['business_latitude'] as num?)?.toDouble();
+            final pLng = (p['business_longitude'] as num?)?.toDouble();
+            if (pLat != null && pLng != null) {
+              p['distance_km'] = LocationService.instance.calculateDistance(
+                location.latitude,
+                location.longitude,
+                pLat,
+                pLng,
+              );
+            } else {
+              p['distance_km'] = 999999.0;
+            }
+          }
+          // Sort by distance ascending
+          allProviders.sort((a, b) {
+            final distA = (a['distance_km'] as num?)?.toDouble() ?? 999999.0;
+            final distB = (b['distance_km'] as num?)?.toDouble() ?? 999999.0;
+            return distA.compareTo(distB);
+          });
+        } else {
+          // If no GPS coordinates, sort by city matching selected city first, then by rating
+          if (widget.city != null && widget.city!.isNotEmpty) {
+            allProviders.sort((a, b) {
+              final cityA = (a['city'] as String? ?? '').toLowerCase();
+              final cityB = (b['city'] as String? ?? '').toLowerCase();
+              final targetCity = widget.city!.toLowerCase();
+              
+              if (cityA == targetCity && cityB != targetCity) return -1;
+              if (cityB == targetCity && cityA != targetCity) return 1;
+              
+              final ratingA = (a['rating'] as num?)?.toDouble() ?? 0.0;
+              final ratingB = (b['rating'] as num?)?.toDouble() ?? 0.0;
+              return ratingB.compareTo(ratingA); // higher rating first
+            });
+          } else {
+            // Sort by rating desc
+            allProviders.sort((a, b) {
+              final ratingA = (a['rating'] as num?)?.toDouble() ?? 0.0;
+              final ratingB = (b['rating'] as num?)?.toDouble() ?? 0.0;
+              return ratingB.compareTo(ratingA);
+            });
+          }
         }
       } catch (e) {
-        debugPrint('[HomeNearbyProviders] GPS load error: $e');
-      }
-
-      // 2. Fallback to Selected City
-      if (data.isEmpty && widget.city != null && widget.city!.isNotEmpty) {
-        data = await SupabaseService.instance.getNearbyProviders(
-          city: widget.city,
-          limit: 12,
-        );
-      }
-
-      // 3. Fallback to ALL active providers in DB
-      if (data.isEmpty) {
-        data = await SupabaseService.instance.getNearbyProviders(
-          limit: 12,
-        );
+        debugPrint('[HomeNearbyProviders] GPS sorting error: $e');
       }
 
       if (mounted) {
         setState(() {
-          _providers = data;
+          _providers = allProviders;
           _isLoading = false;
           _cacheAge = null;
-          _expansionMessage = expansionMsg;
+          _expansionMessage = null; // Hide any radius warning banner
         });
-        await ConnectivityService.instance.cacheData(_cacheKey, data);
+        await ConnectivityService.instance.cacheData(_cacheKey, allProviders);
       }
     } catch (e) {
       debugPrint('[HomeNearbyProviders] Error loading providers: $e');
