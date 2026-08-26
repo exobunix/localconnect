@@ -19,6 +19,13 @@ class BookingSummaryScreen extends StatelessWidget {
     final orderNumber = args['orderNumber'] as String? ?? 'ORD-000001';
     final service = args['service'] as String? ?? 'Service';
     final providerName = args['providerName'] as String? ?? 'Provider';
+    final user = SupabaseService.instance.client.auth.currentUser;
+    final customerName = args['customerName'] as String? ??
+        (user?.userMetadata?['full_name'] as String?)?.trim() ??
+        'Customer';
+    final customerPhone = args['customerPhone'] as String? ??
+        (user?.userMetadata?['phone'] as String?)?.trim() ??
+        '';
     final amount = args['amount'] as String? ?? '₹0';
     final scheduledDate = args['scheduledDate'] as String? ?? '';
     final scheduledTime = args['scheduledTime'] as String? ?? '';
@@ -50,6 +57,8 @@ class BookingSummaryScreen extends StatelessWidget {
               orderNumber: orderNumber,
               service: service,
               providerName: providerName,
+              customerName: customerName,
+              customerPhone: customerPhone,
               amount: amount,
               scheduledDate: scheduledDate,
               scheduledTime: scheduledTime,
@@ -64,6 +73,8 @@ class BookingSummaryScreen extends StatelessWidget {
               orderNumber: orderNumber,
               service: service,
               providerName: providerName,
+              customerName: customerName,
+              customerPhone: customerPhone,
               amount: amount,
               scheduledDate: scheduledDate,
               scheduledTime: scheduledTime,
@@ -84,6 +95,8 @@ class BookingSummaryScreen extends StatelessWidget {
               orderNumber: orderNumber,
               service: service,
               providerName: providerName,
+              customerName: customerName,
+              customerPhone: customerPhone,
               amount: amount,
               scheduledDate: scheduledDate,
               scheduledTime: scheduledTime,
@@ -100,6 +113,8 @@ class BookingSummaryScreen extends StatelessWidget {
                 orderNumber: orderNumber,
                 service: service,
                 providerName: providerName,
+                customerName: customerName,
+                customerPhone: customerPhone,
                 amount: amount,
                 scheduledDate: scheduledDate,
                 scheduledTime: scheduledTime,
@@ -110,6 +125,8 @@ class BookingSummaryScreen extends StatelessWidget {
                 orderNumber: orderNumber,
                 service: service,
                 providerName: providerName,
+                customerName: customerName,
+                customerPhone: customerPhone,
                 amount: amount,
                 scheduledDate: scheduledDate,
                 scheduledTime: scheduledTime,
@@ -152,6 +169,8 @@ class BookingSummaryScreen extends StatelessWidget {
     required String orderNumber,
     required String service,
     required String providerName,
+    required String customerName,
+    required String customerPhone,
     required String amount,
     required String scheduledDate,
     required String scheduledTime,
@@ -162,9 +181,9 @@ class BookingSummaryScreen extends StatelessWidget {
 📋 Booking Summary — LocalConnect
 
 Order #: $orderNumber
+Customer: $customerName${customerPhone.isNotEmpty ? ' ($customerPhone)' : ''}
 Service: $service
-Provider: $providerName
-Date: $scheduledDate${scheduledTime.isNotEmpty ? ' at $scheduledTime' : ''}
+${providerName.isNotEmpty ? 'Provider: $providerName\n' : ''}Date: $scheduledDate${scheduledTime.isNotEmpty ? ' at $scheduledTime' : ''}
 Amount: $amount
 Payment Status: $paymentStatus
 
@@ -204,6 +223,8 @@ Booked via LocalConnect App
     required String orderNumber,
     required String service,
     required String providerName,
+    required String customerName,
+    required String customerPhone,
     required String amount,
     required String scheduledDate,
     required String scheduledTime,
@@ -217,6 +238,8 @@ Booked via LocalConnect App
       orderNumber: orderNumber,
       service: service,
       providerName: providerName,
+      customerName: customerName,
+      customerPhone: customerPhone,
       amount: amount,
       scheduledDate: scheduledDate,
       scheduledTime: scheduledTime,
@@ -278,6 +301,8 @@ Booked via LocalConnect App
     required String orderNumber,
     required String service,
     required String providerName,
+    required String customerName,
+    required String customerPhone,
     required String amount,
     required String scheduledDate,
     required String scheduledTime,
@@ -294,11 +319,14 @@ Booked via LocalConnect App
 Invoice Date : $invoiceDate
 Order Number : $orderNumber
 --------------------------------------------
+CUSTOMER DETAILS
+--------------------------------------------
+Customer     : $customerName
+${customerPhone.isNotEmpty ? 'Phone        : $customerPhone\n' : ''}--------------------------------------------
 SERVICE DETAILS
 --------------------------------------------
 Service      : $service
-${category.isNotEmpty ? 'Category     : $category\n' : ''}Provider     : $providerName
-${scheduledDate.isNotEmpty ? 'Date         : $scheduledDate\n' : ''}${scheduledTime.isNotEmpty ? 'Time         : $scheduledTime\n' : ''}${address.isNotEmpty ? 'Address      : $address\n' : ''}--------------------------------------------
+${category.isNotEmpty ? 'Category     : $category\n' : ''}${providerName.isNotEmpty ? 'Provider     : $providerName\n' : ''}${scheduledDate.isNotEmpty ? 'Date         : $scheduledDate\n' : ''}${scheduledTime.isNotEmpty ? 'Time         : $scheduledTime\n' : ''}${address.isNotEmpty ? 'Address      : $address\n' : ''}--------------------------------------------
 PAYMENT DETAILS
 --------------------------------------------
 Amount       : $amount
@@ -332,6 +360,8 @@ class _InvoiceReceiptCard extends StatelessWidget {
   final String orderNumber;
   final String service;
   final String providerName;
+  final String customerName;
+  final String customerPhone;
   final String amount;
   final String scheduledDate;
   final String scheduledTime;
@@ -345,6 +375,8 @@ class _InvoiceReceiptCard extends StatelessWidget {
     required this.orderNumber,
     required this.service,
     required this.providerName,
+    required this.customerName,
+    required this.customerPhone,
     required this.amount,
     required this.scheduledDate,
     required this.scheduledTime,
@@ -524,6 +556,15 @@ class _InvoiceReceiptCard extends StatelessWidget {
             child: Column(
               children: [
                 _ReceiptRow(
+                  label: 'Customer',
+                  value: customerPhone.isNotEmpty
+                      ? '$customerName ($customerPhone)'
+                      : customerName,
+                  icon: Icons.person_outline_rounded,
+                  iconColor: AppTheme.primary,
+                ),
+                const SizedBox(height: 14),
+                _ReceiptRow(
                   label: 'Service',
                   value: service,
                   icon: Icons.home_repair_service_rounded,
@@ -538,13 +579,16 @@ class _InvoiceReceiptCard extends StatelessWidget {
                     iconColor: AppTheme.secondary,
                   ),
                 ],
-                const SizedBox(height: 14),
-                _ReceiptRow(
-                  label: 'Provider',
-                  value: providerName,
-                  icon: Icons.person_rounded,
-                  iconColor: const Color(0xFF6A1B9A),
-                ),
+                if (providerName.isNotEmpty &&
+                    providerName.toLowerCase() != 'provider') ...[
+                  const SizedBox(height: 14),
+                  _ReceiptRow(
+                    label: 'Provider',
+                    value: providerName,
+                    icon: Icons.store_rounded,
+                    iconColor: const Color(0xFF6A1B9A),
+                  ),
+                ],
                 if (scheduledDate.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   _ReceiptRow(

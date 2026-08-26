@@ -1300,468 +1300,416 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
   }) {
     final isFav = _favourites.contains(listing['id']);
     final isAvailable = listing['available'] as bool;
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => RentListingDetailScreen(
-            listing: listing,
-            subcategory: _activeSubcategory,
-            color: color,
+    return Container(
+      margin: EdgeInsets.only(bottom: isGrid ? 0 : 14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
-        ),
+        ],
       ),
-      child: Container(
-        margin: EdgeInsets.only(bottom: isGrid ? 0 : 14),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                  child: CachedNetworkImage(
-                    imageUrl: listing['image'] as String,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
+                child: CachedNetworkImage(
+                  imageUrl: listing['image'] as String,
+                  height: 140,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => Container(
                     height: 140,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => Container(
-                      height: 140,
-                      color: color.withValues(alpha: 0.1),
-                      child: Icon(Icons.image_rounded, color: color, size: 36),
-                    ),
+                    color: color.withValues(alpha: 0.1),
+                    child: Icon(Icons.image_rounded, color: color, size: 36),
                   ),
                 ),
-                // Badges row
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: Row(
-                    children: [
-                      if (listing['isFeatured'] == true)
-                        Container(
-                          margin: const EdgeInsets.only(right: 5),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFF9A825), Color(0xFFFF8F00)],
-                            ),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.star_rounded,
-                                color: Colors.white,
-                                size: 10,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                'Featured',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (listing['isVerified'] == true)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade600,
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.verified_rounded,
-                                color: Colors.white,
-                                size: 10,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                'Verified',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                // Fav + availability
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () => setState(
-                      () => isFav
-                          ? _favourites.remove(listing['id'])
-                          : _favourites.add(listing['id'] as String),
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isFav
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        size: 16,
-                        color: isFav ? Colors.red : Colors.grey.shade600,
-                      ),
-                    ),
-                  ),
-                ),
-                if (!isAvailable)
-                  Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(16),
-                      ),
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        alignment: Alignment.center,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade700,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Not Available',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                // Distance
-                Positioned(
-                  bottom: 6,
-                  right: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.near_me_rounded,
-                          color: Colors.white,
-                          size: 9,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${listing['distance']} km',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          listing['title'] as String,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
+              ),
+              // Badges row
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Row(
+                  children: [
+                    if (listing['isFeatured'] == true)
                       Container(
+                        margin: const EdgeInsets.only(right: 5),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 1,
+                          horizontal: 6,
+                          vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(4),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFF9A825), Color(0xFFFF8F00)],
+                          ),
+                          borderRadius: BorderRadius.circular(5),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.star_rounded,
-                              size: 11,
-                              color: Colors.amber.shade700,
+                              color: Colors.white,
+                              size: 10,
                             ),
                             const SizedBox(width: 2),
                             Text(
-                              '${listing['rating']}',
+                              'Featured',
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 10,
+                                fontSize: 9,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.amber.shade800,
+                                color: Colors.white,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
+                    if (listing['isVerified'] == true)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade600,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.verified_rounded,
+                              color: Colors.white,
+                              size: 10,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              'Verified',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Fav + availability
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () => setState(
+                    () => isFav
+                        ? _favourites.remove(listing['id'])
+                        : _favourites.add(listing['id'] as String),
                   ),
-                  const SizedBox(height: 2),
-                  Row(
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isFav
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      size: 16,
+                      color: isFav ? Colors.red : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+              if (!isAvailable)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      alignment: Alignment.center,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade700,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Not Available',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              // Distance
+              Positioned(
+                bottom: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.location_on_rounded,
-                        size: 11,
-                        color: Colors.grey.shade500,
+                      const Icon(
+                        Icons.near_me_rounded,
+                        color: Colors.white,
+                        size: 9,
                       ),
                       const SizedBox(width: 2),
-                      Expanded(
-                        child: Text(
-                          listing['location'] as String,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10.5,
-                            color: Colors.grey.shade500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      Text(
+                        '${listing['distance']} km',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 5),
-                  // Amenity chips
-                  Wrap(
-                    spacing: 4,
-                    runSpacing: 2,
-                    children: (listing['amenities'] as List)
-                        .take(3)
-                        .map(
-                          (a) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              a as String,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w600,
-                                color: color,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                  const SizedBox(height: 6),
-                  // Price and View row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '₹${_formatPrice(listing['price'] as num)}',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    color: color,
-                                  ),
-                                ),
-                                Text(
-                                  listing['priceUnit'] as String,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 10,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if ((listing['deposit'] as num) > 0)
-                              Text(
-                                'Deposit: ₹${_formatPrice(listing['deposit'] as num)}',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey.shade600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                          ],
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        listing['title'] as String,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => RentListingDetailScreen(
-                              listing: listing,
-                              subcategory: _activeSubcategory,
-                              color: color,
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.star_rounded,
+                            size: 11,
+                            color: Colors.amber.shade700,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${listing['rating']}',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.amber.shade800,
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_rounded,
+                      size: 11,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 2),
+                    Expanded(
+                      child: Text(
+                        listing['location'] as String,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10.5,
+                          color: Colors.grey.shade500,
                         ),
-                        child: Container(
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                // Amenity chips
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: (listing['amenities'] as List)
+                      .take(3)
+                      .map(
+                        (a) => Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 4,
+                            horizontal: 5,
+                            vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
+                            color: color.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            'View',
+                            a as String,
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w600,
                               color: color,
                             ),
                           ),
                         ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 6),
+                // Price and Deposit row
+                Row(
+                  children: [
+                    Text(
+                      '₹${_formatPrice(listing['price'] as num)}',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: color,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  // Inquiry & Book Now on the main page inside the box!
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 30,
-                          child: OutlinedButton(
-                            onPressed: isAvailable
-                                ? () => _showInquirySheet(listing, color)
-                                : null,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: color,
-                              side: BorderSide(color: color, width: 1.1),
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(7),
-                              ),
+                    ),
+                    Text(
+                      listing['priceUnit'] as String,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                    const Spacer(),
+                    if ((listing['deposit'] as num) > 0)
+                      Text(
+                        'Deposit: ₹${_formatPrice(listing['deposit'] as num)}',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                // Inquiry & Book Now on the main page inside the box!
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 30,
+                        child: OutlinedButton(
+                          onPressed: isAvailable
+                              ? () => _showInquirySheet(listing, color)
+                              : null,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: color,
+                            side: BorderSide(color: color, width: 1.1),
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(7),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.send_rounded, size: 11),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'Inquiry',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.center,
+                            children: [
+                              const Icon(Icons.send_rounded, size: 11),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Inquiry',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: SizedBox(
-                          height: 30,
-                          child: ElevatedButton(
-                            onPressed: isAvailable
-                                ? () => _bookListing(listing)
-                                : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: color,
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.zero,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(7),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: SizedBox(
+                        height: 30,
+                        child: ElevatedButton(
+                          onPressed: isAvailable
+                              ? () => _bookListing(listing)
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: color,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.zero,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.center,
+                            children: [
+                              const Icon(
+                                Icons.shopping_bag_rounded,
+                                size: 11,
                               ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.shopping_bag_rounded,
-                                  size: 11,
+                              const SizedBox(width: 3),
+                              Text(
+                                'Book Now',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'Book Now',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1772,12 +1720,12 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
       AppRoutes.bookingCheckoutScreen,
       arguments: {
         'providerId': listing['provider_id'] as String?,
-        'providerName': listing['provider'] as String? ?? 'Provider',
+        'providerName': listing['provider'] as String? ?? 'Property Owner',
         'providerImage': listing['provider_avatar'] as String? ?? '',
         'providerRating': listing['rating'] as double? ?? 4.8,
         'service': listing['title'] as String? ?? 'Rent Booking',
         'category': 'rent',
-        'scheduledDate': 'Now',
+        'scheduledDate': 'Today',
         'scheduledTime': 'Flexible',
         'amount':
             listing['price'] != null ? '₹${listing['price']}' : '₹2000',

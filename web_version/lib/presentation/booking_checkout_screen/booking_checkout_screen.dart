@@ -30,6 +30,14 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
   double _pendingAmount = 0;
   Map<String, dynamic> _pendingArgs = {};
 
+  // Customer & schedule state
+  String _customerName = '';
+  String _customerPhone = '';
+  String _customerEmail = '';
+  String _scheduledDate = 'Today';
+  String _scheduledTime = 'Flexible';
+  bool _argsInitialized = false;
+
   final List<Map<String, dynamic>> _paymentMethods = [
     {
       'id': 'cash',
@@ -59,9 +67,197 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_argsInitialized) {
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ??
+          {};
+      final user = SupabaseService.instance.client.auth.currentUser;
+      final defaultName =
+          (user?.userMetadata?['full_name'] as String?)?.trim() ??
+          (user?.userMetadata?['name'] as String?)?.trim() ??
+          (user?.email != null && user!.email!.contains('@')
+              ? user.email!.split('@').first
+              : '') ??
+          '';
+      final defaultPhone =
+          (user?.userMetadata?['phone'] as String?)?.trim() ??
+          (user?.phone)?.trim() ??
+          '';
+
+      _customerName = defaultName.isNotEmpty ? defaultName : 'Customer';
+      _customerPhone = defaultPhone;
+      _customerEmail = user?.email ?? '';
+
+      final argDate = args['scheduledDate'] as String? ?? '';
+      if (argDate.isNotEmpty && argDate.toLowerCase() != 'now') {
+        _scheduledDate = argDate;
+      } else {
+        _scheduledDate = 'Today';
+      }
+
+      final argTime = args['scheduledTime'] as String? ?? '';
+      if (argTime.isNotEmpty) {
+        _scheduledTime = argTime;
+      } else {
+        _scheduledTime = 'Flexible';
+      }
+
+      _argsInitialized = true;
+    }
+  }
+
+  @override
   void dispose() {
     _razorpay?.clear();
     super.dispose();
+  }
+
+  // ── Date & Time Pickers ──────────────────────────────────────────────────
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppTheme.primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: const Color(0xFF1A1C1E),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      final formatted =
+          "${picked.day} ${months[picked.month - 1]} ${picked.year}";
+      setState(() => _scheduledDate = formatted);
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppTheme.primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: const Color(0xFF1A1C1E),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && mounted) {
+      setState(() => _scheduledTime = picked.format(context));
+    }
+  }
+
+  void _showEditCustomerDialog() {
+    final nameCtrl = TextEditingController(text: _customerName);
+    final phoneCtrl = TextEditingController(text: _customerPhone);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.person_outline_rounded, color: AppTheme.primary, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              'Edit Name & Contact',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: 'Full Name',
+                prefixIcon: const Icon(Icons.person_rounded, size: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'Phone Number',
+                prefixIcon: const Icon(Icons.phone_rounded, size: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(color: Colors.grey.shade600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                if (nameCtrl.text.trim().isNotEmpty) {
+                  _customerName = nameCtrl.text.trim();
+                }
+                _customerPhone = phoneCtrl.text.trim();
+              });
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Save',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── Parse amount string like "₹500" or "500" to double ──────────────────
@@ -79,10 +275,9 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
       return;
     }
 
-    final user = SupabaseService.instance.client.auth.currentUser;
-    final email = user?.email ?? '';
-    final phone = user?.userMetadata?['phone'] as String? ?? '';
-    final name = user?.userMetadata?['full_name'] as String? ?? 'Customer';
+    final email = _customerEmail;
+    final phone = _customerPhone;
+    final name = _customerName.isNotEmpty ? _customerName : 'Customer';
 
     if (kIsWeb) {
       RazorpayService.instance.openRazorpayWeb(
@@ -98,6 +293,8 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
           'service': _pendingArgs['service'] ?? '',
           'provider': _pendingArgs['providerName'] ?? '',
           'category': _pendingArgs['category'] ?? '',
+          'scheduledDate': _scheduledDate,
+          'scheduledTime': _scheduledTime,
           if (_pendingOrderId != null) 'order_id': _pendingOrderId!,
         },
         onSuccess: (paymentId, orderId, signature) async {
@@ -268,7 +465,11 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
         : args['address'] as String? ?? '';
 
     final enrichedArgs = Map<String, dynamic>.from(args)
-      ..['address'] = addressStr;
+      ..['address'] = addressStr
+      ..['scheduledDate'] = _scheduledDate
+      ..['scheduledTime'] = _scheduledTime
+      ..['customerName'] = _customerName
+      ..['customerPhone'] = _customerPhone;
 
     try {
       // Step 1: Always create the order in Supabase first
@@ -279,8 +480,8 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
             enrichedArgs['serviceName'] as String? ??
             '',
         category: enrichedArgs['category'] as String? ?? '',
-        scheduledDate: enrichedArgs['scheduledDate'] as String? ?? '',
-        scheduledTime: enrichedArgs['scheduledTime'] as String? ?? '',
+        scheduledDate: _scheduledDate,
+        scheduledTime: _scheduledTime,
         amount: amountStr,
         providerId: enrichedArgs['providerId'] as String?,
         paymentMethod: paymentMethodId,
@@ -353,8 +554,10 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
             'Service',
         'providerName': args['providerName'] as String? ?? '',
         'amount': amountStr,
-        'scheduledDate': args['scheduledDate'] as String? ?? '',
-        'scheduledTime': args['scheduledTime'] as String? ?? '',
+        'customerName': _customerName,
+        'customerPhone': _customerPhone,
+        'scheduledDate': _scheduledDate,
+        'scheduledTime': _scheduledTime,
         'paymentMethod': paymentMethodId,
         'paymentStatus': paymentStatus,
         'address': args['address'] as String? ?? '',
@@ -389,16 +592,13 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
         args['service'] as String? ??
         args['serviceName'] as String? ??
         'Service';
-    final providerName = args['providerName'] as String? ?? 'Provider';
-    final providerImage = args['providerImage'] as String? ?? '';
+    final providerName = args['providerName'] as String? ?? '';
     final providerRating = args['providerRating'] as double? ?? 4.8;
     final amount =
         args['amount'] as String? ??
         args['basePrice'] as String? ??
         args['price'] as String? ??
         '₹0';
-    final scheduledDate = args['scheduledDate'] as String? ?? '';
-    final scheduledTime = args['scheduledTime'] as String? ?? '';
     final category = args['category'] as String? ?? '';
     final duration = args['duration'] as String? ?? '';
     final providerId = args['providerId'] as String?;
@@ -443,13 +643,21 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
                   _BookingSummaryCard(
                     serviceName: serviceName,
                     providerName: providerName,
-                    providerImage: providerImage,
                     providerRating: providerRating,
-                    scheduledDate: scheduledDate,
-                    scheduledTime: scheduledTime,
+                    customerName: _customerName,
+                    customerPhone: _customerPhone,
+                    customerEmail: _customerEmail,
+                    scheduledDate: _scheduledDate,
+                    scheduledTime: _scheduledTime,
                     category: category,
                     duration: duration,
                     amount: amount,
+                    onEditCustomer: _showEditCustomerDialog,
+                    onPickDate: _pickDate,
+                    onPickTime: _pickTime,
+                    onQuickDateSelect: (dateStr) {
+                      setState(() => _scheduledDate = dateStr);
+                    },
                   ),
                   const SizedBox(height: 16),
 
@@ -552,24 +760,36 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen> {
 class _BookingSummaryCard extends StatelessWidget {
   final String serviceName;
   final String providerName;
-  final String providerImage;
   final double providerRating;
+  final String customerName;
+  final String customerPhone;
+  final String customerEmail;
   final String scheduledDate;
   final String scheduledTime;
   final String category;
   final String duration;
   final String amount;
+  final VoidCallback onEditCustomer;
+  final VoidCallback onPickDate;
+  final VoidCallback onPickTime;
+  final Function(String) onQuickDateSelect;
 
   const _BookingSummaryCard({
     required this.serviceName,
     required this.providerName,
-    required this.providerImage,
     required this.providerRating,
+    required this.customerName,
+    required this.customerPhone,
+    required this.customerEmail,
     required this.scheduledDate,
     required this.scheduledTime,
     required this.category,
     required this.duration,
     required this.amount,
+    required this.onEditCustomer,
+    required this.onPickDate,
+    required this.onPickTime,
+    required this.onQuickDateSelect,
   });
 
   @override
@@ -591,7 +811,7 @@ class _BookingSummaryCard extends StatelessWidget {
         children: [
           // Header
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -609,15 +829,15 @@ class _BookingSummaryCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: BorderRadius.circular(8.0),
                   ),
                   child: Icon(
                     Icons.receipt_long_rounded,
                     color: AppTheme.primary,
-                    size: 18,
+                    size: 16,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -629,6 +849,26 @@ class _BookingSummaryCard extends StatelessWidget {
                     color: AppTheme.primary,
                   ),
                 ),
+                const Spacer(),
+                if (category.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      category.toUpperCase(),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -636,125 +876,332 @@ class _BookingSummaryCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Provider row
-                Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12.0),
-                        color: AppTheme.surfaceVariant,
+                // ── Customer Details Section (Logged-in User) ─────────────
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.primary.withValues(alpha: 0.12),
+                        ),
+                        child: Icon(
+                          Icons.person_rounded,
+                          color: AppTheme.primary,
+                          size: 24,
+                        ),
                       ),
-                      clipBehavior: Clip.antiAlias,
-                      child: providerImage.isNotEmpty
-                          ? Image.network(
-                              providerImage,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.person_rounded,
-                                color: AppTheme.primary,
-                                size: 28,
-                              ),
-                            )
-                          : Icon(
-                              Icons.person_rounded,
-                              color: AppTheme.primary,
-                              size: 28,
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            providerName,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1A1C1E),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 3),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.star_rounded,
-                                color: Color(0xFFFFA726),
-                                size: 14,
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                providerRating.toStringAsFixed(1),
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF78909C),
-                                ),
-                              ),
-                              if (category.isNotEmpty) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primary.withValues(
-                                      alpha: 0.1,
-                                    ),
-                                    borderRadius: BorderRadius.circular(20.0),
-                                  ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
                                   child: Text(
-                                    category,
+                                    customerName,
                                     style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.primary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF1A1C1E),
                                     ),
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Customer',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.green.shade800,
+                                    ),
+                                  ),
+                                ),
                               ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              customerPhone.isNotEmpty
+                                  ? customerPhone
+                                  : (customerEmail.isNotEmpty
+                                      ? customerEmail
+                                      : 'Tap Edit to add contact'),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11.5,
+                                color: const Color(0xFF64748B),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: onEditCustomer,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.edit_rounded,
+                                size: 12,
+                                color: AppTheme.primary,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Edit',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                const Divider(height: 1, color: Color(0xFFF0F2F5)),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
-                // Service detail rows
+                // ── Service & Provider Details ────────────────────────────
                 _DetailRow(
                   icon: Icons.home_repair_service_rounded,
                   iconColor: AppTheme.primary,
                   label: 'Service',
                   value: serviceName,
                 ),
-                if (scheduledDate.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _DetailRow(
-                    icon: Icons.calendar_today_rounded,
-                    iconColor: AppTheme.warning,
-                    label: 'Date',
-                    value: scheduledDate,
+                if (providerName.isNotEmpty &&
+                    providerName.toLowerCase() != 'provider') ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.store_rounded,
+                        color: Colors.indigo.shade600,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Listed by: ',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                      Text(
+                        providerName,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E293B),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber.shade700,
+                        size: 13,
+                      ),
+                      Text(
+                        ' ${providerRating.toStringAsFixed(1)}',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-                if (scheduledTime.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _DetailRow(
-                    icon: Icons.access_time_rounded,
-                    iconColor: AppTheme.info,
-                    label: 'Time',
-                    value: scheduledTime,
-                  ),
-                ],
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                const SizedBox(height: 12),
+
+                // ── Date Row with Interactive Change ───────────────────────
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        Icons.calendar_today_rounded,
+                        color: Colors.orange.shade800,
+                        size: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Scheduled Date',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.5,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                        Text(
+                          scheduledDate,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: onPickDate,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          border: Border.all(color: Colors.orange.shade200),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Change Date',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.orange.shade900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Quick date chips
+                Row(
+                  children: [
+                    _buildQuickChip('Today', scheduledDate == 'Today', () {
+                      onQuickDateSelect('Today');
+                    }),
+                    const SizedBox(width: 6),
+                    _buildQuickChip(
+                      'Tomorrow',
+                      scheduledDate == 'Tomorrow',
+                      () {
+                        onQuickDateSelect('Tomorrow');
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    _buildQuickChip(
+                      'Pick Date...',
+                      scheduledDate != 'Today' && scheduledDate != 'Tomorrow',
+                      onPickDate,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                const SizedBox(height: 12),
+
+                // ── Time Row with Interactive Change ───────────────────────
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        Icons.access_time_rounded,
+                        color: Colors.blue.shade700,
+                        size: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Scheduled Time',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.5,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                        Text(
+                          scheduledTime,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: onPickTime,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          border: Border.all(color: Colors.blue.shade200),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Change Time',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
                 if (duration.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   _DetailRow(
@@ -768,6 +1215,30 @@ class _BookingSummaryCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickChip(String label, bool isSelected, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.primary
+              : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 10.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF475569),
+          ),
+        ),
       ),
     );
   }
