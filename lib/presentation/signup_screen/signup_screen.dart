@@ -380,11 +380,7 @@ class _SignupScreenState extends State<SignupScreen>
     try {
       if (kIsWeb) {
         final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
-        final realClient = SupabaseClient(
-          'https://ckyopijftlasebanhhqm.supabase.co',
-          'sb_publishable_pztyR-WMEHV-T7k2MUgrlg_0KkpC75H',
-        );
-        await realClient.auth.signInWithOAuth(
+        await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: Uri.base.toString(),
           queryParams: {

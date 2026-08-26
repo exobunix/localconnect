@@ -215,11 +215,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     GoogleSignInAccount? googleUser;
     try {
       if (kIsWeb) {
-        final realClient = SupabaseClient(
-          'https://ckyopijftlasebanhhqm.supabase.co',
-          'sb_publishable_pztyR-WMEHV-T7k2MUgrlg_0KkpC75H',
-        );
-        await realClient.auth.signInWithOAuth(
+        await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: Uri.base.toString(),
           queryParams: {
