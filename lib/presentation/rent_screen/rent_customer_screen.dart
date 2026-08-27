@@ -69,6 +69,68 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
     },
   ];
 
+  Map<String, List<Map<String, dynamic>>> _liveListings = {};
+  bool _isLoadingDb = false;
+
+  Future<void> _fetchListingsFromDb() async {
+    setState(() => _isLoadingDb = true);
+    try {
+      final response = await SupabaseService.instance.client
+          .from('service_providers')
+          .select('*, charges:provider_service_charges(*)')
+          .or('category.ilike.%rent%,category.ilike.%Rent%')
+          .eq('is_active', true)
+          .order('rating', ascending: false);
+
+      final Map<String, List<Map<String, dynamic>>> grouped = {};
+      for (final row in response) {
+        final sub = (row['subcategory'] as String? ?? '').toLowerCase().trim();
+        String subKey = 'room';
+        if (sub.contains('room') || sub.contains('flat') || sub.contains('apartment')) subKey = 'room';
+        else if (sub.contains('pg')) subKey = 'pg';
+        else if (sub.contains('hostel')) subKey = 'hostel';
+        else if (sub.contains('hotel')) subKey = 'hotel';
+        else if (sub.contains('villa')) subKey = 'villa';
+        else if (sub.contains('tool') || sub.contains('machin') || sub.contains('equipment')) subKey = 'tools';
+
+        final charges = (row['charges'] as List?) ?? [];
+        final firstCharge = charges.isNotEmpty ? charges.first : null;
+        final priceVal = firstCharge != null ? (firstCharge['base_price'] as num?)?.toDouble() ?? 5000.0 : 5000.0;
+        final priceUnit = firstCharge != null ? (firstCharge['unit'] as String? ?? '/month') : '/month';
+
+        final mapped = {
+          'id': row['id'],
+          'title': row['business_name'] ?? row['owner_name'] ?? 'Rental Property',
+          'location': row['address'] ?? row['city'] ?? 'Pune',
+          'price': priceVal.toInt(),
+          'priceUnit': priceUnit.startsWith('/') ? priceUnit : '/$priceUnit',
+          'rating': (row['rating'] as num?)?.toDouble() ?? 4.8,
+          'reviews': (row['review_count'] as num?)?.toInt() ?? 50,
+          'distance': 1.5,
+          'available': row['is_open'] != false,
+          'furnished': 'Furnished',
+          'image': row['image_url'] ?? '',
+          'amenities': ['Wi-Fi', 'Parking', '24/7 Water'],
+          'deposit': (priceVal * 2).toInt(),
+          'provider': row['owner_name'] ?? row['business_name'] ?? 'Owner',
+          'phone': row['phone'] ?? '+919876543210',
+          'isFeatured': true,
+          'isVerified': row['is_verified'] == true || row['registration_status'] == 'approved',
+          'charges': charges,
+        };
+        grouped.putIfAbsent(subKey, () => []).add(mapped);
+      }
+      if (mounted) {
+        setState(() {
+          _liveListings = grouped;
+          _isLoadingDb = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingDb = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +143,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
         });
       }
     });
+    _fetchListingsFromDb();
   }
 
   @override
@@ -569,7 +632,8 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
   }
 
   List<Map<String, dynamic>> _filteredListings(String sub) {
-    final listings = _getListings(sub);
+    final live = _liveListings[sub];
+    final listings = (live != null && live.isNotEmpty) ? live : _getListings(sub);
     return listings.where((l) {
       if (_showAvailableOnly && l['available'] == false) return false;
       if (_searchQuery.isNotEmpty) {

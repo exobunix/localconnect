@@ -906,7 +906,7 @@ class _EventManagementCustomerScreenState
         'badge': 'Premium',
         'subcategoryDetails': {
           'tentTypes': ['Shamiyana', 'Pagoda', 'Stretch Tent', 'Dome'],
-          'stageSetup': true,
+'stageSetup': true,
           'decoration': true,
           'seatingArrangements': true,
           'lightingPackages': true,
@@ -915,13 +915,89 @@ class _EventManagementCustomerScreenState
     ],
   };
 
+  Map<String, List<Map<String, dynamic>>> _liveProviders = {};
+  bool _isLoadingProviders = false;
+
+  Future<void> _fetchProvidersFromDb() async {
+    setState(() => _isLoadingProviders = true);
+    try {
+      final response = await SupabaseService.instance.client
+          .from('service_providers')
+          .select('*, charges:provider_service_charges(*)')
+          .or('category.ilike.%events%,category.ilike.%Event Management%')
+          .eq('is_active', true)
+          .order('rating', ascending: false);
+
+      final Map<String, List<Map<String, dynamic>>> grouped = {};
+      for (final row in response) {
+        final sub = (row['subcategory'] as String? ?? '').toLowerCase().trim();
+        String subKey = 'photography';
+        if (sub.contains('photo')) subKey = 'photography';
+        else if (sub.contains('video')) subKey = 'videography';
+        else if (sub.contains('sound') || sub.contains('dj')) subKey = 'sound';
+        else if (sub.contains('mandap')) subKey = 'mandap';
+        else if (sub.contains('birth')) subKey = 'birthday';
+        else if (sub.contains('cater')) subKey = 'catering';
+        else if (sub.contains('makeup')) subKey = 'makeup';
+        else if (sub.contains('mehendi') || sub.contains('mehndi')) subKey = 'mehendi';
+        else if (sub.contains('light')) subKey = 'lighting';
+        else if (sub.contains('plan')) subKey = 'planner';
+        else if (sub.contains('anchor') || sub.contains('host')) subKey = 'anchor';
+        else if (sub.contains('band')) subKey = 'band';
+        else if (sub.contains('orchestra')) subKey = 'orchestra';
+        else if (sub.contains('dance')) subKey = 'dance';
+        else if (sub.contains('gen')) subKey = 'generator';
+        else if (sub.contains('chair') || sub.contains('table')) subKey = 'chair_table';
+        else if (sub.contains('tent')) subKey = 'tent';
+
+        final charges = (row['charges'] as List?) ?? [];
+        final firstCharge = charges.isNotEmpty ? charges.first : null;
+        final chargeVal = firstCharge != null ? (firstCharge['base_price'] as num?)?.toDouble() ?? 5000.0 : 5000.0;
+
+        final mapped = {
+          'id': row['id'],
+          'name': row['business_name'] ?? row['owner_name'] ?? 'Provider',
+          'phone': row['phone'] ?? '+919876543210',
+          'rating': (row['rating'] as num?)?.toDouble() ?? 4.8,
+          'reviews': (row['review_count'] as num?)?.toInt() ?? 100,
+          'distance': 2.0,
+          'startingPrice': chargeVal.toInt(),
+          'experience': '${row['years_experience'] ?? 6} years',
+          'verified': row['is_verified'] == true || row['registration_status'] == 'approved',
+          'available': row['is_open'] != false,
+          'speciality': row['description'] ?? '${row['subcategory']} Services',
+          'isFeatured': true,
+          'image': row['image_url'] ?? '',
+          'portfolio': (row['gallery_photos'] as List?)?.isNotEmpty == true
+              ? row['gallery_photos']
+              : (row['image_url'] != null ? [row['image_url']] : []),
+          'tags': [row['subcategory'] ?? 'Events', 'Professional'],
+          'badge': 'Verified',
+          'charges': charges,
+        };
+        grouped.putIfAbsent(subKey, () => []).add(mapped);
+      }
+      if (mounted) {
+        setState(() {
+          _liveProviders = grouped;
+          _isLoadingProviders = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingProviders = false);
+    }
+  }
+
   Map<String, dynamic> get _activeSubcategoryData =>
       _subcategories.firstWhere((s) => s['id'] == _activeSubcategory);
 
   Color get _activeColor => _activeSubcategoryData['color'] as Color;
 
   List<Map<String, dynamic>> get _filteredProviders {
-    final all = _mockProviders[_activeSubcategory] ?? [];
+    final liveList = _liveProviders[_activeSubcategory];
+    final all = (liveList != null && liveList.isNotEmpty)
+        ? liveList
+        : (_mockProviders[_activeSubcategory] ?? []);
     var filtered = all.where((p) {
       if (_verifiedOnly && p['verified'] != true) return false;
       if (_availableOnly && p['available'] != true) return false;
@@ -973,7 +1049,10 @@ class _EventManagementCustomerScreenState
   List<Map<String, dynamic>> get _featuredProviders {
     final all = <Map<String, dynamic>>[];
     for (final sub in _subcategories) {
-      final providers = _mockProviders[sub['id']] ?? [];
+      final liveList = _liveProviders[sub['id']];
+      final providers = (liveList != null && liveList.isNotEmpty)
+          ? liveList
+          : (_mockProviders[sub['id']] ?? []);
       for (final p in providers) {
         if (p['isFeatured'] == true) {
           all.add({...p, 'subcategory': sub});
@@ -995,6 +1074,7 @@ class _EventManagementCustomerScreenState
         );
       }
     });
+    _fetchProvidersFromDb();
   }
 
   @override

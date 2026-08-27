@@ -2029,9 +2029,16 @@ class _DeliveryCustomerScreenState extends State<DeliveryCustomerScreen>
                               ),
                             );
 
+                            final defaultDeliveryProviderId = sub['id'] == 'food'
+                                ? 'c03f8af9-e13f-4310-964e-2a3a427aa458'
+                                : 'ed788ac6-2004-417f-bae8-3381ae40d2ec';
+                            final defaultDeliveryProviderName = sub['id'] == 'food'
+                                ? 'QuickBite Food Delivery'
+                                : 'SpeedyCourier Parcel Delivery';
+
                             final order = await SupabaseService.instance.createOrder(
-                              providerId: provider?['id'],
-                              providerName: provider?['business_name'] ?? provider?['full_name'] ?? 'Delivery Rider',
+                              providerId: provider?['id'] ?? defaultDeliveryProviderId,
+                              providerName: provider?['business_name'] ?? provider?['full_name'] ?? defaultDeliveryProviderName,
                               service: sub['name'] ?? 'Delivery',
                               category: 'delivery',
                               scheduledDate: DateTime.now().toString().split(' ').first,

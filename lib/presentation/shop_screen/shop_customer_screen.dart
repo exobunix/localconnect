@@ -62,11 +62,14 @@ class _ShopCustomerScreenState extends State<ShopCustomerScreen> {
         setState(() {
           _providers = data
               .where(
-                (p) =>
-                    (p['subcategory'] as String? ?? '') == _subcategoryId ||
-                    (p['subcategories'] as List? ?? []).contains(
-                      _subcategoryId,
-                    ),
+                (p) {
+                  final sub = (p['subcategory'] as String? ?? '').toLowerCase().trim();
+                  final target = _subcategoryId.toLowerCase().trim();
+                  if (sub.isEmpty) return true;
+                  return sub.contains(target) ||
+                      target.contains(sub) ||
+                      (p['subcategories'] as List? ?? []).contains(_subcategoryId);
+                },
               )
               .toList();
           _isLoading = false;

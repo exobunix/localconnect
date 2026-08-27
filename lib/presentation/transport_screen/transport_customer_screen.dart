@@ -195,14 +195,34 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
       
       final data = await supabase
           .from('service_providers')
-          .select()
-          .ilike('category', 'transport')
-          .or('subcategory.ilike."%$dbSubcategory%",subcategory.ilike."%$_vehicleType%"')
+          .select('*, charges:provider_service_charges(*)')
+          .or('category.ilike.%transport%,category.ilike.%Transport%')
           .eq('is_active', true);
           
       final List<Map<String, dynamic>> processed = [];
+      final targetSub = _getDbSubcategory(_vehicleType).toLowerCase();
+      final targetType = _vehicleType.toLowerCase();
       
       for (var p in List<Map<String, dynamic>>.from(data)) {
+        final sub = (p['subcategory'] as String? ?? '').toLowerCase();
+        if (targetSub.isNotEmpty) {
+          bool matches = sub.contains(targetType) || sub.contains(targetSub);
+          if (!matches) {
+            if (targetType == 'rickshaw' && (sub.contains('auto') || sub.contains('rickshaw'))) matches = true;
+            else if (targetType == 'tempo' && sub.contains('tempo')) matches = true;
+            else if (targetType == 'pickup_van' && (sub.contains('pickup') || sub.contains('bolero') || sub.contains('van'))) matches = true;
+            else if (targetType == 'truck' && (sub.contains('truck') || sub.contains('tata') || sub.contains('heavy'))) matches = true;
+            else if (targetType == 'car' && (sub.contains('car') || sub.contains('cab') || sub.contains('taxi'))) matches = true;
+          }
+          if (!matches) {
+            final subList = (p['subcategories'] as List? ?? []).map((e) => e.toString().toLowerCase()).toList();
+            if (subList.any((s) => s.contains(targetType) || s.contains(targetSub))) {
+              matches = true;
+            }
+          }
+          if (!matches) continue;
+        }
+
         double distanceKm = 9999.0;
         
         double? pLat = (p['business_latitude'] as num?)?.toDouble() ?? (p['lat'] as num?)?.toDouble();

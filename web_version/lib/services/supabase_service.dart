@@ -443,14 +443,23 @@ class SupabaseService {
     try {
       final response = await client
           .from('service_providers')
-          .select()
-          .eq('category', category)
+          .select('*, charges:provider_service_charges(*)')
+          .ilike('category', '%$category%')
           .eq('is_active', true)
           .order('rating', ascending: false);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      return [];
+      try {
+        final response = await client
+            .from('service_providers')
+            .select()
+            .ilike('category', '%$category%')
+            .order('rating', ascending: false);
+        return List<Map<String, dynamic>>.from(response);
+      } catch (_) {
+        return [];
+      }
     }
   }
 
@@ -1267,13 +1276,40 @@ class SupabaseService {
     try {
       final response = await client
           .from('service_providers')
-          .select(
-            'id, full_name, business_name, category, city, status:registration_status, rating, total_orders, phone, email, created_at',
-          )
+          .select('*, user:user_id(email, full_name)')
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response);
+      return List<Map<String, dynamic>>.from(response).map((p) {
+        final user = p['user'] as Map<String, dynamic>?;
+        return {
+          ...p,
+          'full_name': p['owner_name'] ?? p['full_name'] ?? user?['full_name'] ?? p['business_name'] ?? 'Provider',
+          'status': p['registration_status'] ?? (p['is_active'] == true ? 'approved' : 'pending'),
+          'total_orders': p['completed_orders'] ?? p['total_orders'] ?? 0,
+          'earnings': p['earnings_total'] ?? p['earnings'] ?? 0,
+          'email': user?['email'] ?? p['email'] ?? '',
+          'joined': p['member_since'] ?? p['created_at'] ?? '',
+        };
+      }).toList();
     } catch (e) {
-      return [];
+      try {
+        final response = await client
+            .from('service_providers')
+            .select()
+            .order('created_at', ascending: false);
+        return List<Map<String, dynamic>>.from(response).map((p) {
+          return {
+            ...p,
+            'full_name': p['owner_name'] ?? p['business_name'] ?? 'Provider',
+            'status': p['registration_status'] ?? (p['is_active'] == true ? 'approved' : 'pending'),
+            'total_orders': p['completed_orders'] ?? 0,
+            'earnings': p['earnings_total'] ?? 0,
+            'joined': p['member_since'] ?? p['created_at'] ?? '',
+          };
+        }).toList();
+      } catch (err) {
+        debugPrint('getAdminAllProviders error: $err');
+        return [];
+      }
     }
   }
 

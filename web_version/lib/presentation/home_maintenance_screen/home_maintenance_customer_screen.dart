@@ -83,7 +83,7 @@ class _HomeMaintenanceCustomerScreenState
   static final Map<String, List<Map<String, dynamic>>> _mockProviders = {
     'plumber': [
       {
-        'id': 'p1',
+        'id': '53d09495-2bd2-478f-b686-3d856184d934',
         'name': 'Ramesh Plumbing Works',
         'rating': 4.8,
         'reviews': 124,
@@ -97,14 +97,14 @@ class _HomeMaintenanceCustomerScreenState
         'completedJobs': 340,
         'phone': '+919876543210',
         'image':
-            'https://img.rocket.new/generatedImages/rocket_gen_img_131b0a68b-1764663629659.png',
+            'https://images.pexels.com/photos/1216589/pexels-photo-1216589.jpeg?w=600',
         'gallery': [
           'https://images.pexels.com/photos/8486944/pexels-photo-8486944.jpeg?w=300',
           'https://images.pexels.com/photos/6419128/pexels-photo-6419128.jpeg?w=300',
         ],
       },
       {
-        'id': 'p2',
+        'id': '474aaf7b-3110-40c1-a64f-34eeab2973d9',
         'name': 'Suresh Kumar Plumber',
         'rating': 4.5,
         'reviews': 89,
@@ -116,37 +116,37 @@ class _HomeMaintenanceCustomerScreenState
         'available': true,
         'speciality': 'Water Tank & Motor Installation',
         'completedJobs': 210,
-        'phone': '+919812345678',
-        'image': 'https://images.unsplash.com/photo-1723407653103-7a9c6b579acf',
+        'phone': '+919876543211',
+        'image': 'https://images.pexels.com/photos/1342609/pexels-photo-1342609.jpeg?w=600',
         'gallery': [
           'https://images.pexels.com/photos/8486972/pexels-photo-8486972.jpeg?w=300',
         ],
       },
       {
-        'id': 'p3',
-        'name': 'Mohan Pipe Services',
-        'rating': 4.2,
+        'id': '32dea8c2-53f4-4e8b-99aa-87552d511b18',
+        'name': 'Mauli Plumbing Works',
+        'rating': 4.3,
         'reviews': 56,
         'distance': 3.8,
         'charge': 200,
         'experience': 3,
-        'verified': false,
+        'verified': true,
         'emergency': true,
-        'available': false,
+        'available': true,
         'speciality': 'Drain Blockage & Tap Repair',
         'completedJobs': 98,
         'phone': '+919823456789',
         'image':
-            'https://img.rocket.new/generatedImages/rocket_gen_img_11fcbce8b-1772357500449.png',
+            'https://images.pexels.com/photos/1216589/pexels-photo-1216589.jpeg?w=600',
         'gallery': [],
       },
     ],
     'electrician': [
       {
-        'id': 'e1',
-        'name': 'Vijay Electrical Services',
+        'id': '251e07e8-fbc0-471e-bfca-2a8d8a9c1e25',
+        'name': 'Ravi Electricals & Power',
         'rating': 4.9,
-        'reviews': 201,
+        'reviews': 210,
         'distance': 0.8,
         'charge': 350,
         'experience': 12,
@@ -157,14 +157,14 @@ class _HomeMaintenanceCustomerScreenState
         'completedJobs': 520,
         'phone': '+919834567890',
         'image':
-            'https://img.rocket.new/generatedImages/rocket_gen_img_14068230d-1783271524011.png',
+            'https://images.pexels.com/photos/257736/pexels-photo-257736.jpeg?w=600',
         'gallery': [
           'https://images.pexels.com/photos/257736/pexels-photo-257736.jpeg?w=300',
         ],
       },
       {
-        'id': 'e2',
-        'name': 'Prakash Electrician',
+        'id': 'de054c6f-251d-4e82-ae7e-c295f0b608f5',
+        'name': 'Prakash Electrician & Appliances',
         'rating': 4.6,
         'reviews': 143,
         'distance': 1.9,
@@ -177,7 +177,7 @@ class _HomeMaintenanceCustomerScreenState
         'completedJobs': 380,
         'phone': '+919845678901',
         'image':
-            'https://img.rocket.new/generatedImages/rocket_gen_img_1118faa9d-1768844919530.png',
+            'https://images.pexels.com/photos/1108101/pexels-photo-1108101.jpeg?w=600',
         'gallery': [
           'https://images.pexels.com/photos/1108101/pexels-photo-1108101.jpeg?w=300',
         ],
@@ -185,8 +185,8 @@ class _HomeMaintenanceCustomerScreenState
     ],
     'painter': [
       {
-        'id': 'pa1',
-        'name': 'ColorCraft Painters',
+        'id': '5284aac9-259b-44f8-8080-20a227deab25',
+        'name': 'ColorCraft Professional Painters',
         'rating': 4.7,
         'reviews': 98,
         'distance': 2.1,
@@ -199,21 +199,21 @@ class _HomeMaintenanceCustomerScreenState
         'completedJobs': 180,
         'chargeUnit': '/sq.ft',
         'phone': '+919856789012',
-        'image': 'https://images.unsplash.com/photo-1693200430042-a37503921b88',
+        'image': 'https://images.pexels.com/photos/1669754/pexels-photo-1669754.jpeg?w=600',
         'gallery': [
           'https://images.pexels.com/photos/1669754/pexels-photo-1669754.jpeg?w=300',
           'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?w=300',
         ],
       },
       {
-        'id': 'pa2',
-        'name': 'Shyam Painting Works',
+        'id': '471d1d12-aa0d-4dad-8c4e-896a225c294f',
+        'name': 'Anil Painting Services',
         'rating': 4.4,
         'reviews': 67,
         'distance': 3.2,
         'charge': 12,
         'experience': 6,
-        'verified': false,
+        'verified': true,
         'emergency': false,
         'available': true,
         'speciality': 'Exterior & Waterproof Coating',
@@ -221,14 +221,14 @@ class _HomeMaintenanceCustomerScreenState
         'chargeUnit': '/sq.ft',
         'phone': '+919867890123',
         'image':
-            'https://img.rocket.new/generatedImages/rocket_gen_img_1dfbcd802-1783271523283.png',
+            'https://images.pexels.com/photos/1669754/pexels-photo-1669754.jpeg?w=600',
         'gallery': [],
       },
     ],
     'mason': [
       {
-        'id': 'm1',
-        'name': 'Ganesh Construction',
+        'id': 'a3074292-a225-40c7-9742-caf3148334ec',
+        'name': 'Ganesh Construction & Masonry',
         'rating': 4.6,
         'reviews': 77,
         'distance': 2.8,
@@ -242,7 +242,7 @@ class _HomeMaintenanceCustomerScreenState
         'chargeUnit': '/day',
         'phone': '+919878901234',
         'image':
-            'https://img.rocket.new/generatedImages/rocket_gen_img_112d89bc5-1773104737112.png',
+            'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?w=600',
         'gallery': [
           'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?w=300',
         ],
@@ -250,8 +250,8 @@ class _HomeMaintenanceCustomerScreenState
     ],
     'carpenter': [
       {
-        'id': 'c1',
-        'name': 'WoodCraft Carpentry',
+        'id': '43568142-4e0d-4341-b19c-7f093ce812b7',
+        'name': 'WoodCraft Carpentry Services',
         'rating': 4.8,
         'reviews': 112,
         'distance': 1.5,
@@ -265,7 +265,7 @@ class _HomeMaintenanceCustomerScreenState
         'chargeUnit': '/day',
         'phone': '+919889012345',
         'image':
-            'https://img.rocket.new/generatedImages/rocket_gen_img_145d460fd-1765180551539.png',
+            'https://images.pexels.com/photos/1350789/pexels-photo-1350789.jpeg?w=600',
         'gallery': [
           'https://images.pexels.com/photos/1350789/pexels-photo-1350789.jpeg?w=300',
         ],
@@ -273,50 +273,31 @@ class _HomeMaintenanceCustomerScreenState
     ],
     'daily_wage': [
       {
-        'id': 'd1',
-        'name': 'Raju Helper Services',
+        'id': '62c700a2-635e-435a-9e10-daf905b49b2b',
+        'name': 'Raju Helper & Labor Services',
         'rating': 4.3,
         'reviews': 45,
         'distance': 0.9,
-        'charge': 400,
+        'charge': 450,
         'experience': 2,
-        'verified': false,
+        'verified': true,
         'emergency': true,
         'available': true,
         'speciality': 'Loading, Moving & Garden Work',
-        'completedJobs': 88,
+        'completedJobs': 150,
         'chargeUnit': '/day',
         'phone': '+919890123456',
         'image':
-            'https://img.rocket.new/generatedImages/rocket_gen_img_1405eb26b-1783271524814.png',
-        'gallery': [],
-      },
-      {
-        'id': 'd2',
-        'name': 'Santosh Labour Group',
-        'rating': 4.5,
-        'reviews': 62,
-        'distance': 1.7,
-        'charge': 350,
-        'experience': 4,
-        'verified': true,
-        'emergency': false,
-        'available': true,
-        'speciality': 'Construction Helper & Loader',
-        'completedJobs': 145,
-        'chargeUnit': '/day',
-        'phone': '+919901234567',
-        'image':
-            'https://img.rocket.new/generatedImages/rocket_gen_img_112d89bc5-1773104737112.png',
+            'https://images.pexels.com/photos/585419/pexels-photo-585419.jpeg?w=600',
         'gallery': [],
       },
     ],
     'cleaning': [
       {
-        'id': 'cl1',
-        'name': 'SparkleClean Services',
-        'rating': 4.9,
-        'reviews': 187,
+        'id': 'fddf2642-225e-4bf1-a61c-db8d855a3907',
+        'name': 'SparkleClean Deep Cleaning',
+        'rating': 4.8,
+        'reviews': 198,
         'distance': 1.1,
         'charge': 800,
         'experience': 6,
@@ -327,15 +308,15 @@ class _HomeMaintenanceCustomerScreenState
         'completedJobs': 420,
         'phone': '+919912345678',
         'image':
-            'https://img.rocket.new/generatedImages/rocket_gen_img_1b758300c-1772483659351.png',
+            'https://images.pexels.com/photos/4107120/pexels-photo-4107120.jpeg?w=600',
         'gallery': [
           'https://images.pexels.com/photos/4107120/pexels-photo-4107120.jpeg?w=300',
         ],
       },
       {
-        'id': 'cl2',
-        'name': 'HomeFresh Cleaners',
-        'rating': 4.6,
+        'id': 'fe4372fa-7350-4af4-9315-780aefd6ff33',
+        'name': 'Sunita Home Cleaning',
+        'rating': 4.8,
         'reviews': 134,
         'distance': 2.3,
         'charge': 600,
@@ -353,9 +334,75 @@ class _HomeMaintenanceCustomerScreenState
     ],
   };
 
+  Map<String, List<Map<String, dynamic>>> _liveProviders = {};
+  bool _isLoadingProviders = false;
+
+  Future<void> _fetchProvidersFromDb() async {
+    setState(() => _isLoadingProviders = true);
+    try {
+      final response = await SupabaseService.instance.client
+          .from('service_providers')
+          .select('*, charges:provider_service_charges(*)')
+          .or('category.ilike.%home_maintenance%,category.ilike.%Home Maintenance%')
+          .eq('is_active', true)
+          .order('rating', ascending: false);
+
+      final Map<String, List<Map<String, dynamic>>> grouped = {};
+      for (final row in response) {
+        final sub = (row['subcategory'] as String? ?? '').toLowerCase().trim();
+        String subKey = 'plumber';
+        if (sub.contains('plumb')) subKey = 'plumber';
+        else if (sub.contains('elect')) subKey = 'electrician';
+        else if (sub.contains('paint')) subKey = 'painter';
+        else if (sub.contains('mason')) subKey = 'mason';
+        else if (sub.contains('carpent')) subKey = 'carpenter';
+        else if (sub.contains('wage') || sub.contains('labour') || sub.contains('labor') || sub.contains('helper')) subKey = 'daily_wage';
+        else if (sub.contains('clean')) subKey = 'cleaning';
+        else if (sub.contains('waterproof')) subKey = 'waterproofing';
+
+        final charges = (row['charges'] as List?) ?? [];
+        final firstCharge = charges.isNotEmpty ? charges.first : null;
+        final chargeVal = firstCharge != null ? (firstCharge['base_price'] as num?)?.toDouble() ?? 300.0 : 300.0;
+        final chargeUnit = firstCharge != null ? (firstCharge['unit'] as String? ?? '/visit') : '/visit';
+
+        final mapped = {
+          'id': row['id'],
+          'name': row['business_name'] ?? row['owner_name'] ?? 'Provider',
+          'rating': (row['rating'] as num?)?.toDouble() ?? 4.8,
+          'reviews': (row['review_count'] as num?)?.toInt() ?? 100,
+          'distance': 1.8,
+          'charge': chargeVal.toInt(),
+          'chargeUnit': chargeUnit.startsWith('/') ? chargeUnit : '/$chargeUnit',
+          'experience': (row['years_experience'] as num?)?.toInt() ?? 6,
+          'verified': row['is_verified'] == true || row['registration_status'] == 'approved',
+          'emergency': true,
+          'available': row['is_open'] != false,
+          'speciality': row['description'] ?? '${row['subcategory']} Services',
+          'completedJobs': (row['completed_orders'] as num?)?.toInt() ?? 250,
+          'phone': row['phone'] ?? '+919876543210',
+          'image': row['image_url'] ?? '',
+          'gallery': row['gallery_photos'] ?? [],
+          'charges': charges,
+        };
+        grouped.putIfAbsent(subKey, () => []).add(mapped);
+      }
+      if (mounted) {
+        setState(() {
+          _liveProviders = grouped;
+          _isLoadingProviders = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingProviders = false);
+    }
+  }
+
   List<Map<String, dynamic>> get _filteredProviders {
+    final liveList = _liveProviders[_activeSubcategory];
     final list = List<Map<String, dynamic>>.from(
-      _mockProviders[_activeSubcategory] ?? [],
+      (liveList != null && liveList.isNotEmpty)
+          ? liveList
+          : (_mockProviders[_activeSubcategory] ?? []),
     );
     return list.where((p) {
       if (_verifiedOnly && p['verified'] != true) return false;
@@ -403,6 +450,7 @@ class _HomeMaintenanceCustomerScreenState
   void initState() {
     super.initState();
     _loadSubcategories();
+    _fetchProvidersFromDb();
   }
 
   Future<void> _loadSubcategories() async {
