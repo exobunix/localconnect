@@ -4,6 +4,7 @@ import '../../core/app_export.dart';
 import '../../services/delivery_realtime_service.dart';
 import '../../services/supabase_service.dart';
 import '../../services/location_service.dart';
+import '../../widgets/universal_enquiry_dialog.dart';
 
 class DeliveryCustomerScreen extends StatefulWidget {
   const DeliveryCustomerScreen({super.key});
@@ -978,6 +979,7 @@ class _DeliveryCustomerScreenState extends State<DeliveryCustomerScreen>
   }
 
   Widget _buildProviderCard(Map<String, dynamic> provider, {bool isGrid = false}) {
+    final sub = _subcategories[_selectedSubIndex];
     return GestureDetector(
       onTap: () => _showDeliveryRequestSheet(provider),
       child: Container(
@@ -1097,6 +1099,68 @@ class _DeliveryCustomerScreenState extends State<DeliveryCustomerScreen>
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            UniversalEnquiryDialog.show(
+                              context,
+                              providerId: provider['name'] as String? ?? 'del_p',
+                              providerName: provider['name'] as String? ?? 'Delivery Partner',
+                              providerImage: provider['image'] as String?,
+                              providerRating: (provider['rating'] as num?)?.toDouble() ?? 4.8,
+                              category: 'Delivery & Courier',
+                              subcategory: sub['name'] as String? ?? 'Delivery',
+                              serviceTitle: '${provider['name']} - ${sub['name']}',
+                              basePrice: 'Base ₹${sub['baseCharge']} + ₹${sub['perKm']}/km',
+                              themeColor: _currentColor,
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _currentColor,
+                            side: BorderSide(color: _currentColor),
+                            padding: const EdgeInsets.symmetric(vertical: 7),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            'Enquiry',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _showDeliveryRequestSheet(provider),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _currentColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 7),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Book Now',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
                     ],

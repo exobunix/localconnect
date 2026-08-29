@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:html' as html;
+import 'package:universal_html/html.dart' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -12,7 +12,6 @@ import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/auth_left_banner.dart';
-import '../../widgets/auth_features_footer.dart';
 
 class SignupScreen extends StatefulWidget {
   final String? initialEmail;
@@ -41,7 +40,7 @@ class _SignupScreenState extends State<SignupScreen>
   bool _isGoogleEmailLocked = false;
   String? _errorMessage;
 
-  // Password strength criteria
+  // Password strength indicators
   bool _hasMinLength = false;
   bool _hasUppercase = false;
   bool _hasLowercase = false;
@@ -136,7 +135,7 @@ class _SignupScreenState extends State<SignupScreen>
     });
 
     try {
-      // 2. Duplicate phone check
+      // 2. Duplicate mobile check
       final isPhoneTaken = await SupabaseService.instance.isPhoneRegistered(phone);
       if (isPhoneTaken) {
         setState(() {
@@ -146,9 +145,9 @@ class _SignupScreenState extends State<SignupScreen>
         return;
       }
 
+      // Check if user is already authenticated (via Google OAuth or active session)
       final currentUser = SupabaseService.instance.currentUser;
       if (currentUser != null && (currentUser.email == email || _isGoogleEmailLocked)) {
-        // User already in active Google OAuth session
         try {
           await SupabaseService.instance.client.auth.updateUser(
             UserAttributes(
@@ -182,33 +181,75 @@ class _SignupScreenState extends State<SignupScreen>
       }
 
       // 3. Normal signup with email & password
-      final authResponse = await SupabaseService.instance.signUpWithEmail(
-        email: email,
-        password: password,
-        fullName: name,
-        phone: phone,
-        role: 'customer',
-      );
-
-      final newUserId = authResponse.user?.id;
-      if (newUserId != null) {
-        await SupabaseService.instance.upsertUserProfile(
-          userId: newUserId,
+      try {
+        final authResponse = await SupabaseService.instance.signUpWithEmail(
           email: email,
+          password: password,
           fullName: name,
           phone: phone,
           role: 'customer',
-          city: 'Pune',
         );
-      }
 
-      if (authResponse.session == null) {
-        try {
-          await SupabaseService.instance.signInWithEmail(
+        final newUserId = authResponse.user?.id;
+        if (newUserId != null) {
+          await SupabaseService.instance.upsertUserProfile(
+            userId: newUserId,
             email: email,
-            password: password,
+            fullName: name,
+            phone: phone,
+            role: 'customer',
+            city: 'Pune',
           );
-        } catch (_) {}
+        }
+
+        if (authResponse.session == null) {
+          try {
+            await SupabaseService.instance.signInWithEmail(
+              email: email,
+              password: password,
+            );
+          } catch (_) {}
+        }
+      } on AuthException catch (authEx) {
+        if (authEx.message.contains('User already registered') || authEx.message.contains('already exists')) {
+          try {
+            final signInRes = await SupabaseService.instance.signInWithEmail(
+              email: email,
+              password: password,
+            );
+            if (signInRes.user != null) {
+              await SupabaseService.instance.upsertUserProfile(
+                userId: signInRes.user!.id,
+                email: email,
+                fullName: name,
+                phone: phone,
+                role: 'customer',
+                city: 'Pune',
+              );
+              if (mounted) {
+                Navigator.pushNamedAndRemoveUntil(context, AppRoutes.homeScreen, (r) => false);
+              }
+              return;
+            }
+          } catch (_) {
+            final profile = await SupabaseService.instance.getUserProfileByEmail(email);
+            if (profile == null) {
+              setState(() {
+                _errorMessage = 'Google sign-up detected. Please tap "Continue with Google" below to complete sign-in.';
+                _isLoading = false;
+              });
+              return;
+            } else {
+              setState(() {
+                _errorMessage = 'An account with this email already exists. Please log in.';
+                _isLoading = false;
+              });
+              return;
+            }
+          }
+        } else {
+          rethrow;
+        }
       }
 
       if (mounted) {
@@ -221,9 +262,7 @@ class _SignupScreenState extends State<SignupScreen>
     } on AuthException catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.message.contains('User already registered')
-              ? 'An account with this email already exists. Please log in.'
-              : e.message;
+          _errorMessage = e.message;
           _isLoading = false;
         });
       }
@@ -248,24 +287,23 @@ class _SignupScreenState extends State<SignupScreen>
       if (kIsWeb) {
         try {
           html.window.localStorage['google_signin_role'] = 'customer';
+          html.window.localStorage['google_signin_flow'] = 'signup';
         } catch (_) {}
+
         await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: '${Uri.base.origin}/',
-          queryParams: {
-            'role': 'customer',
-          },
         );
         return;
       }
 
-      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
-      final effectiveClientId = webClientId.isNotEmpty
-          ? webClientId
-          : '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com';
-
-      final googleSignIn = GoogleSignIn(
-        serverClientId: effectiveClientId,
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: const String.fromEnvironment(
+          'GOOGLE_WEB_CLIENT_ID',
+          defaultValue:
+              '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com',
+        ),
+        scopes: ['email', 'profile'],
       );
 
       final googleUser = await googleSignIn.signIn();
@@ -319,7 +357,7 @@ class _SignupScreenState extends State<SignupScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width > 800;
+    final isWide = MediaQuery.of(context).size.width > 850;
 
     Widget formContent = Container(
       padding: EdgeInsets.symmetric(
@@ -331,7 +369,7 @@ class _SignupScreenState extends State<SignupScreen>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 24,
             offset: const Offset(0, 6),
           ),
@@ -341,20 +379,20 @@ class _SignupScreenState extends State<SignupScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildHeader(isWide),
-          SizedBox(height: isWide ? 20 : 2.5.h),
-          _buildRoleSelector(isWide),
-          SizedBox(height: isWide ? 20 : 2.5.h),
+          _buildHeader(),
+          SizedBox(height: 2.5.h),
+          _buildRoleSelector(),
+          SizedBox(height: 2.5.h),
           if (_errorMessage != null) ...[
             _buildErrorBox(_errorMessage!),
-            SizedBox(height: isWide ? 16 : 2.h),
+            SizedBox(height: 2.h),
           ],
-          _buildSignupForm(isWide),
-          SizedBox(height: isWide ? 20 : 2.5.h),
+          _buildSignupForm(),
+          SizedBox(height: 2.5.h),
           _buildOrDivider(),
-          SizedBox(height: isWide ? 20 : 2.5.h),
-          _buildGoogleButton(isWide),
-          SizedBox(height: isWide ? 24 : 3.h),
+          SizedBox(height: 2.5.h),
+          _buildGoogleButton(),
+          SizedBox(height: 3.h),
           _buildLoginLink(),
         ],
       ),
@@ -365,22 +403,24 @@ class _SignupScreenState extends State<SignupScreen>
         backgroundColor: const Color(0xFFEEF2FF),
         body: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1040),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Expanded(
-                    flex: 5,
-                    child: AuthLeftBanner(),
-                  ),
-                  const SizedBox(width: 32),
-                  Expanded(
-                    flex: 6,
-                    child: formContent,
-                  ),
-                ],
+              constraints: const BoxConstraints(maxWidth: 1080),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Expanded(
+                      flex: 5,
+                      child: AuthLeftBanner(),
+                    ),
+                    const SizedBox(width: 32),
+                    Expanded(
+                      flex: 6,
+                      child: formContent,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -407,15 +447,15 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildHeader(bool isWide) {
+  Widget _buildHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Container(
-              width: isWide ? 44 : 11.w,
-              height: isWide ? 44 : 11.w,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 gradient: const LinearGradient(
@@ -435,7 +475,7 @@ class _SignupScreenState extends State<SignupScreen>
                 Text(
                   'LocalConnect',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: isWide ? 18 : 16.sp,
+                    fontSize: 16.sp,
                     fontWeight: FontWeight.w800,
                     color: const Color(0xFF0D1B4B),
                   ),
@@ -443,7 +483,7 @@ class _SignupScreenState extends State<SignupScreen>
                 Text(
                   'Connect with local service providers',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: isWide ? 11 : 8.5.sp,
+                    fontSize: 8.5.sp,
                     color: const Color(0xFF74777F),
                   ),
                 ),
@@ -451,22 +491,22 @@ class _SignupScreenState extends State<SignupScreen>
             ),
           ],
         ),
-        SizedBox(height: isWide ? 16 : 2.h),
+        SizedBox(height: 2.h),
         Text(
           'Create Account',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: isWide ? 22 : 18.sp,
+            fontSize: 18.sp,
             fontWeight: FontWeight.w800,
             color: const Color(0xFF1A1C1E),
           ),
         ),
-        SizedBox(height: isWide ? 4 : 0.5.h),
+        SizedBox(height: 0.5.h),
         Text(
           _isGoogleEmailLocked
               ? 'Complete your profile to finish registration'
               : 'Sign up to browse and book services',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: isWide ? 13 : 10.sp,
+            fontSize: 10.sp,
             color: const Color(0xFF74777F),
           ),
         ),
@@ -474,7 +514,7 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildRoleSelector(bool isWide) {
+  Widget _buildRoleSelector() {
     return Row(
       children: [
         Expanded(
@@ -484,11 +524,10 @@ class _SignupScreenState extends State<SignupScreen>
             subtitle: 'Browse & book services',
             isSelected: _selectedRole == 0,
             color: AppTheme.primary,
-            isWide: isWide,
             onTap: () => setState(() => _selectedRole = 0),
           ),
         ),
-        SizedBox(width: isWide ? 16 : 3.w),
+        SizedBox(width: 3.w),
         Expanded(
           child: _RoleCard(
             icon: Icons.handyman_outlined,
@@ -496,7 +535,6 @@ class _SignupScreenState extends State<SignupScreen>
             subtitle: 'Manage your business',
             isSelected: _selectedRole == 1,
             color: const Color(0xFFE65100),
-            isWide: isWide,
             onTap: () {
               Navigator.pushNamed(context, AppRoutes.providerRegistrationScreen);
             },
@@ -506,52 +544,50 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildSignupForm(bool isWide) {
+  Widget _buildSignupForm() {
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Full Name
-          _buildFieldLabel('Full Name', isWide),
-          SizedBox(height: isWide ? 6 : 0.8.h),
+          _buildFieldLabel('Full Name'),
+          SizedBox(height: 0.8.h),
           TextFormField(
             controller: _nameController,
             textCapitalization: TextCapitalization.words,
-            style: GoogleFonts.plusJakartaSans(fontSize: isWide ? 13 : 11.sp),
+            style: GoogleFonts.plusJakartaSans(fontSize: 11.sp),
             decoration: _inputDecoration(
               hint: 'Enter your full name',
               icon: Icons.person_outline_rounded,
-              isWide: isWide,
             ),
           ),
-          SizedBox(height: isWide ? 14 : 1.8.h),
+          SizedBox(height: 1.8.h),
 
           // Email Address
-          _buildFieldLabel('Email Address', isWide),
-          SizedBox(height: isWide ? 6 : 0.8.h),
+          _buildFieldLabel('Email Address'),
+          SizedBox(height: 0.8.h),
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             readOnly: _isGoogleEmailLocked,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: isWide ? 13 : 11.sp,
+              fontSize: 11.sp,
               color: _isGoogleEmailLocked ? const Color(0xFF44474E) : const Color(0xFF1A1C1E),
             ),
             decoration: _inputDecoration(
               hint: 'Enter your email',
               icon: Icons.email_outlined,
-              isWide: isWide,
               suffixIcon: _isGoogleEmailLocked
                   ? const Icon(Icons.lock_outline_rounded, color: Color(0xFFB0BEC5), size: 18)
                   : null,
             ),
           ),
-          SizedBox(height: isWide ? 14 : 1.8.h),
+          SizedBox(height: 1.8.h),
 
           // Mobile Number
-          _buildFieldLabel('Mobile Number', isWide),
-          SizedBox(height: isWide ? 6 : 0.8.h),
+          _buildFieldLabel('Mobile Number'),
+          SizedBox(height: 0.8.h),
           TextFormField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
@@ -559,28 +595,26 @@ class _SignupScreenState extends State<SignupScreen>
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(10),
             ],
-            style: GoogleFonts.plusJakartaSans(fontSize: isWide ? 13 : 11.sp),
+            style: GoogleFonts.plusJakartaSans(fontSize: 11.sp),
             decoration: _inputDecoration(
               hint: '10-digit mobile number',
               icon: Icons.phone_outlined,
               prefixText: '+91 ',
-              isWide: isWide,
             ),
           ),
-          SizedBox(height: isWide ? 14 : 1.8.h),
+          SizedBox(height: 1.8.h),
 
           // Password
-          _buildFieldLabel('Password', isWide),
-          SizedBox(height: isWide ? 6 : 0.8.h),
+          _buildFieldLabel('Password'),
+          SizedBox(height: 0.8.h),
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,
             onChanged: _onPasswordChanged,
-            style: GoogleFonts.plusJakartaSans(fontSize: isWide ? 13 : 11.sp),
+            style: GoogleFonts.plusJakartaSans(fontSize: 11.sp),
             decoration: _inputDecoration(
               hint: 'Create password',
               icon: Icons.lock_outline_rounded,
-              isWide: isWide,
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -591,23 +625,22 @@ class _SignupScreenState extends State<SignupScreen>
               ),
             ),
           ),
-          SizedBox(height: isWide ? 10 : 1.2.h),
+          SizedBox(height: 1.2.h),
 
           // Password Strength Indicators
-          _buildStrengthBox(isWide),
-          SizedBox(height: isWide ? 14 : 1.8.h),
+          _buildStrengthBox(),
+          SizedBox(height: 1.8.h),
 
           // Confirm Password
-          _buildFieldLabel('Confirm Password', isWide),
-          SizedBox(height: isWide ? 6 : 0.8.h),
+          _buildFieldLabel('Confirm Password'),
+          SizedBox(height: 0.8.h),
           TextFormField(
             controller: _confirmPasswordController,
             obscureText: _obscureConfirm,
-            style: GoogleFonts.plusJakartaSans(fontSize: isWide ? 13 : 11.sp),
+            style: GoogleFonts.plusJakartaSans(fontSize: 11.sp),
             decoration: _inputDecoration(
               hint: 'Confirm password',
               icon: Icons.lock_outline_rounded,
-              isWide: isWide,
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -618,12 +651,12 @@ class _SignupScreenState extends State<SignupScreen>
               ),
             ),
           ),
-          SizedBox(height: isWide ? 24 : 3.h),
+          SizedBox(height: 3.h),
 
           // Create Account Button
           SizedBox(
             width: double.infinity,
-            height: isWide ? 50 : 6.5.h,
+            height: 6.5.h,
             child: ElevatedButton(
               onPressed: _isLoading ? null : _handleCustomerRegistration,
               style: ElevatedButton.styleFrom(
@@ -646,7 +679,7 @@ class _SignupScreenState extends State<SignupScreen>
                   : Text(
                       'Create Account',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: isWide ? 14 : 12.sp,
+                        fontSize: 12.sp,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -657,11 +690,11 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildFieldLabel(String label, bool isWide) {
+  Widget _buildFieldLabel(String label) {
     return Text(
       label,
       style: GoogleFonts.plusJakartaSans(
-        fontSize: isWide ? 12 : 10.sp,
+        fontSize: 10.sp,
         fontWeight: FontWeight.w600,
         color: const Color(0xFF1A1C1E),
       ),
@@ -671,19 +704,18 @@ class _SignupScreenState extends State<SignupScreen>
   InputDecoration _inputDecoration({
     required String hint,
     required IconData icon,
-    required bool isWide,
     Widget? suffixIcon,
     String? prefixText,
   }) {
     return InputDecoration(
       hintText: hint,
       hintStyle: GoogleFonts.plusJakartaSans(
-        fontSize: isWide ? 13 : 10.5.sp,
+        fontSize: 10.5.sp,
         color: const Color(0xFF90A4AE),
       ),
       prefixText: prefixText,
       prefixStyle: GoogleFonts.plusJakartaSans(
-        fontSize: isWide ? 13 : 11.sp,
+        fontSize: 11.sp,
         fontWeight: FontWeight.w600,
         color: const Color(0xFF1A1C1E),
       ),
@@ -707,7 +739,7 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildStrengthBox(bool isWide) {
+  Widget _buildStrengthBox() {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -718,16 +750,16 @@ class _SignupScreenState extends State<SignupScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _strengthItem('At least 8 characters', _hasMinLength, isWide),
-          _strengthItem('One uppercase & lowercase letter', _hasUppercase && _hasLowercase, isWide),
-          _strengthItem('One number (0-9)', _hasNumber, isWide),
-          _strengthItem('One special character (!@#\$...)', _hasSpecial, isWide),
+          _strengthItem('At least 8 characters', _hasMinLength),
+          _strengthItem('One uppercase & lowercase letter', _hasUppercase && _hasLowercase),
+          _strengthItem('One number (0-9)', _hasNumber),
+          _strengthItem('One special character (!@#\$...)', _hasSpecial),
         ],
       ),
     );
   }
 
-  Widget _strengthItem(String label, bool met, bool isWide) {
+  Widget _strengthItem(String label, bool met) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -741,7 +773,7 @@ class _SignupScreenState extends State<SignupScreen>
           Text(
             label,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: isWide ? 11 : 8.5.sp,
+              fontSize: 8.5.sp,
               color: met ? const Color(0xFF2E7D32) : const Color(0xFF74777F),
               fontWeight: met ? FontWeight.w600 : FontWeight.w400,
             ),
@@ -783,11 +815,11 @@ class _SignupScreenState extends State<SignupScreen>
       children: [
         const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: EdgeInsets.symmetric(horizontal: 3.w),
           child: Text(
             'or',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
+              fontSize: 10.sp,
               color: const Color(0xFF90A4AE),
               fontWeight: FontWeight.w500,
             ),
@@ -798,19 +830,19 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildGoogleButton(bool isWide) {
+  Widget _buildGoogleButton() {
     return GestureDetector(
       onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
       child: Container(
         width: double.infinity,
-        height: isWide ? 50 : 6.5.h,
+        height: 6.5.h,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14.0),
           border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -831,11 +863,11 @@ class _SignupScreenState extends State<SignupScreen>
                       size: 28,
                       color: Color(0xFF4285F4),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 2.w),
                     Text(
                       'Continue with Google',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: isWide ? 14 : 11.5.sp,
+                        fontSize: 11.5.sp,
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFF1A1C1E),
                       ),
@@ -861,14 +893,14 @@ class _SignupScreenState extends State<SignupScreen>
           text: TextSpan(
             text: 'Already have an account? ',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 13,
+              fontSize: 10.5.sp,
               color: const Color(0xFF74777F),
             ),
             children: [
               TextSpan(
                 text: 'Login',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
+                  fontSize: 10.5.sp,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.primary,
                 ),
@@ -888,7 +920,6 @@ class _RoleCard extends StatelessWidget {
   final String subtitle;
   final bool isSelected;
   final Color color;
-  final bool isWide;
   final VoidCallback onTap;
 
   const _RoleCard({
@@ -897,7 +928,6 @@ class _RoleCard extends StatelessWidget {
     required this.subtitle,
     required this.isSelected,
     required this.color,
-    required this.isWide,
     required this.onTap,
   });
 
@@ -907,12 +937,9 @@ class _RoleCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(
-          vertical: isWide ? 12 : 1.5.h,
-          horizontal: isWide ? 16 : 3.w,
-        ),
+        padding: EdgeInsets.symmetric(vertical: 1.5.h, horizontal: 3.w),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.08) : Colors.white,
+          color: isSelected ? color.withValues(alpha: 0.08) : Colors.white,
           borderRadius: BorderRadius.circular(14.0),
           border: Border.all(
             color: isSelected ? color : const Color(0xFFE0E0E0),
@@ -927,11 +954,11 @@ class _RoleCard extends StatelessWidget {
               color: isSelected ? color : const Color(0xFF90A4AE),
               size: 20,
             ),
-            SizedBox(height: isWide ? 6 : 0.8.h),
+            SizedBox(height: 0.8.h),
             Text(
               label,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: isWide ? 13 : 11.sp,
+                fontSize: 11.sp,
                 fontWeight: FontWeight.w700,
                 color: isSelected ? color : const Color(0xFF44474E),
               ),
@@ -939,7 +966,7 @@ class _RoleCard extends StatelessWidget {
             Text(
               subtitle,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: isWide ? 11 : 8.5.sp,
+                fontSize: 8.5.sp,
                 color: const Color(0xFF90A4AE),
               ),
               overflow: TextOverflow.ellipsis,

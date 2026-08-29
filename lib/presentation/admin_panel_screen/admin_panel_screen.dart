@@ -539,6 +539,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             ),
           ),
           _buildSettingsTile(
+            icon: Icons.campaign_rounded,
+            title: 'Push Notification Hub',
+            subtitle: 'Dispatch broadcast & targeted push alerts with sound',
+            color: const Color(0xFF7C3AED),
+            onTap: () => Navigator.pushNamed(
+              context,
+              AppRoutes.adminNotificationHubScreen,
+            ),
+          ),
+          _buildSettingsTile(
             icon: Icons.report_problem_rounded,
             title: 'Complaints',
             subtitle: 'View and resolve user complaints',
@@ -547,8 +557,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           ),
           _buildSettingsTile(
             icon: Icons.notifications_active_rounded,
-            title: 'Notifications',
-            subtitle: 'Send platform-wide notifications',
+            title: 'Notifications Feed',
+            subtitle: 'View all platform notification activities',
             onTap: () =>
                 Navigator.pushNamed(context, AppRoutes.notificationScreen),
           ),

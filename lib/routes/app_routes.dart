@@ -16,6 +16,7 @@ import '../presentation/admin_panel_screen/admin_event_management_screen.dart';
 import '../presentation/admin_panel_screen/admin_kyc_verification_screen.dart';
 import '../presentation/admin_panel_screen/admin_location_settings_screen.dart';
 import '../presentation/admin_panel_screen/admin_media_moderation_screen.dart';
+import '../presentation/admin_panel_screen/admin_notification_hub_screen.dart';
 import '../presentation/admin_panel_screen/admin_panel_screen.dart';
 import '../presentation/admin_panel_screen/admin_play_store_review_screen.dart';
 import '../presentation/admin_panel_screen/admin_provider_management_screen.dart';
@@ -185,6 +186,7 @@ class AppRoutes {
   static const String adminBannerAdsScreen = '/admin-banner-ads-screen';
   static const String adminReportsScreen = '/admin-reports-screen';
   static const String adminComplaintsScreen = '/admin-complaints-screen';
+  static const String adminNotificationHubScreen = '/admin-notification-hub-screen';
   static const String checkoutScreen = '/checkout-screen';
   static const String chatListScreen = '/chat-list-screen';
   static const String chatDetailScreen = '/chat-detail-screen';
@@ -725,6 +727,10 @@ class AppRoutes {
       adminLocationSettingsScreen: (context) => const RoleGuard(
         requiredRole: 'admin',
         child: AdminLocationSettingsScreen(),
+      ),
+      adminNotificationHubScreen: (context) => const RoleGuard(
+        requiredRole: 'admin',
+        child: AdminNotificationHubScreen(),
       ),
       // ── Home Maintenance Customer Routes ─────────────────────────────────,
       homeMaintenanceCustomerScreen: (context) => const RoleGuard(

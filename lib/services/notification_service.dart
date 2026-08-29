@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:universal_html/html.dart' as html;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'supabase_service.dart';
 
 /// Service for showing local push notifications for order updates.
 class NotificationService {
@@ -16,6 +19,52 @@ class NotificationService {
 
   bool _initialized = false;
 
+  /// Plays a notification chime sound (Web Audio synthesizer on Web, system sound on mobile)
+  void playNotificationSound() {
+    try {
+      if (kIsWeb) {
+        try {
+          final script = html.ScriptElement()
+            ..text = '''
+              (function() {
+                try {
+                  var AudioContext = window.AudioContext || window.webkitAudioContext;
+                  if (!AudioContext) return;
+                  var ctx = new AudioContext();
+                  
+                  var osc1 = ctx.createOscillator();
+                  var gain1 = ctx.createGain();
+                  osc1.type = 'sine';
+                  osc1.frequency.setValueAtTime(880, ctx.currentTime);
+                  gain1.gain.setValueAtTime(0.2, ctx.currentTime);
+                  gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+                  osc1.connect(gain1);
+                  gain1.connect(ctx.destination);
+                  osc1.start(ctx.currentTime);
+                  osc1.stop(ctx.currentTime + 0.35);
+
+                  var osc2 = ctx.createOscillator();
+                  var gain2 = ctx.createGain();
+                  osc2.type = 'sine';
+                  osc2.frequency.setValueAtTime(1318.5, ctx.currentTime + 0.12);
+                  gain2.gain.setValueAtTime(0.25, ctx.currentTime + 0.12);
+                  gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+                  osc2.connect(gain2);
+                  gain2.connect(ctx.destination);
+                  osc2.start(ctx.currentTime + 0.12);
+                  osc2.stop(ctx.currentTime + 0.45);
+                } catch(e) {}
+              })();
+            ''';
+          html.document.body?.append(script);
+          script.remove();
+        } catch (_) {}
+      } else {
+        SystemSound.play(SystemSoundType.alert);
+      }
+    } catch (_) {}
+  }
+
   // ─── IN-APP TOAST OVERLAY ─────────────────────────────────────────────────
 
   /// Global overlay key for in-app toast notifications
@@ -24,6 +73,42 @@ class NotificationService {
 
   OverlayEntry? _currentToastEntry;
   Timer? _toastTimer;
+
+  /// Show generic in-app toast notification with icon and message
+  void showInAppToast({
+    required String title,
+    required String subtitle,
+    IconData icon = Icons.notifications_active_rounded,
+    Color iconColor = const Color(0xFF1E3A8A),
+    Color bgColor = const Color(0xFFF1F5F9),
+  }) {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    _currentToastEntry?.remove();
+    _toastTimer?.cancel();
+
+    _currentToastEntry = OverlayEntry(
+      builder: (_) => _RideStatusToastWidget(
+        icon: icon,
+        iconColor: iconColor,
+        bgColor: bgColor,
+        title: title,
+        subtitle: subtitle,
+        onDismiss: () {
+          _currentToastEntry?.remove();
+          _currentToastEntry = null;
+        },
+      ),
+    );
+
+    Overlay.of(context).insert(_currentToastEntry!);
+
+    _toastTimer = Timer(const Duration(seconds: 4), () {
+      _currentToastEntry?.remove();
+      _currentToastEntry = null;
+    });
+  }
 
   /// Show an in-app toast overlay for ride status changes
   void showRideStatusToast({
@@ -913,6 +998,235 @@ class NotificationService {
           return null;
       }
     }
+  }
+
+  // ─── UNIVERSAL BOOKING, ENQUIRY & ADMIN PUSH DISPATCHERS ─────────────────
+
+  /// Notify when a customer creates a new booking
+  Future<void> notifyBookingCreated({
+    required String bookingId,
+    required String service,
+    required String customerId,
+    required String customerName,
+    required String providerId,
+    required String providerName,
+    required String amount,
+  }) async {
+    playNotificationSound();
+
+    showInAppToast(
+      title: '✅ Booking Confirmed (#$bookingId)',
+      subtitle: 'Your booking for $service with $providerName ($amount) is confirmed.',
+      icon: Icons.check_circle_rounded,
+      iconColor: const Color(0xFF00C853),
+      bgColor: const Color(0xFFE8F5E9),
+    );
+
+    try {
+      final now = DateTime.now().toIso8601String();
+      await SupabaseService.instance.client.from('notifications').insert({
+        'user_id': customerId,
+        'title': 'Booking Confirmed (#$bookingId)',
+        'body': 'Your booking for $service with $providerName has been placed.',
+        'type': 'booking',
+        'is_read': false,
+        'created_at': now,
+      });
+
+      await SupabaseService.instance.client.from('notifications').insert({
+        'user_id': providerId,
+        'title': '🎉 New Booking Received (#$bookingId)',
+        'body': '$customerName booked $service for $amount.',
+        'type': 'booking',
+        'is_read': false,
+        'created_at': now,
+      });
+
+      await SupabaseService.instance.client.from('notifications').insert({
+        'user_id': 'admin',
+        'title': '📦 New Booking Placed (#$bookingId)',
+        'body': '$customerName booked $service with $providerName ($amount).',
+        'type': 'admin_broadcast',
+        'is_read': false,
+        'created_at': now,
+      });
+    } catch (_) {}
+  }
+
+  /// Notify when booking status changes (accepted, in_progress, completed, cancelled)
+  Future<void> notifyBookingStatusChanged({
+    required String bookingId,
+    required String service,
+    required String customerId,
+    required String providerId,
+    required String newStatus,
+  }) async {
+    playNotificationSound();
+
+    final statusText = newStatus == 'accepted'
+        ? 'Accepted'
+        : newStatus == 'in_progress'
+            ? 'In Progress'
+            : newStatus == 'completed'
+                ? 'Completed'
+                : 'Cancelled';
+
+    showInAppToast(
+      title: 'Booking $statusText (#$bookingId)',
+      subtitle: 'Your booking for $service is now $statusText.',
+      icon: newStatus == 'completed'
+          ? Icons.verified_rounded
+          : newStatus == 'cancelled'
+              ? Icons.cancel_rounded
+              : Icons.update_rounded,
+      iconColor: newStatus == 'completed'
+          ? const Color(0xFF00C853)
+          : newStatus == 'cancelled'
+              ? Colors.red
+              : const Color(0xFF1E3A8A),
+      bgColor: const Color(0xFFF1F5F9),
+    );
+
+    try {
+      final now = DateTime.now().toIso8601String();
+      await SupabaseService.instance.client.from('notifications').insert({
+        'user_id': customerId,
+        'title': 'Booking Status: $statusText (#$bookingId)',
+        'body': 'Your service $service is now marked as $statusText.',
+        'type': 'booking_status',
+        'is_read': false,
+        'created_at': now,
+      });
+    } catch (_) {}
+  }
+
+  /// Notify when a customer submits an enquiry to a provider
+  Future<void> notifyEnquirySubmitted({
+    required String enquiryId,
+    required String subcategory,
+    required String customerId,
+    required String customerName,
+    required String customerPhone,
+    required String providerId,
+    required String providerName,
+    required String message,
+  }) async {
+    playNotificationSound();
+
+    showInAppToast(
+      title: '📨 Enquiry Sent (#$enquiryId)',
+      subtitle: 'Your enquiry for $subcategory was sent to $providerName.',
+      icon: Icons.send_rounded,
+      iconColor: const Color(0xFF1E3A8A),
+      bgColor: const Color(0xFFE0E7FF),
+    );
+
+    try {
+      final now = DateTime.now().toIso8601String();
+      await SupabaseService.instance.client.from('notifications').insert({
+        'user_id': providerId,
+        'title': '📩 New Customer Enquiry (#$enquiryId)',
+        'body': '$customerName ($customerPhone) sent an enquiry for $subcategory: "$message"',
+        'type': 'enquiry',
+        'is_read': false,
+        'created_at': now,
+      });
+
+      await SupabaseService.instance.client.from('notifications').insert({
+        'user_id': customerId,
+        'title': 'Enquiry Submitted (#$enquiryId)',
+        'body': 'Your enquiry for $subcategory has reached $providerName.',
+        'type': 'enquiry',
+        'is_read': false,
+        'created_at': now,
+      });
+
+      await SupabaseService.instance.client.from('notifications').insert({
+        'user_id': 'admin',
+        'title': '📋 New Platform Enquiry (#$enquiryId)',
+        'body': '$customerName ➔ $providerName ($subcategory)',
+        'type': 'admin_broadcast',
+        'is_read': false,
+        'created_at': now,
+      });
+    } catch (_) {}
+  }
+
+  /// Admin broadcast push notification to all customers, all vendors, or a specific user
+  Future<int> broadcastAdminPushNotification({
+    required String targetType,
+    String? targetUserId,
+    required String title,
+    required String body,
+  }) async {
+    playNotificationSound();
+    int sentCount = 0;
+
+    try {
+      final now = DateTime.now().toIso8601String();
+
+      if (targetType == 'specific_user' && targetUserId != null) {
+        await SupabaseService.instance.client.from('notifications').insert({
+          'user_id': targetUserId,
+          'title': title,
+          'body': body,
+          'type': 'admin_broadcast',
+          'is_read': false,
+          'created_at': now,
+        });
+        sentCount = 1;
+      } else {
+        var query = SupabaseService.instance.client.from('user_profiles').select('id, role');
+        if (targetType == 'all_customers') {
+          query = query.eq('role', 'customer');
+        } else if (targetType == 'all_vendors') {
+          query = query.eq('role', 'provider');
+        }
+
+        final users = await query;
+        final rows = <Map<String, dynamic>>[];
+        for (final u in users) {
+          final uid = u['id'] as String?;
+          if (uid != null) {
+            rows.add({
+              'user_id': uid,
+              'title': title,
+              'body': body,
+              'type': 'admin_broadcast',
+              'is_read': false,
+              'created_at': now,
+            });
+          }
+        }
+
+        if (rows.isNotEmpty) {
+          await SupabaseService.instance.client.from('notifications').insert(rows);
+          sentCount = rows.length;
+        } else {
+          await SupabaseService.instance.client.from('notifications').insert({
+            'user_id': targetType,
+            'title': title,
+            'body': body,
+            'type': 'admin_broadcast',
+            'is_read': false,
+            'created_at': now,
+          });
+          sentCount = 1;
+        }
+      }
+
+      showInAppToast(
+        title: '📢 Push Notification Dispatched',
+        subtitle: 'Sent "$title" to $sentCount recipient(s).',
+        icon: Icons.campaign_rounded,
+        iconColor: const Color(0xFF7C3AED),
+        bgColor: const Color(0xFFF5F3FF),
+      );
+    } catch (e) {
+      debugPrint('[NotificationService] Broadcast error: $e');
+    }
+
+    return sentCount;
   }
 }
 

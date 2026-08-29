@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_export.dart';
 import '../../services/notification_service.dart';
 import '../../services/location_service.dart';
+import '../../widgets/universal_enquiry_dialog.dart';
 
 class TransportCustomerScreen extends StatefulWidget {
   const TransportCustomerScreen({super.key});
@@ -1222,6 +1223,81 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
                       label: 'Track',
                       color: const Color(0xFFE65100),
                       onTap: () => _trackVehicle(provider),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(
+                        Icons.help_outline_rounded,
+                        size: 15,
+                      ),
+                      label: Text(
+                        'Make Enquiry',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _vehicleColor,
+                        side: BorderSide(color: _vehicleColor),
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () {
+                        UniversalEnquiryDialog.show(
+                          context,
+                          providerId: provider['id'] as String? ?? 'trans_p',
+                          providerName: name,
+                          providerPhone: phone,
+                          providerRating: rating > 0 ? rating : 4.8,
+                          category: 'Transport & Logistics',
+                          subcategory: _vehicleLabel,
+                          serviceTitle: '$_vehicleLabel ($vehicleNo)',
+                          basePrice: priceRange.isNotEmpty ? priceRange : 'Standard Fare',
+                          themeColor: _vehicleColor,
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(
+                        Icons.directions_car_rounded,
+                        size: 15,
+                        color: Colors.white,
+                      ),
+                      label: Text(
+                        'Book Ride Now',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _vehicleColor,
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _selectedProviderIds.clear();
+                          _selectedProviderIds.add(id);
+                        });
+                        _tabController.animateTo(1);
+                      },
                     ),
                   ),
                 ],

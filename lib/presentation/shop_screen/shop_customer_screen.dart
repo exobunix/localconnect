@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import '../../widgets/universal_enquiry_dialog.dart';
 
 /// Customer-facing shop screen for Grocery and Vegetables subcategories
 /// Supports: product browsing, category filter, cart, checkout
@@ -237,6 +238,27 @@ class _ShopCustomerScreenState extends State<ShopCustomerScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline_rounded),
+            tooltip: 'Make Enquiry',
+            onPressed: () {
+              final pName = _selectedProvider?['business_name'] ??
+                  _selectedProvider?['full_name'] ??
+                  'Shop Partner';
+              UniversalEnquiryDialog.show(
+                context,
+                providerId: _selectedProvider?['id'] as String? ?? 'shop_p',
+                providerName: pName as String,
+                providerPhone: _selectedProvider?['phone'] as String?,
+                providerRating: (_selectedProvider?['rating'] as num?)?.toDouble() ?? 4.8,
+                category: 'Shop',
+                subcategory: _subcategoryName,
+                serviceTitle: '$pName - $_subcategoryName',
+                basePrice: 'Product Rates Apply',
+                themeColor: _accentColor,
+              );
+            },
+          ),
           // Previous Lists button (grocery/vegetables only)
           if (_subcategoryId == 'grocery' || _subcategoryId == 'vegetables')
             IconButton(

@@ -840,17 +840,38 @@ class _AdminCategoryManagementScreenState
           ),
           ElevatedButton(
             onPressed: () async {
-              if (nameCtrl.text.isNotEmpty) {
+              if (nameCtrl.text.trim().isNotEmpty) {
+                final name = nameCtrl.text.trim();
+                final marathi = marathiCtrl.text.trim();
                 Navigator.pop(context);
-                final id = nameCtrl.text.toLowerCase().replaceAll(' ', '_');
-                await SupabaseService.instance.adminUpsertCategory(
-                  id: id,
-                  name: nameCtrl.text,
-                  nameMarathi: marathiCtrl.text,
-                  isActive: false, // New categories start hidden
-                );
-                CategoryService.instance.invalidateCache();
-                await _loadCategories();
+                try {
+                  final id = name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '');
+                  await SupabaseService.instance.adminUpsertCategory(
+                    id: id.isNotEmpty ? id : 'cat_${DateTime.now().millisecondsSinceEpoch}',
+                    name: name,
+                    nameMarathi: marathi,
+                    isActive: true, // Make immediately active and visible
+                  );
+                  CategoryService.instance.invalidateCache();
+                  await _loadCategories();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Category "$name" added successfully!'),
+                        backgroundColor: const Color(0xFF00C853),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error adding category: $e'),
+                        backgroundColor: Colors.red.shade700,
+                      ),
+                    );
+                  }
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
@@ -929,7 +950,8 @@ class _AdminCategoryManagementScreenState
                 id: cat['id'] as String,
                 name: nameCtrl.text,
                 nameMarathi: marathiCtrl.text,
-                isActive: cat['is_active'] as bool? ?? false,
+                isActive: cat['is_active'] as bool? ?? true,
+                description: descCtrl.text,
               );
               CategoryService.instance.invalidateCache();
               await _loadCategories();
@@ -975,17 +997,38 @@ class _AdminCategoryManagementScreenState
           ),
           ElevatedButton(
             onPressed: () async {
-              if (nameCtrl.text.isNotEmpty) {
+              if (nameCtrl.text.trim().isNotEmpty) {
+                final name = nameCtrl.text.trim();
                 Navigator.pop(context);
-                final subId =
-                    '${cat['id']}_${nameCtrl.text.toLowerCase().replaceAll(' ', '_')}';
-                await SupabaseService.instance.adminAddSubcategory(
-                  categoryId: cat['id'] as String,
-                  id: subId,
-                  name: nameCtrl.text,
-                );
-                CategoryService.instance.invalidateCache();
-                await _loadCategories();
+                try {
+                  final catId = cat['id'] as String;
+                  final rawSlug = name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '');
+                  final subId = '${catId}_${rawSlug.isNotEmpty ? rawSlug : DateTime.now().millisecondsSinceEpoch}';
+                  await SupabaseService.instance.adminAddSubcategory(
+                    categoryId: catId,
+                    id: subId,
+                    name: name,
+                  );
+                  CategoryService.instance.invalidateCache();
+                  await _loadCategories();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Subcategory "$name" added to ${cat['name']}!'),
+                        backgroundColor: const Color(0xFF00C853),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error adding subcategory: $e'),
+                        backgroundColor: Colors.red.shade700,
+                      ),
+                    );
+                  }
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),

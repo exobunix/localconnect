@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/auth_left_banner.dart';
 
 class SignupScreen extends StatefulWidget {
   final String? initialEmail;
@@ -144,11 +145,9 @@ class _SignupScreenState extends State<SignupScreen>
         return;
       }
 
-      // Check if user is currently authenticated via Google
+      // Check if user is already authenticated (via Google OAuth or active session)
       final currentUser = SupabaseService.instance.currentUser;
       if (currentUser != null && (currentUser.email == email || _isGoogleEmailLocked)) {
-        // User already has an active Google OAuth session
-        // Update password and profile
         try {
           await SupabaseService.instance.client.auth.updateUser(
             UserAttributes(
@@ -182,34 +181,75 @@ class _SignupScreenState extends State<SignupScreen>
       }
 
       // 3. Normal signup with email & password
-      final authResponse = await SupabaseService.instance.signUpWithEmail(
-        email: email,
-        password: password,
-        fullName: name,
-        phone: phone,
-        role: 'customer',
-      );
-
-      final newUserId = authResponse.user?.id;
-      if (newUserId != null) {
-        await SupabaseService.instance.upsertUserProfile(
-          userId: newUserId,
+      try {
+        final authResponse = await SupabaseService.instance.signUpWithEmail(
           email: email,
+          password: password,
           fullName: name,
           phone: phone,
           role: 'customer',
-          city: 'Pune',
         );
-      }
 
-      // Ensure logged in session
-      if (authResponse.session == null) {
-        try {
-          await SupabaseService.instance.signInWithEmail(
+        final newUserId = authResponse.user?.id;
+        if (newUserId != null) {
+          await SupabaseService.instance.upsertUserProfile(
+            userId: newUserId,
             email: email,
-            password: password,
+            fullName: name,
+            phone: phone,
+            role: 'customer',
+            city: 'Pune',
           );
-        } catch (_) {}
+        }
+
+        if (authResponse.session == null) {
+          try {
+            await SupabaseService.instance.signInWithEmail(
+              email: email,
+              password: password,
+            );
+          } catch (_) {}
+        }
+      } on AuthException catch (authEx) {
+        if (authEx.message.contains('User already registered') || authEx.message.contains('already exists')) {
+          try {
+            final signInRes = await SupabaseService.instance.signInWithEmail(
+              email: email,
+              password: password,
+            );
+            if (signInRes.user != null) {
+              await SupabaseService.instance.upsertUserProfile(
+                userId: signInRes.user!.id,
+                email: email,
+                fullName: name,
+                phone: phone,
+                role: 'customer',
+                city: 'Pune',
+              );
+              if (mounted) {
+                Navigator.pushNamedAndRemoveUntil(context, AppRoutes.homeScreen, (r) => false);
+              }
+              return;
+            }
+          } catch (_) {
+            final profile = await SupabaseService.instance.getUserProfileByEmail(email);
+            if (profile == null) {
+              setState(() {
+                _errorMessage = 'Google sign-up detected. Please tap "Continue with Google" below to complete sign-in.';
+                _isLoading = false;
+              });
+              return;
+            } else {
+              setState(() {
+                _errorMessage = 'An account with this email already exists. Please log in.';
+                _isLoading = false;
+              });
+              return;
+            }
+          }
+        } else {
+          rethrow;
+        }
       }
 
       if (mounted) {
@@ -222,9 +262,7 @@ class _SignupScreenState extends State<SignupScreen>
     } on AuthException catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.message.contains('User already registered')
-              ? 'An account with this email already exists. Please log in.'
-              : e.message;
+          _errorMessage = e.message;
           _isLoading = false;
         });
       }
@@ -249,24 +287,23 @@ class _SignupScreenState extends State<SignupScreen>
       if (kIsWeb) {
         try {
           html.window.localStorage['google_signin_role'] = 'customer';
+          html.window.localStorage['google_signin_flow'] = 'signup';
         } catch (_) {}
+
         await SupabaseService.instance.client.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: '${Uri.base.origin}/',
-          queryParams: {
-            'role': 'customer',
-          },
         );
         return;
       }
 
-      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
-      final effectiveClientId = webClientId.isNotEmpty
-          ? webClientId
-          : '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com';
-
-      final googleSignIn = GoogleSignIn(
-        serverClientId: effectiveClientId,
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: const String.fromEnvironment(
+          'GOOGLE_WEB_CLIENT_ID',
+          defaultValue:
+              '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com',
+        ),
+        scopes: ['email', 'profile'],
       );
 
       final googleUser = await googleSignIn.signIn();
@@ -290,11 +327,9 @@ class _SignupScreenState extends State<SignupScreen>
 
       final user = SupabaseService.instance.currentUser;
       if (user != null) {
-        // Check if customer profile exists
         final profile = await SupabaseService.instance.getUserProfile(user.id);
         if (!mounted) return;
         if (profile != null) {
-          // Existing customer -> direct login
           Navigator.pushNamedAndRemoveUntil(
             context,
             AppRoutes.homeScreen,
@@ -303,7 +338,6 @@ class _SignupScreenState extends State<SignupScreen>
           return;
         }
 
-        // New customer -> prefill form and allow completing registration
         setState(() {
           _isGoogleLoading = false;
           _emailController.text = user.email ?? googleUser.email;
@@ -323,6 +357,77 @@ class _SignupScreenState extends State<SignupScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width > 850;
+
+    Widget formContent = Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isWide ? 40 : 6.w,
+        vertical: isWide ? 40 : 3.5.h,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildHeader(),
+          SizedBox(height: 2.5.h),
+          _buildRoleSelector(),
+          SizedBox(height: 2.5.h),
+          if (_errorMessage != null) ...[
+            _buildErrorBox(_errorMessage!),
+            SizedBox(height: 2.h),
+          ],
+          _buildSignupForm(),
+          SizedBox(height: 2.5.h),
+          _buildOrDivider(),
+          SizedBox(height: 2.5.h),
+          _buildGoogleButton(),
+          SizedBox(height: 3.h),
+          _buildLoginLink(),
+        ],
+      ),
+    );
+
+    if (isWide) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFEEF2FF),
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1080),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Expanded(
+                      flex: 5,
+                      child: AuthLeftBanner(),
+                    ),
+                    const SizedBox(width: 32),
+                    Expanded(
+                      flex: 6,
+                      child: formContent,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFEEF2FF),
       body: SafeArea(
@@ -333,41 +438,7 @@ class _SignupScreenState extends State<SignupScreen>
               padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.5.h),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.07),
-                        blurRadius: 24,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildHeader(),
-                      SizedBox(height: 2.5.h),
-                      _buildRoleSelector(),
-                      SizedBox(height: 2.5.h),
-                      if (_errorMessage != null) ...[
-                        _buildErrorBox(_errorMessage!),
-                        SizedBox(height: 2.h),
-                      ],
-                      _buildSignupForm(),
-                      SizedBox(height: 2.5.h),
-                      _buildOrDivider(),
-                      SizedBox(height: 2.5.h),
-                      _buildGoogleButton(),
-                      SizedBox(height: 3.h),
-                      _buildLoginLink(),
-                    ],
-                  ),
-                ),
+                child: formContent,
               ),
             ),
           ),

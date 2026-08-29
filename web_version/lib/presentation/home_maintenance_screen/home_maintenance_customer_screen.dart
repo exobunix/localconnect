@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_export.dart';
 import '../../services/category_service.dart';
 import '../../services/supabase_service.dart';
+import '../../widgets/universal_enquiry_dialog.dart';
 
 class HomeMaintenanceCustomerScreen extends StatefulWidget {
   const HomeMaintenanceCustomerScreen({super.key});
@@ -30,18 +31,18 @@ class _HomeMaintenanceCustomerScreenState
   bool _subcategoriesLoaded = false;
 
   // Fallback hardcoded subcategories (used only if Supabase fails)
-  static const _fallbackSubcategories = [
+  static const List<Map<String, dynamic>> _fallbackSubcategories = [
     {
       'id': 'plumber',
       'label': 'Plumber',
       'icon': Icons.plumbing_rounded,
-      'color': Color(0xFF0277BD),
+      'color': Color(0xFF1E88E5),
     },
     {
       'id': 'electrician',
       'label': 'Electrician',
-      'icon': Icons.electrical_services_rounded,
-      'color': Color(0xFFF57F17),
+      'icon': Icons.bolt_rounded,
+      'color': Color(0xFFF57C00),
     },
     {
       'id': 'painter',
@@ -72,6 +73,18 @@ class _HomeMaintenanceCustomerScreenState
       'label': 'Cleaning',
       'icon': Icons.cleaning_services_rounded,
       'color': Color(0xFF1565C0),
+    },
+    {
+      'id': 'maid',
+      'label': 'Maid / Housekeeping',
+      'icon': Icons.cleaning_services_rounded,
+      'color': Color(0xFFE91E63),
+    },
+    {
+      'id': 'waterproofing',
+      'label': 'Waterproofing',
+      'icon': Icons.water_damage_rounded,
+      'color': Color(0xFF00ACC1),
     },
   ];
 
@@ -329,6 +342,124 @@ class _HomeMaintenanceCustomerScreenState
         'phone': '+919923456789',
         'image':
             'https://images.pexels.com/photos/4107120/pexels-photo-4107120.jpeg?w=400',
+        'gallery': [],
+      },
+    ],
+    'maid': [
+      {
+        'id': 'maid-001',
+        'name': 'Laxmi Domestic & Maid Services',
+        'rating': 4.9,
+        'reviews': 142,
+        'distance': 1.2,
+        'charge': 250,
+        'chargeUnit': '/visit',
+        'experience': 6,
+        'verified': true,
+        'emergency': true,
+        'available': true,
+        'speciality': 'Full House Cleaning, Utensils & Mopping',
+        'completedJobs': 420,
+        'phone': '+919822114455',
+        'image':
+            'https://images.pexels.com/photos/4107120/pexels-photo-4107120.jpeg?w=600',
+        'gallery': [],
+      },
+      {
+        'id': 'maid-002',
+        'name': 'Seema House Help & Cooking',
+        'rating': 4.8,
+        'reviews': 98,
+        'distance': 2.0,
+        'charge': 300,
+        'chargeUnit': '/visit',
+        'experience': 8,
+        'verified': true,
+        'emergency': false,
+        'available': true,
+        'speciality': 'Daily Cooking, Dusting & Deep Kitchen Cleaning',
+        'completedJobs': 290,
+        'phone': '+919833225566',
+        'image':
+            'https://images.pexels.com/photos/3768911/pexels-photo-3768911.jpeg?w=600',
+        'gallery': [],
+      },
+      {
+        'id': 'maid-003',
+        'name': 'Aarti Professional Home Helpers',
+        'rating': 4.7,
+        'reviews': 76,
+        'distance': 3.1,
+        'charge': 200,
+        'chargeUnit': '/visit',
+        'experience': 4,
+        'verified': true,
+        'emergency': true,
+        'available': true,
+        'speciality': 'Part-time & Full-time Domestic House Cleaning',
+        'completedJobs': 180,
+        'phone': '+919844336677',
+        'image':
+            'https://images.pexels.com/photos/4108715/pexels-photo-4108715.jpeg?w=600',
+        'gallery': [],
+      },
+    ],
+    'waterproofing': [
+      {
+        'id': 'wp-001',
+        'name': 'Dr. Shield Waterproofing Experts',
+        'rating': 4.9,
+        'reviews': 186,
+        'distance': 1.5,
+        'charge': 35,
+        'chargeUnit': '/sq.ft',
+        'experience': 12,
+        'verified': true,
+        'emergency': true,
+        'available': true,
+        'speciality': 'Terrace, Wall Seepage & Bathroom Waterproofing',
+        'completedJobs': 310,
+        'phone': '+919855447788',
+        'image':
+            'https://images.pexels.com/photos/2219024/pexels-photo-2219024.jpeg?w=600',
+        'gallery': [],
+      },
+      {
+        'id': 'wp-002',
+        'name': 'AquaStop Solutions & Epoxy Grouting',
+        'rating': 4.8,
+        'reviews': 114,
+        'distance': 2.7,
+        'charge': 40,
+        'chargeUnit': '/sq.ft',
+        'experience': 9,
+        'verified': true,
+        'emergency': false,
+        'available': true,
+        'speciality': 'Roof Leakage Chemical Coating & Damp Proofing',
+        'completedJobs': 240,
+        'phone': '+919866558899',
+        'image':
+            'https://images.pexels.com/photos/1216589/pexels-photo-1216589.jpeg?w=600',
+        'gallery': [],
+      },
+      {
+        'id': 'wp-003',
+        'name': 'Apex Moisture Lock Systems',
+        'rating': 4.6,
+        'reviews': 68,
+        'distance': 4.0,
+        'charge': 30,
+        'chargeUnit': '/sq.ft',
+        'experience': 5,
+        'verified': true,
+        'emergency': true,
+        'available': true,
+        'speciality': 'External Wall Crack Filling & Terrace Coating',
+        'completedJobs': 150,
+        'phone': '+919877669900',
+        'image':
+            'https://images.pexels.com/photos/8486944/pexels-photo-8486944.jpeg?w=600',
         'gallery': [],
       },
     ],
@@ -1073,9 +1204,9 @@ class _HomeMaintenanceCustomerScreenState
                         size: 16,
                       ),
                       label: Text(
-                        'Chat',
+                        'Make Enquiry',
                         style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
@@ -1088,13 +1219,18 @@ class _HomeMaintenanceCustomerScreenState
                       ),
                       onPressed: () {
                         Navigator.pop(context);
-                        Navigator.pushNamed(
+                        UniversalEnquiryDialog.show(
                           context,
-                          AppRoutes.chatDetailScreen,
-                          arguments: {
-                            'providerId': provider['id'],
-                            'providerName': provider['name'],
-                          },
+                          providerId: provider['id'] as String? ?? 'p_1',
+                          providerName: provider['name'] as String? ?? 'Provider',
+                          providerImage: provider['image'] as String?,
+                          providerPhone: provider['phone'] as String?,
+                          providerRating: (provider['rating'] as num?)?.toDouble() ?? 4.8,
+                          category: 'Home Maintenance',
+                          subcategory: _activeSubcategory,
+                          serviceTitle: provider['speciality'] as String? ?? 'Home Maintenance Service',
+                          basePrice: '₹${provider['charge']}${provider['chargeUnit'] ?? '/visit'}',
+                          themeColor: _activeColor,
                         );
                       },
                     ),
@@ -1442,9 +1578,9 @@ class _HomeMaintenanceCustomerScreenState
 
   @override
   Widget build(BuildContext context) {
-    final providers = _filteredProviders;
-    final activeColor = _activeColor;
     final subs = _subcategories;
+    final activeColor = _activeColor;
+    final providers = _filteredProviders;
     Map<String, dynamic> activeSub = {
       'id': '',
       'label': 'Services',
@@ -1530,172 +1666,146 @@ class _HomeMaintenanceCustomerScreenState
             ),
           ),
         ),
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            final isDesktop = MediaQuery.of(context).size.width > 800;
-            Widget content = Column(
-              children: [
-                // Search bar
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(12.0),
+        body: Column(
+          children: [
+            // Search bar
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (v) => setState(() => _searchQuery = v),
+                        decoration: InputDecoration(
+                          hintText: 'Search ${activeSub['label']} providers...',
+                          hintStyle: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            color: Colors.grey[400],
                           ),
-                          child: TextField(
-                            controller: _searchController,
-                            onChanged: (v) => setState(() => _searchQuery = v),
-                            decoration: InputDecoration(
-                              hintText: 'Search ${activeSub['label']} providers...',
-                              hintStyle: GoogleFonts.plusJakartaSans(
-                                fontSize: 13,
-                                color: Colors.grey[400],
-                              ),
-                              prefixIcon: Icon(
-                                Icons.search_rounded,
-                                size: 18,
-                                color: Colors.grey[400],
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 12,
-                              ),
-                            ),
+                          prefixIcon: Icon(
+                            Icons.search_rounded,
+                            size: 18,
+                            color: Colors.grey[400],
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-                // Results count
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${providers.length} providers found',
+                ],
+              ),
+            ),
+            // Results count
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${providers.length} providers found',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (_verifiedOnly || _emergencyOnly || !_availableOnly)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: activeColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6.0),
+                      ),
+                      child: Text(
+                        'Filtered',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
+                          fontSize: 11,
+                          color: activeColor,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (_verifiedOnly || _emergencyOnly || !_availableOnly)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
+                    ),
+                ],
+              ),
+            ),
+            // Provider list
+            Expanded(
+              child: providers.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            activeSub['icon'] as IconData,
+                            size: 56,
+                            color: Colors.grey[300],
                           ),
-                          decoration: BoxDecoration(
-                            color: activeColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6.0),
-                          ),
-                          child: Text(
-                            'Filtered',
+                          const SizedBox(height: 12),
+                          Text(
+                            'No providers found',
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              color: activeColor,
+                              fontSize: 16,
+                              color: Colors.grey[500],
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                ),
-                // Provider list
-                Expanded(
-                  child: providers.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                activeSub['icon'] as IconData,
-                                size: 56,
-                                color: Colors.grey[300],
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'No providers found',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 16,
-                                  color: Colors.grey[500],
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Try adjusting your filters',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 13,
-                                  color: Colors.grey[400],
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : isDesktop
-                          ? GridView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: 2.2,
-                              ),
-                              itemCount: providers.length,
-                              itemBuilder: (_, i) => _ProviderCard(
-                                provider: providers[i],
-                                activeColor: activeColor,
-                                isFavourite: _favourites.contains(providers[i]['id']),
-                                onFavourite: () => setState(() {
-                                  final id = providers[i]['id'] as String;
-                                  _favourites.contains(id)
-                                      ? _favourites.remove(id)
-                                      : _favourites.add(id);
-                                }),
-                                onTap: () => _showProviderDetail(providers[i]),
-                                onBook: () => _showBookingSheet(providers[i]),
-                              ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                              itemCount: providers.length,
-                              itemBuilder: (_, i) => _ProviderCard(
-                                provider: providers[i],
-                                activeColor: activeColor,
-                                isFavourite: _favourites.contains(providers[i]['id']),
-                                onFavourite: () => setState(() {
-                                  final id = providers[i]['id'] as String;
-                                  _favourites.contains(id)
-                                      ? _favourites.remove(id)
-                                      : _favourites.add(id);
-                                }),
-                                onTap: () => _showProviderDetail(providers[i]),
-                                onBook: () => _showBookingSheet(providers[i]),
-                              ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Try adjusting your filters',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              color: Colors.grey[400],
                             ),
-                ),
-              ],
-            );
-
-            if (isDesktop) {
-              return Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: content,
-                ),
-              );
-            }
-            return content;
-          },
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                      itemCount: providers.length,
+                      itemBuilder: (_, i) => _ProviderCard(
+                        provider: providers[i],
+                        activeColor: activeColor,
+                        isFavourite: _favourites.contains(providers[i]['id']),
+                        onFavourite: () => setState(() {
+                          final id = providers[i]['id'] as String;
+                          _favourites.contains(id)
+                              ? _favourites.remove(id)
+                              : _favourites.add(id);
+                        }),
+                        onTap: () => _showProviderDetail(providers[i]),
+                        onEnquiry: () => UniversalEnquiryDialog.show(
+                          context,
+                          providerId: providers[i]['id'] as String? ?? 'p_1',
+                          providerName: providers[i]['name'] as String? ?? 'Provider',
+                          providerImage: providers[i]['image'] as String?,
+                          providerPhone: providers[i]['phone'] as String?,
+                          providerRating: (providers[i]['rating'] as num?)?.toDouble() ?? 4.8,
+                          category: 'Home Maintenance',
+                          subcategory: _activeSubcategory,
+                          serviceTitle: providers[i]['speciality'] as String? ?? 'Home Maintenance Service',
+                          basePrice: '₹${providers[i]['charge']}${providers[i]['chargeUnit'] ?? '/visit'}',
+                          themeColor: activeColor,
+                        ),
+                        onBook: () => _showBookingSheet(providers[i]),
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );
@@ -1708,6 +1818,7 @@ class _ProviderCard extends StatelessWidget {
   final bool isFavourite;
   final VoidCallback onFavourite;
   final VoidCallback onTap;
+  final VoidCallback onEnquiry;
   final VoidCallback onBook;
 
   const _ProviderCard({
@@ -1716,6 +1827,7 @@ class _ProviderCard extends StatelessWidget {
     required this.isFavourite,
     required this.onFavourite,
     required this.onTap,
+    required this.onEnquiry,
     required this.onBook,
   });
 
@@ -1889,7 +2001,7 @@ class _ProviderCard extends StatelessWidget {
                           color: Colors.grey[600],
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Icon(
                         Icons.currency_rupee_rounded,
                         size: 13,
@@ -1903,27 +2015,37 @@ class _ProviderCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.timer_rounded,
-                        size: 13,
-                        color: Colors.grey[500],
-                      ),
-                      Text(
-                        ' ${provider['experience']} yrs',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          color: Colors.grey[600],
+                      const Spacer(),
+                      OutlinedButton(
+                        onPressed: onEnquiry,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: activeColor,
+                          side: BorderSide(color: activeColor),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          minimumSize: Size.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        ),
+                        child: Text(
+                          'Enquiry',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 6),
                       ElevatedButton(
                         onPressed: onBook,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: activeColor,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
+                            horizontal: 12,
+                            vertical: 6,
                           ),
                           minimumSize: Size.zero,
                           shape: RoundedRectangleBorder(
@@ -1932,9 +2054,9 @@ class _ProviderCard extends StatelessWidget {
                           elevation: 0,
                         ),
                         child: Text(
-                          'Book',
+                          'Book Now',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
                           ),

@@ -2,6 +2,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import '../../widgets/universal_enquiry_dialog.dart';
 import './event_provider_detail_screen.dart';
 import './event_subscription_screen.dart';
 
@@ -907,7 +908,7 @@ class _EventManagementCustomerScreenState
         'badge': 'Premium',
         'subcategoryDetails': {
           'tentTypes': ['Shamiyana', 'Pagoda', 'Stretch Tent', 'Dome'],
-          'stageSetup': true,
+'stageSetup': true,
           'decoration': true,
           'seatingArrangements': true,
           'lightingPackages': true,
@@ -1338,9 +1339,8 @@ class _SubcategoryTab extends StatelessWidget {
     final subFeatured = featuredProviders
         .where((p) => (p['subcategory'] as Map)['id'] == subcategory['id'])
         .toList();
-    final isDesktop = MediaQuery.of(context).size.width > 800;
 
-    Widget scrollView = CustomScrollView(
+    return CustomScrollView(
       slivers: [
         // Featured Providers Carousel
         if (subFeatured.isNotEmpty) ...[
@@ -1355,10 +1355,10 @@ class _SubcategoryTab extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         colors: [
-                          Color(0xFFFFB300),
-                          Color(0xFFFF8F00),
+                          const Color(0xFFFFB300),
+                          const Color(0xFFFF8F00),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(6),
@@ -1496,54 +1496,23 @@ class _SubcategoryTab extends StatelessWidget {
                   ),
                 ),
               )
-            : isDesktop
-                ? SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 1.85,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (_, i) => _ProviderCard(
-                        provider: providers[i],
-                        color: color,
-                        isDark: isDark,
-                        isFavourite: favourites.contains(providers[i]['id']),
-                        onFavourite: () => onFavouriteToggle(providers[i]['id'] as String),
-                        onTap: () => onProviderTap(providers[i]),
-                      ),
-                      childCount: providers.length,
-                    ),
-                  )
-                : SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (_, i) => _ProviderCard(
-                        provider: providers[i],
-                        color: color,
-                        isDark: isDark,
-                        isFavourite: favourites.contains(providers[i]['id']),
-                        onFavourite: () =>
-                            onFavouriteToggle(providers[i]['id'] as String),
-                        onTap: () => onProviderTap(providers[i]),
-                      ),
-                      childCount: providers.length,
-                    ),
+            : SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (_, i) => _ProviderCard(
+                    provider: providers[i],
+                    color: color,
+                    isDark: isDark,
+                    isFavourite: favourites.contains(providers[i]['id']),
+                    onFavourite: () =>
+                        onFavouriteToggle(providers[i]['id'] as String),
+                    onTap: () => onProviderTap(providers[i]),
                   ),
+                  childCount: providers.length,
+                ),
+              ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
-
-    if (isDesktop) {
-      return Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
-          child: scrollView,
-        ),
-      );
-    }
-    return scrollView;
   }
 }
 
@@ -2120,32 +2089,75 @@ class _ProviderCard extends StatelessWidget {
                         ],
                       ),
                       const Spacer(),
-                      // Quick action buttons
-                      _QuickActionBtn(
-                        icon: Icons.chat_bubble_outline_rounded,
-                        color: color,
+                      OutlinedButton(
+                        onPressed: () {
+                          UniversalEnquiryDialog.show(
+                            context,
+                            providerId: provider['id'] as String? ?? 'event_p',
+                            providerName: provider['name'] as String? ?? 'Event Partner',
+                            providerImage: provider['image'] as String?,
+                            providerRating: (provider['rating'] as num?)?.toDouble() ?? 4.8,
+                            category: 'Event Management',
+                            subcategory: provider['speciality'] as String? ?? 'Events',
+                            serviceTitle: provider['speciality'] as String? ?? 'Event Service',
+                            basePrice: 'From ${_formatPrice(provider['startingPrice'] as num)}',
+                            themeColor: color,
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: color,
+                          side: BorderSide(color: color),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          minimumSize: Size.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        ),
+                        child: Text(
+                          'Enquiry',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 6),
-                      _QuickActionBtn(icon: Icons.phone_rounded, color: color),
-                      const SizedBox(width: 8),
                       ElevatedButton(
-                        onPressed: onTap,
+                        onPressed: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppRoutes.bookingCheckoutScreen,
+                            arguments: {
+                              'providerId': provider['id'] as String?,
+                              'providerName': provider['name'] as String? ?? 'Event Partner',
+                              'providerImage': provider['image'] as String? ?? '',
+                              'providerRating': (provider['rating'] as num?)?.toDouble() ?? 4.8,
+                              'service': provider['speciality'] as String? ?? 'Event Management',
+                              'category': 'event_management',
+                              'amount': _formatPrice(provider['startingPrice'] as num),
+                            },
+                          );
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: color,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
+                            horizontal: 12,
+                            vertical: 8,
                           ),
+                          minimumSize: Size.zero,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(8.0),
                           ),
                           elevation: 0,
                         ),
                         child: Text(
-                          'View Profile',
+                          'Book Now',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
