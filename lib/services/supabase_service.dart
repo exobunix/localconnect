@@ -1307,7 +1307,7 @@ class SupabaseService {
           };
         }).toList();
       } catch (err) {
-        debugPrint('getAdminAllProviders error: $err');
+        print('getAdminAllProviders error: $err');
         return [];
       }
     }
