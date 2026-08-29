@@ -2,6 +2,7 @@ import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/app_export.dart';
+import '../../core/role_guard.dart';
 import '../../core/testing_mode.dart';
 import '../../core/theme_provider.dart';
 import '../../services/demo_seeder_service.dart';
@@ -74,11 +75,20 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   Future<void> _checkAdminRole() async {
+    if (isAdminSessionActive || canAccess(AppRoutes.adminPanelScreen)) {
+      if (mounted) {
+        setState(() {
+          _isAdmin = true;
+          _isCheckingRole = false;
+        });
+      }
+      return;
+    }
     try {
       final userId = SupabaseService.instance.currentUser?.id;
       if (userId == null) {
         if (mounted) {
-          Navigator.pushReplacementNamed(context, AppRoutes.loginScreen);
+          Navigator.pushReplacementNamed(context, AppRoutes.adminLoginScreen);
         }
         return;
       }
@@ -86,9 +96,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       final role = profile?['role'] as String? ?? '';
       if (mounted) {
         if (role != 'admin') {
-          Navigator.pushReplacementNamed(context, AppRoutes.homeScreen);
+          Navigator.pushReplacementNamed(context, AppRoutes.adminLoginScreen);
           return;
         }
+        setAdminSessionActive(true);
         setState(() {
           _isAdmin = true;
           _isCheckingRole = false;
@@ -96,7 +107,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.loginScreen);
+        Navigator.pushReplacementNamed(context, AppRoutes.adminLoginScreen);
       }
     }
   }

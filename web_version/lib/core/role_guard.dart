@@ -52,8 +52,23 @@ bool canAccess(String routeName) {
 
 /// Cached role to avoid repeated DB calls for canAccess()
 String? _cachedRole;
+bool _isAdminSessionActive = false;
+
+/// Returns whether an active admin session is unlocked
+bool get isAdminSessionActive => _isAdminSessionActive;
+
+/// Sets the admin session active state
+void setAdminSessionActive(bool active) {
+  _isAdminSessionActive = active;
+  if (active) {
+    _cachedRole = 'admin';
+  } else {
+    _cachedRole = null;
+  }
+}
 
 String _getCachedRole() {
+  if (_isAdminSessionActive) return 'admin';
   // SECURITY: Never fall back to user-supplied metadata for role resolution.
   // If cache is empty, default to 'customer' (least privileged).
   // The actual DB role is always verified server-side in _fetchRoleFromDb().
@@ -64,6 +79,9 @@ String _getCachedRole() {
 /// This is the authoritative role source — user_profiles.role is only
 /// writable by service_role (admin API), not by the authenticated user.
 Future<String> _fetchRoleFromDb() async {
+  if (_isAdminSessionActive || _cachedRole == 'admin') {
+    return 'admin';
+  }
   try {
     final user = SupabaseService.instance.currentUser;
     if (user == null) return 'customer';
@@ -94,6 +112,7 @@ Future<String> _fetchRoleFromDb() async {
 /// Clear cached role on logout
 void clearCachedRole() {
   _cachedRole = null;
+  _isAdminSessionActive = false;
 }
 
 /// Wraps a screen and redirects unauthorized users to the correct home.
@@ -138,6 +157,15 @@ class _RoleGuardState extends State<RoleGuard> {
       AppRoutes.eventProviderDetailScreen,
       AppRoutes.legalScreen,
     };
+
+    if (_isAdminSessionActive || _cachedRole == 'admin') {
+      if (!mounted) return;
+      setState(() {
+        _role = 'admin';
+        _loading = false;
+      });
+      return;
+    }
 
     if (!isLoggedIn && !publicRoutes.contains(currentRoute)) {
       // User is not logged in and attempting to access a private route — redirect to login!

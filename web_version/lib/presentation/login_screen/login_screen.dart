@@ -587,6 +587,28 @@ class _LoginScreenState extends State<LoginScreen>
                         ],
                       ),
                     ],
+                    SizedBox(height: 1.5.h),
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.pushNamed(
+                          context,
+                          AppRoutes.adminLoginScreen,
+                        ),
+                        icon: const Icon(
+                          Icons.shield_outlined,
+                          size: 16,
+                          color: Color(0xFF5C6BC0),
+                        ),
+                        label: Text(
+                          'Administrator Portal Access →',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9.5.sp,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF3949AB),
+                          ),
+                        ),
+                      ),
+                    ),
                     const AuthFeaturesFooter(),
                   ],
                 ),

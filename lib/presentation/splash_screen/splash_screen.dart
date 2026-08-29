@@ -6,9 +6,10 @@ import 'package:sizer/sizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/role_guard.dart';
+import '../../core/testing_mode.dart';
 import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
-import '../../core/testing_mode.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -98,6 +99,34 @@ class _SplashScreenState extends State<SplashScreen>
               AppRoutes.resetPasswordScreen,
               (route) => false,
             );
+          }
+          return;
+        }
+        if (href.contains('admin-login')) {
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.adminLoginScreen,
+              (route) => false,
+            );
+          }
+          return;
+        }
+        if (href.contains('admin-panel') || href.contains('admin-')) {
+          if (mounted) {
+            if (isAdminSessionActive) {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.adminPanelScreen,
+                (route) => false,
+              );
+            } else {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.adminLoginScreen,
+                (route) => false,
+              );
+            }
           }
           return;
         }
