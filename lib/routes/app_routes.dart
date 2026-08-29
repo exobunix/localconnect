@@ -111,6 +111,7 @@ import '../presentation/rent_screen/room_provider_dashboard.dart';
 import '../presentation/rent_screen/tools_provider_dashboard.dart';
 import '../presentation/rent_screen/villa_provider_dashboard.dart';
 import '../presentation/review_submission_screen/review_submission_screen.dart';
+import '../presentation/reset_password_screen/reset_password_screen.dart';
 import '../presentation/service_booking_screen/service_booking_screen.dart';
 import '../presentation/service_order_confirmation_screen/service_order_confirmation_screen.dart';
 import '../presentation/shop_screen/electrical_hardware_customer_screen.dart';
@@ -370,6 +371,7 @@ class AppRoutes {
   // ── GPS Location Testing Screen ───────────────────────────────────────────
   static const String gpsLocationTestingScreen = '/gps-location-testing-screen';
   static const String changePasswordScreen = '/change-password-screen';
+  static const String resetPasswordScreen = '/reset-password';
 
   // ── QA Developer Panel ────────────────────────────────────────────────────
   static const String qaDeveloperPanelScreen = '/qa-developer-panel-screen';
@@ -882,6 +884,11 @@ class AppRoutes {
         child: GpsLocationTestingScreen(),
       ),
       changePasswordScreen: (context) => const ChangePasswordScreen(),
+      resetPasswordScreen: (context) {
+        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final email = args?['email'] as String?;
+        return ResetPasswordScreen(initialEmail: email);
+      },
       providerBusinessProfileEditScreen: (context) => const RoleGuard(
         requiredRole: 'provider',
         child: ProviderBusinessProfileEditScreen(),

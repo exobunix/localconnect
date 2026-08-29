@@ -207,6 +207,32 @@ app.get('/auth/v1/user', (req, res) => {
   res.status(200).json(user);
 });
 
+app.put('/auth/v1/user', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const token = authHeader.replace('Bearer ', '');
+  const userId = token.replace('mock-token-', '');
+  let user = users.find(u => u.id === userId);
+  
+  if (!user) {
+    return res.status(401).json({ error: 'User session not found' });
+  }
+
+  const { password, data } = req.body;
+  if (password) user.password = password;
+  if (data) user.user_metadata = { ...(user.user_metadata || {}), ...data };
+
+  res.status(200).json(user);
+});
+
+app.post('/auth/v1/recover', (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  res.status(200).json({ message: 'Password recovery email sent' });
+});
+
 app.post('/auth/v1/logout', (req, res) => {
   res.status(200).json({ message: 'Logged out successfully' });
 });

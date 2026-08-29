@@ -41,6 +41,11 @@ void main() async {
       BookingRealtimeService.instance.stopListening();
       // Clear cached role on sign-out to prevent stale role access
       clearCachedRole();
+    } else if (authState.event == AuthChangeEvent.passwordRecovery) {
+      NotificationService.navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        AppRoutes.resetPasswordScreen,
+        (route) => false,
+      );
     }
   });
 

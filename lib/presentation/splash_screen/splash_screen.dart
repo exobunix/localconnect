@@ -88,6 +88,22 @@ class _SplashScreenState extends State<SplashScreen>
       // Ignore errors — proceed with whatever state is available
     }
 
+    if (kIsWeb) {
+      try {
+        final href = html.window.location.href;
+        if (href.contains('type=recovery') || href.contains('reset-password')) {
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.resetPasswordScreen,
+              (route) => false,
+            );
+          }
+          return;
+        }
+      } catch (_) {}
+    }
+
     final isLoggedIn = SupabaseService.instance.isLoggedIn;
     if (!isLoggedIn) {
       // Check if first-time user — show onboarding

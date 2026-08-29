@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,10 +14,6 @@ import '../../theme/app_theme.dart';
 import '../../widgets/auth_left_banner.dart';
 import '../../widgets/auth_features_footer.dart';
 
-/// Signup steps:
-/// 0 = Basic Info (name, email, role, password)
-/// 1 = CAPTCHA verification
-/// 2 = Email verification (check inbox for Supabase confirmation link/OTP)
 class SignupScreen extends StatefulWidget {
   final String? initialEmail;
   final String? initialFullName;
@@ -29,236 +24,111 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen>
-    with TickerProviderStateMixin {
-  int _step = 0;
-  int _selectedRole = 0; // 0 = customer, 1 = provider
+    with SingleTickerProviderStateMixin {
+  int _selectedRole = 0; // 0 = Customer, 1 = Provider
 
-  // Step 0 - Basic Info
+  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
-
-  // Step 1 - CAPTCHA
-  String _captchaQuestion = '';
-  int _captchaAnswer = 0;
-  final _captchaController = TextEditingController();
-  bool _captchaVerified = false;
-
-  // Step 2 - Email verification (Supabase sends a 6-digit OTP to email)
-  final List<TextEditingController> _emailOtpControllers = List.generate(
-    6,
-    (_) => TextEditingController(),
-  );
-  final List<FocusNode> _emailOtpFocusNodes = List.generate(
-    6,
-    (_) => FocusNode(),
-  );
-  bool _emailOtpVerified = false;
-  int _emailResendSeconds = 60;
-  Timer? _emailResendTimer;
-  bool _canResendEmail = false;
-
   bool _isLoading = false;
   bool _isGoogleLoading = false;
+  bool _isGoogleEmailLocked = false;
   String? _errorMessage;
 
-  late AnimationController _fadeController;
-  late AnimationController _progressController;
+  // Password strength criteria
+  bool _hasMinLength = false;
+  bool _hasUppercase = false;
+  bool _hasLowercase = false;
+  bool _hasNumber = false;
+  bool _hasSpecial = false;
+
+  late AnimationController _animController;
   late Animation<double> _fadeAnim;
-  late Animation<Offset> _slideAnim;
 
   @override
   void initState() {
     super.initState();
     if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty) {
       _emailController.text = widget.initialEmail!;
+      _isGoogleEmailLocked = true;
     }
     if (widget.initialFullName != null && widget.initialFullName!.isNotEmpty) {
       _nameController.text = widget.initialFullName!;
     }
-    _fadeController = AnimationController(
+    _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
-    _progressController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(0.05, 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
-    _fadeController.forward();
-    _generateCaptcha();
+    _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    _animController.forward();
   }
 
   @override
   void dispose() {
-    _fadeController.dispose();
-    _progressController.dispose();
+    _animController.dispose();
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _captchaController.dispose();
-    for (final c in _emailOtpControllers) {
-      c.dispose();
-    }
-    for (final f in _emailOtpFocusNodes) {
-      f.dispose();
-    }
-    _emailResendTimer?.cancel();
     super.dispose();
   }
 
-  void _generateCaptcha() {
-    final rng = Random();
-    final a = rng.nextInt(9) + 1;
-    final b = rng.nextInt(9) + 1;
-    _captchaQuestion = '$a + $b = ?';
-    _captchaAnswer = a + b;
-    _captchaController.clear();
+  void _onPasswordChanged(String value) {
+    setState(() {
+      _hasMinLength = value.length >= 8;
+      _hasUppercase = value.contains(RegExp(r'[A-Z]'));
+      _hasLowercase = value.contains(RegExp(r'[a-z]'));
+      _hasNumber = value.contains(RegExp(r'[0-9]'));
+      _hasSpecial = value.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\\/]'));
+    });
   }
 
-  void _animateToNextStep() {
-    _fadeController.reset();
-    _fadeController.forward();
-  }
+  bool get _isPasswordStrong =>
+      _hasMinLength &&
+      _hasUppercase &&
+      _hasLowercase &&
+      _hasNumber &&
+      _hasSpecial;
 
-  // ── Step 0: Validate basic info ──────────────────────────────────────────
-  void _proceedFromBasicInfo() {
+  Future<void> _handleCustomerRegistration() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
     final password = _passwordController.text.trim();
     final confirm = _confirmPasswordController.text.trim();
 
+    // 1. Validation
     if (name.isEmpty) {
       setState(() => _errorMessage = 'Please enter your full name.');
       return;
     }
     if (name.length < 2 || name.length > 100) {
-      setState(
-        () => _errorMessage = 'Name must be between 2 and 100 characters.',
-      );
+      setState(() => _errorMessage = 'Name must be between 2 and 100 characters.');
       return;
     }
     if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
       setState(() => _errorMessage = 'Please enter a valid email address.');
       return;
     }
-    // Strong password policy: min 8 chars, uppercase, lowercase, digit
-    if (password.length < 8) {
-      setState(() => _errorMessage = 'Password must be at least 8 characters.');
+    if (phone.isEmpty || phone.length != 10) {
+      setState(() => _errorMessage = 'Please enter a valid 10-digit mobile number.');
       return;
     }
-    if (!RegExp(r'[A-Z]').hasMatch(password)) {
-      setState(
-        () => _errorMessage =
-            'Password must contain at least one uppercase letter.',
-      );
-      return;
-    }
-    if (!RegExp(r'[a-z]').hasMatch(password)) {
-      setState(
-        () => _errorMessage =
-            'Password must contain at least one lowercase letter.',
-      );
-      return;
-    }
-    if (!RegExp(r'[0-9]').hasMatch(password)) {
-      setState(
-        () => _errorMessage = 'Password must contain at least one number.',
-      );
+    if (!_isPasswordStrong) {
+      setState(() => _errorMessage = 'Password must meet all security requirements.');
       return;
     }
     if (password != confirm) {
       setState(() => _errorMessage = 'Passwords do not match.');
       return;
     }
-    // XSS/injection check on name
-    if (RegExp(
-      r'<[^>]*>|javascript:|on\w+\s*=',
-      caseSensitive: false,
-    ).hasMatch(name)) {
-      setState(() => _errorMessage = 'Name contains invalid characters.');
-      return;
-    }
-
-    setState(() {
-      _errorMessage = null;
-      _step = 1;
-    });
-    _animateToNextStep();
-  }
-
-  // ── Step 1: Verify CAPTCHA ────────────────────────────────────────────────
-  void _verifyCaptcha() {
-    final input = int.tryParse(_captchaController.text.trim());
-    if (input == null || input != _captchaAnswer) {
-      setState(() {
-        _errorMessage = 'Incorrect answer. Please try again.';
-        _generateCaptcha();
-      });
-      return;
-    }
-    setState(() {
-      _captchaVerified = true;
-      _errorMessage = null;
-    });
-    _createAccountAndSendVerification();
-  }
-
-  Future<void> _createAccountAndSendVerification() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
-      await SupabaseService.instance.signUpWithEmail(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-        fullName: _nameController.text.trim(),
-        role: roleStr,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _step = 2;
-        _isLoading = false;
-      });
-      _animateToNextStep();
-      _startEmailResendTimer();
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = e.message;
-        _isLoading = false;
-        _step = 0; // Go back to basic info on error
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Account creation failed. Please try again.';
-        _isLoading = false;
-        _step = 0;
-      });
-    }
-  }
-
-  // ── Step 2: Verify email OTP sent by Supabase ─────────────────────────────
-  Future<void> _verifyEmailOtp() async {
-    final otp = _emailOtpControllers.map((c) => c.text).join();
-    if (otp.length < 6) {
-      setState(() => _errorMessage = 'Please enter the complete 6-digit code.');
-      return;
-    }
 
     setState(() {
       _isLoading = true;
@@ -266,32 +136,82 @@ class _SignupScreenState extends State<SignupScreen>
     });
 
     try {
-      await SupabaseService.instance.client.auth.verifyOTP(
-        email: _emailController.text.trim(),
-        token: otp,
-        type: OtpType.signup,
-      );
+      // 2. Duplicate phone check
+      final isPhoneTaken = await SupabaseService.instance.isPhoneRegistered(phone);
+      if (isPhoneTaken) {
+        setState(() {
+          _errorMessage = 'This mobile number is already registered. Please log in or use another number.';
+          _isLoading = false;
+        });
+        return;
+      }
 
-      if (!mounted) return;
+      final currentUser = SupabaseService.instance.currentUser;
+      if (currentUser != null && (currentUser.email == email || _isGoogleEmailLocked)) {
+        // User already in active Google OAuth session
+        try {
+          await SupabaseService.instance.client.auth.updateUser(
+            UserAttributes(
+              password: password,
+              data: {
+                'full_name': name,
+                'phone': phone,
+                'role': 'customer',
+              },
+            ),
+          );
+        } catch (_) {}
 
-      // Role metadata is already set during signUp — no need to updateUser
-
-      if (!mounted) return;
-
-      setState(() {
-        _emailOtpVerified = true;
-        _isLoading = false;
-      });
-
-      // Navigate based on role
-      final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
-      if (roleStr == 'provider') {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.providerOnboardingScreen,
-          (route) => false,
+        await SupabaseService.instance.upsertUserProfile(
+          userId: currentUser.id,
+          email: email,
+          fullName: name,
+          phone: phone,
+          role: 'customer',
+          city: 'Pune',
         );
-      } else {
+
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.homeScreen,
+            (route) => false,
+          );
+        }
+        return;
+      }
+
+      // 3. Normal signup with email & password
+      final authResponse = await SupabaseService.instance.signUpWithEmail(
+        email: email,
+        password: password,
+        fullName: name,
+        phone: phone,
+        role: 'customer',
+      );
+
+      final newUserId = authResponse.user?.id;
+      if (newUserId != null) {
+        await SupabaseService.instance.upsertUserProfile(
+          userId: newUserId,
+          email: email,
+          fullName: name,
+          phone: phone,
+          role: 'customer',
+          city: 'Pune',
+        );
+      }
+
+      if (authResponse.session == null) {
+        try {
+          await SupabaseService.instance.signInWithEmail(
+            email: email,
+            password: password,
+          );
+        } catch (_) {}
+      }
+
+      if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
           AppRoutes.homeScreen,
@@ -299,82 +219,22 @@ class _SignupScreenState extends State<SignupScreen>
         );
       }
     } on AuthException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage =
-            e.message.contains('expired') || e.message.contains('invalid')
-            ? 'Invalid or expired code. Please request a new one.'
-            : e.message;
-        _isLoading = false;
-        for (final c in _emailOtpControllers) {
-          c.clear();
-        }
-      });
-      Future.delayed(const Duration(milliseconds: 200), () {
-        if (mounted) _emailOtpFocusNodes[0].requestFocus();
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Verification failed. Please try again.';
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _onEmailOtpChanged(int index, String value) {
-    if (value.length == 1 && index < 5) {
-      _emailOtpFocusNodes[index + 1].requestFocus();
-    } else if (value.isEmpty && index > 0) {
-      _emailOtpFocusNodes[index - 1].requestFocus();
-    }
-    final otp = _emailOtpControllers.map((c) => c.text).join();
-    if (otp.length == 6) _verifyEmailOtp();
-  }
-
-  void _startEmailResendTimer() {
-    _emailResendSeconds = 60;
-    _canResendEmail = false;
-    _emailResendTimer?.cancel();
-    _emailResendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.message.contains('User already registered')
+              ? 'An account with this email already exists. Please log in.'
+              : e.message;
+          _isLoading = false;
+        });
       }
-      setState(() {
-        if (_emailResendSeconds > 0) {
-          _emailResendSeconds--;
-        } else {
-          _canResendEmail = true;
-          timer.cancel();
-        }
-      });
-    });
-  }
-
-  Future<void> _resendEmailVerification() async {
-    if (!_canResendEmail) return;
-    setState(() {
-      for (final c in _emailOtpControllers) {
-        c.clear();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Registration failed. Please check your details and try again.';
+          _isLoading = false;
+        });
       }
-      _errorMessage = null;
-    });
-    try {
-      final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
-      await SupabaseService.instance.signUpWithEmail(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-        fullName: _nameController.text.trim(),
-        role: roleStr,
-      );
-    } catch (_) {
-      // Silently handle
     }
-    _startEmailResendTimer();
-    Future.delayed(const Duration(milliseconds: 200), () {
-      if (mounted) _emailOtpFocusNodes[0].requestFocus();
-    });
   }
 
   // ── Google Sign-In ────────────────────────────────────────────────────────
@@ -400,99 +260,60 @@ class _SignupScreenState extends State<SignupScreen>
       }
 
       const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
+      final effectiveClientId = webClientId.isNotEmpty
+          ? webClientId
+          : '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com';
+
       final googleSignIn = GoogleSignIn(
-        clientId: kIsWeb ? (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId) : null,
-        serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId),
+        serverClientId: effectiveClientId,
       );
+
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
-        setState(() {
-          _isGoogleLoading = false;
-        });
+        if (mounted) setState(() => _isGoogleLoading = false);
         return;
       }
+
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken ?? googleUser.id;
+      final accessToken = googleAuth.accessToken;
+
       await SupabaseService.instance.signInWithGoogleIdToken(
         idToken: idToken,
-        accessToken: googleAuth.accessToken,
+        accessToken: accessToken,
         email: googleUser.email,
         name: googleUser.displayName,
       );
 
       if (!mounted) return;
 
-      // Set role metadata if not already set
       final user = SupabaseService.instance.currentUser;
       if (user != null) {
-        final existingRole = user.userMetadata?['role'] as String?;
-        if (existingRole == null || existingRole.isEmpty) {
-          final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
-          await SupabaseService.instance.client.auth.updateUser(
-            UserAttributes(data: {'role': roleStr}),
+        final profile = await SupabaseService.instance.getUserProfile(user.id);
+        if (!mounted) return;
+        if (profile != null) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.homeScreen,
+            (route) => false,
           );
+          return;
         }
-      }
 
-      if (!mounted) return;
-      _navigateAfterAuth();
+        setState(() {
+          _isGoogleLoading = false;
+          _emailController.text = user.email ?? googleUser.email;
+          _nameController.text = user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '';
+          _isGoogleEmailLocked = true;
+        });
+      }
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isGoogleLoading = false;
-        _errorMessage = 'Google Sign-In failed: $e';
-      });
-    }
-  }
-
-  Future<void> _navigateAfterAuth() async {
-    final user = SupabaseService.instance.currentUser;
-    final userId = user?.id;
-    final role = user?.userMetadata?['role'] as String? ?? 'customer';
-    
-    if (role == 'provider' && userId != null) {
-      final onboardingDone = await SupabaseService.instance
-          .isProviderOnboardingComplete(userId);
-      if (!mounted) return;
-      if (!onboardingDone) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.providerOnboardingScreen,
-          (route) => false,
-        );
-        return;
+      if (mounted) {
+        setState(() {
+          _isGoogleLoading = false;
+          _errorMessage = 'Google Sign-In failed: $e';
+        });
       }
-      final regStatus = await SupabaseService.instance
-          .getProviderRegistrationStatus(userId);
-      if (!mounted) return;
-      if (regStatus == 'approved') {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.providerDashboardScreen,
-          (route) => false,
-        );
-      } else if (regStatus == 'pending_approval' || regStatus == 'rejected') {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.providerPendingApprovalScreen,
-          (route) => false,
-        );
-      } else {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.homeScreen,
-          (route) => false,
-        );
-      }
-      return;
-    }
-
-    if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.homeScreen,
-        (route) => false,
-      );
     }
   }
 
@@ -500,88 +321,69 @@ class _SignupScreenState extends State<SignupScreen>
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 800;
 
-    Widget buildHeader() {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 16.0),
-        child: Row(
-          children: [
-            GestureDetector(
-              onTap: () {
-                if (_step > 0) {
-                  setState(() {
-                    _step--;
-                    _errorMessage = null;
-                  });
-                  _animateToNextStep();
-                } else {
-                  Navigator.pop(context);
-                }
-              },
-              child: Container(
-                width: isWide ? 40 : 10.w,
-                height: isWide ? 40 : 10.w,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.arrow_back_rounded,
-                  color: Color(0xFF1A1C1E),
-                  size: 20,
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
+    Widget formContent = Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isWide ? 40 : 6.w,
+        vertical: isWide ? 40 : 3.5.h,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.07),
+            blurRadius: 24,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildHeader(isWide),
+          SizedBox(height: isWide ? 20 : 2.5.h),
+          _buildRoleSelector(isWide),
+          SizedBox(height: isWide ? 20 : 2.5.h),
+          if (_errorMessage != null) ...[
+            _buildErrorBox(_errorMessage!),
+            SizedBox(height: isWide ? 16 : 2.h),
+          ],
+          _buildSignupForm(isWide),
+          SizedBox(height: isWide ? 20 : 2.5.h),
+          _buildOrDivider(),
+          SizedBox(height: isWide ? 20 : 2.5.h),
+          _buildGoogleButton(isWide),
+          SizedBox(height: isWide ? 24 : 3.h),
+          _buildLoginLink(),
+        ],
+      ),
+    );
+
+    if (isWide) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFEEF2FF),
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1040),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Create Account',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: isWide ? 22 : 14.sp,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF1A1C1E),
-                    ),
+                  const Expanded(
+                    flex: 5,
+                    child: AuthLeftBanner(),
                   ),
-                  Text(
-                    _stepLabel(),
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: isWide ? 12 : 9.5.sp,
-                      color: const Color(0xFF74777F),
-                    ),
+                  const SizedBox(width: 32),
+                  Expanded(
+                    flex: 6,
+                    child: formContent,
                   ),
                 ],
               ),
             ),
-            Text(
-              'Step ${_step + 1}/3',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: isWide ? 12 : 10.sp,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primary,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    Widget buildProgressBar() {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(4.0),
-        child: LinearProgressIndicator(
-          value: (_step + 1) / 3,
-          backgroundColor: const Color(0xFFE0E0E0),
-          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
-          minHeight: 4,
+          ),
         ),
       );
     }
@@ -589,85 +391,14 @@ class _SignupScreenState extends State<SignupScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFEEF2FF),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Align(
-              alignment: Alignment.topCenter,
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1050),
-                child: Column(
-                  children: [
-                    if (isWide) ...[
-                      // Split Screen Layout for Desktop
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24.0),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 24,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const AuthLeftBanner(),
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(40.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      buildHeader(),
-                                      const SizedBox(height: 8),
-                                      buildProgressBar(),
-                                      const SizedBox(height: 24),
-                                      _buildCurrentStep(),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ] else ...[
-                      // Mobile Layout
-                      buildHeader(),
-                      const SizedBox(height: 8),
-                      buildProgressBar(),
-                      const SizedBox(height: 16),
-                      FadeTransition(
-                        opacity: _fadeAnim,
-                        child: SlideTransition(
-                          position: _slideAnim,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24.0),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.07),
-                                  blurRadius: 24,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            padding: EdgeInsets.all(5.w),
-                            child: _buildCurrentStep(),
-                          ),
-                        ),
-                      ),
-                    ],
-                    const AuthFeaturesFooter(),
-                  ],
-                ),
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: formContent,
               ),
             ),
           ),
@@ -676,597 +407,343 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  String _stepLabel() {
-    switch (_step) {
-      case 0:
-        return 'Basic information & password';
-      case 1:
-        return 'Security verification';
-      case 2:
-        return 'Email verification';
-      default:
-        return '';
-    }
-  }
-
-  Widget _buildCurrentStep() {
-    switch (_step) {
-      case 0:
-        return _buildBasicInfoStep();
-      case 1:
-        return _buildCaptchaStep();
-      case 2:
-        return _buildEmailVerificationStep();
-      default:
-        return const SizedBox();
-    }
-  }
-
-  Widget _buildBasicInfoStep() {
+  Widget _buildHeader(bool isWide) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildStepHeader(
-          icon: Icons.person_add_rounded,
-          title: 'Your Information',
-          subtitle: 'Tell us a bit about yourself',
-          color: AppTheme.primary,
-        ),
-        SizedBox(height: 2.5.h),
-
-        // Role selector
-        Text(
-          'I want to',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 11.sp,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF44474E),
-          ),
-        ),
-        SizedBox(height: 1.h),
         Row(
           children: [
-            Expanded(
-              child: _RoleChip(
-                label: 'Book Services',
-                icon: Icons.person_rounded,
-                isSelected: _selectedRole == 0,
-                color: AppTheme.primary,
-                onTap: () => setState(() => _selectedRole = 0),
+            Container(
+              width: isWide ? 44 : 11.w,
+              height: isWide ? 44 : 11.w,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0D1B4B), Color(0xFF1E3A8A)],
+                ),
+              ),
+              child: const Icon(
+                Icons.location_on_rounded,
+                color: Colors.white,
+                size: 24,
               ),
             ),
-            SizedBox(width: 3.w),
-            Expanded(
-              child: _RoleChip(
-                label: 'Offer Services',
-                icon: Icons.handyman_rounded,
-                isSelected: _selectedRole == 1,
-                color: AppTheme.secondary,
-                onTap: () => setState(() => _selectedRole = 1),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 2.h),
-
-        TextFormField(
-          controller: _nameController,
-          textCapitalization: TextCapitalization.words,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 11.sp,
-            color: const Color(0xFF1D1B20),
-          ),
-          decoration: InputDecoration(
-            hintText: 'Enter your full name',
-            hintStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              color: const Color(0xFF74777F),
-            ),
-            labelText: 'Full Name',
-            labelStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              color: const Color(0xFF44474E),
-            ),
-            prefixIcon: const Icon(
-              Icons.person_outline_rounded,
-              color: AppTheme.primary,
-            ),
-          ),
-        ),
-        SizedBox(height: 1.5.h),
-        TextFormField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 11.sp,
-            color: const Color(0xFF1D1B20),
-          ),
-          decoration: InputDecoration(
-            hintText: 'Enter your email address',
-            hintStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              color: const Color(0xFF74777F),
-            ),
-            labelText: 'Email Address',
-            labelStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              color: const Color(0xFF44474E),
-            ),
-            prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.primary),
-          ),
-        ),
-        SizedBox(height: 1.5.h),
-        TextFormField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 11.sp,
-            color: const Color(0xFF1D1B20),
-          ),
-          decoration: InputDecoration(
-            hintText: 'Minimum 8 characters',
-            hintStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              color: const Color(0xFF74777F),
-            ),
-            labelText: 'Password',
-            labelStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              color: const Color(0xFF44474E),
-            ),
-            prefixIcon: const Icon(
-              Icons.lock_outline_rounded,
-              color: AppTheme.primary,
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePassword
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: AppTheme.outline,
-              ),
-              onPressed: () =>
-                  setState(() => _obscurePassword = !_obscurePassword),
-            ),
-          ),
-        ),
-        SizedBox(height: 1.5.h),
-        TextFormField(
-          controller: _confirmPasswordController,
-          obscureText: _obscureConfirm,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 11.sp,
-            color: const Color(0xFF1D1B20),
-          ),
-          decoration: InputDecoration(
-            hintText: 'Re-enter your password',
-            hintStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              color: const Color(0xFF74777F),
-            ),
-            labelText: 'Confirm Password',
-            labelStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              color: const Color(0xFF44474E),
-            ),
-            prefixIcon: const Icon(
-              Icons.lock_outline_rounded,
-              color: AppTheme.primary,
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscureConfirm
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: AppTheme.outline,
-              ),
-              onPressed: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
-            ),
-          ),
-        ),
-        if (_errorMessage != null) ...[
-          SizedBox(height: 1.5.h),
-          _buildErrorBox(_errorMessage!),
-        ],
-        SizedBox(height: 2.5.h),
-        _buildPrimaryButton(
-          label: 'Continue',
-          icon: Icons.arrow_forward_rounded,
-          onTap: _proceedFromBasicInfo,
-          color: AppTheme.primary,
-        ),
-        SizedBox(height: 2.h),
-        _buildDivider(),
-        SizedBox(height: 2.h),
-        _buildGoogleButton(),
-        SizedBox(height: 2.h),
-        Center(
-          child: GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Already have an account? ',
+                  'LocalConnect',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11.sp,
+                    fontSize: isWide ? 18 : 16.sp,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0D1B4B),
+                  ),
+                ),
+                Text(
+                  'Connect with local service providers',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: isWide ? 11 : 8.5.sp,
                     color: const Color(0xFF74777F),
                   ),
                 ),
-                Text(
-                  'Sign In',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.primary,
-                  ),
-                ),
               ],
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCaptchaStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildStepHeader(
-          icon: Icons.security_rounded,
-          title: 'Security Check',
-          subtitle: 'Prove you\'re human to continue',
-          color: const Color(0xFF00897B),
-        ),
-        SizedBox(height: 2.5.h),
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(4.w),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF00897B), Color(0xFF26A69A)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16.0),
-          ),
-          child: Column(
-            children: [
-              const Icon(
-                Icons.calculate_rounded,
-                color: Colors.white,
-                size: 32,
-              ),
-              SizedBox(height: 1.h),
-              Text(
-                'Solve this:',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11.sp,
-                  color: Colors.white.withValues(alpha: 0.8),
-                ),
-              ),
-              SizedBox(height: 0.5.h),
-              Text(
-                _captchaQuestion,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22.sp,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 2,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 2.h),
-        TextFormField(
-          controller: _captchaController,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          textAlign: TextAlign.center,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 18.sp,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF00897B),
-          ),
-          decoration: InputDecoration(
-            hintText: 'Enter your answer',
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: const BorderSide(color: Color(0xFF00897B), width: 2),
-            ),
-          ),
-        ),
-        SizedBox(height: 1.h),
-        Center(
-          child: GestureDetector(
-            onTap: () => setState(() => _generateCaptcha()),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.refresh_rounded,
-                  color: Color(0xFF00897B),
-                  size: 16,
-                ),
-                SizedBox(width: 1.w),
-                Text(
-                  'New question',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10.sp,
-                    color: const Color(0xFF00897B),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_errorMessage != null) ...[
-          SizedBox(height: 1.5.h),
-          _buildErrorBox(_errorMessage!),
-        ],
-        SizedBox(height: 2.5.h),
-        _isLoading
-            ? _buildLoadingButton('Creating account...')
-            : _buildPrimaryButton(
-                label: 'Verify & Create Account',
-                icon: Icons.verified_rounded,
-                onTap: _verifyCaptcha,
-                color: const Color(0xFF00897B),
-              ),
-      ],
-    );
-  }
-
-  Widget _buildEmailVerificationStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildStepHeader(
-          icon: Icons.mark_email_read_rounded,
-          title: 'Verify Your Email',
-          subtitle: _emailController.text.trim(),
-          color: AppTheme.primary,
-        ),
-        SizedBox(height: 2.5.h),
-        Container(
-          padding: EdgeInsets.all(3.w),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(10.0),
-            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.email_rounded, color: AppTheme.primary, size: 16),
-              SizedBox(width: 2.w),
-              Expanded(
-                child: Text(
-                  'We\'ve sent a 6-digit verification code to your email. Enter it below to activate your account.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9.5.sp,
-                    color: AppTheme.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 2.h),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(6, (index) {
-            return Padding(
-              padding: EdgeInsets.symmetric(horizontal: 1.5.w),
-              child: SizedBox(
-                width: 11.w,
-                child: TextFormField(
-                  controller: _emailOtpControllers[index],
-                  focusNode: _emailOtpFocusNodes[index],
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 1,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.primary,
-                  ),
-                  decoration: InputDecoration(
-                    counterText: '',
-                    filled: false,
-                    border: UnderlineInputBorder(
-                      borderSide: BorderSide(
-                        color: const Color(0xFFE0E0E0),
-                        width: 2,
-                      ),
-                    ),
-                    enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(
-                        color: const Color(0xFFE0E0E0),
-                        width: 2,
-                      ),
-                    ),
-                    focusedBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(
-                        color: AppTheme.primary,
-                        width: 2.5,
-                      ),
-                    ),
-                    contentPadding: EdgeInsets.only(bottom: 0.5.h),
-                  ),
-                  onChanged: (value) => _onEmailOtpChanged(index, value),
-                ),
-              ),
-            );
-          }),
-        ),
-        if (_errorMessage != null) ...[
-          SizedBox(height: 1.5.h),
-          _buildErrorBox(_errorMessage!),
-        ],
-        SizedBox(height: 2.h),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Didn\'t receive email?',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 10.sp,
-                color: const Color(0xFF74777F),
-              ),
-            ),
-            _canResendEmail
-                ? GestureDetector(
-                    onTap: _resendEmailVerification,
-                    child: Text(
-                      'Resend',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10.sp,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primary,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  )
-                : Text(
-                    'Resend in ${_emailResendSeconds}s',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10.sp,
-                      color: const Color(0xFF90A4AE),
-                    ),
-                  ),
           ],
         ),
-        SizedBox(height: 2.5.h),
-        _isLoading
-            ? _buildLoadingButton('Verifying...')
-            : _buildPrimaryButton(
-                label: 'Verify & Activate Account',
-                icon: Icons.verified_rounded,
-                onTap: _verifyEmailOtp,
-                color: AppTheme.primary,
-              ),
+        SizedBox(height: isWide ? 16 : 2.h),
+        Text(
+          'Create Account',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: isWide ? 22 : 18.sp,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF1A1C1E),
+          ),
+        ),
+        SizedBox(height: isWide ? 4 : 0.5.h),
+        Text(
+          _isGoogleEmailLocked
+              ? 'Complete your profile to finish registration'
+              : 'Sign up to browse and book services',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: isWide ? 13 : 10.sp,
+            color: const Color(0xFF74777F),
+          ),
+        ),
       ],
     );
   }
 
-
-
-  Widget _buildStepHeader({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-  }) {
+  Widget _buildRoleSelector(bool isWide) {
     return Row(
       children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12.0),
-          ),
-          child: Icon(icon, color: color, size: 22),
-        ),
-        SizedBox(width: 3.w),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1A1C1E),
-                ),
-              ),
-              Text(
-                subtitle,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 9.5.sp,
-                  color: const Color(0xFF74777F),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+          child: _RoleCard(
+            icon: Icons.person_outline_rounded,
+            label: 'Customer',
+            subtitle: 'Browse & book services',
+            isSelected: _selectedRole == 0,
+            color: AppTheme.primary,
+            isWide: isWide,
+            onTap: () => setState(() => _selectedRole = 0),
+          ),
+        ),
+        SizedBox(width: isWide ? 16 : 3.w),
+        Expanded(
+          child: _RoleCard(
+            icon: Icons.handyman_outlined,
+            label: 'Provider',
+            subtitle: 'Manage your business',
+            isSelected: _selectedRole == 1,
+            color: const Color(0xFFE65100),
+            isWide: isWide,
+            onTap: () {
+              Navigator.pushNamed(context, AppRoutes.providerRegistrationScreen);
+            },
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPrimaryButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-    required Color color,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        height: 6.5.h,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(14.0),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.35),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+  Widget _buildSignupForm(bool isWide) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Full Name
+          _buildFieldLabel('Full Name', isWide),
+          SizedBox(height: isWide ? 6 : 0.8.h),
+          TextFormField(
+            controller: _nameController,
+            textCapitalization: TextCapitalization.words,
+            style: GoogleFonts.plusJakartaSans(fontSize: isWide ? 13 : 11.sp),
+            decoration: _inputDecoration(
+              hint: 'Enter your full name',
+              icon: Icons.person_outline_rounded,
+              isWide: isWide,
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 18),
-            SizedBox(width: 2.w),
-            Text(
-              label,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+          ),
+          SizedBox(height: isWide ? 14 : 1.8.h),
+
+          // Email Address
+          _buildFieldLabel('Email Address', isWide),
+          SizedBox(height: isWide ? 6 : 0.8.h),
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            readOnly: _isGoogleEmailLocked,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: isWide ? 13 : 11.sp,
+              color: _isGoogleEmailLocked ? const Color(0xFF44474E) : const Color(0xFF1A1C1E),
+            ),
+            decoration: _inputDecoration(
+              hint: 'Enter your email',
+              icon: Icons.email_outlined,
+              isWide: isWide,
+              suffixIcon: _isGoogleEmailLocked
+                  ? const Icon(Icons.lock_outline_rounded, color: Color(0xFFB0BEC5), size: 18)
+                  : null,
+            ),
+          ),
+          SizedBox(height: isWide ? 14 : 1.8.h),
+
+          // Mobile Number
+          _buildFieldLabel('Mobile Number', isWide),
+          SizedBox(height: isWide ? 6 : 0.8.h),
+          TextFormField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+            style: GoogleFonts.plusJakartaSans(fontSize: isWide ? 13 : 11.sp),
+            decoration: _inputDecoration(
+              hint: '10-digit mobile number',
+              icon: Icons.phone_outlined,
+              prefixText: '+91 ',
+              isWide: isWide,
+            ),
+          ),
+          SizedBox(height: isWide ? 14 : 1.8.h),
+
+          // Password
+          _buildFieldLabel('Password', isWide),
+          SizedBox(height: isWide ? 6 : 0.8.h),
+          TextFormField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            onChanged: _onPasswordChanged,
+            style: GoogleFonts.plusJakartaSans(fontSize: isWide ? 13 : 11.sp),
+            decoration: _inputDecoration(
+              hint: 'Create password',
+              icon: Icons.lock_outline_rounded,
+              isWide: isWide,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: const Color(0xFF90A4AE),
+                  size: 20,
+                ),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
               ),
             ),
-          ],
-        ),
+          ),
+          SizedBox(height: isWide ? 10 : 1.2.h),
+
+          // Password Strength Indicators
+          _buildStrengthBox(isWide),
+          SizedBox(height: isWide ? 14 : 1.8.h),
+
+          // Confirm Password
+          _buildFieldLabel('Confirm Password', isWide),
+          SizedBox(height: isWide ? 6 : 0.8.h),
+          TextFormField(
+            controller: _confirmPasswordController,
+            obscureText: _obscureConfirm,
+            style: GoogleFonts.plusJakartaSans(fontSize: isWide ? 13 : 11.sp),
+            decoration: _inputDecoration(
+              hint: 'Confirm password',
+              icon: Icons.lock_outline_rounded,
+              isWide: isWide,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: const Color(0xFF90A4AE),
+                  size: 20,
+                ),
+                onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+              ),
+            ),
+          ),
+          SizedBox(height: isWide ? 24 : 3.h),
+
+          // Create Account Button
+          SizedBox(
+            width: double.infinity,
+            height: isWide ? 50 : 6.5.h,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _handleCustomerRegistration,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      'Create Account',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isWide ? 14 : 12.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildLoadingButton(String label) {
-    return Container(
-      width: double.infinity,
-      height: 6.5.h,
-      decoration: BoxDecoration(
-        color: AppTheme.primary.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(14.0),
+  Widget _buildFieldLabel(String label, bool isWide) {
+    return Text(
+      label,
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: isWide ? 12 : 10.sp,
+        fontWeight: FontWeight.w600,
+        color: const Color(0xFF1A1C1E),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String hint,
+    required IconData icon,
+    required bool isWide,
+    Widget? suffixIcon,
+    String? prefixText,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: GoogleFonts.plusJakartaSans(
+        fontSize: isWide ? 13 : 10.5.sp,
+        color: const Color(0xFF90A4AE),
+      ),
+      prefixText: prefixText,
+      prefixStyle: GoogleFonts.plusJakartaSans(
+        fontSize: isWide ? 13 : 11.sp,
+        fontWeight: FontWeight.w600,
+        color: const Color(0xFF1A1C1E),
+      ),
+      prefixIcon: Icon(icon, color: const Color(0xFF90A4AE), size: 20),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: _isGoogleEmailLocked && hint.contains('email') ? const Color(0xFFF1F3F9) : const Color(0xFFFAFAFA),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    );
+  }
+
+  Widget _buildStrengthBox(bool isWide) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 2.5,
-            ),
+          _strengthItem('At least 8 characters', _hasMinLength, isWide),
+          _strengthItem('One uppercase & lowercase letter', _hasUppercase && _hasLowercase, isWide),
+          _strengthItem('One number (0-9)', _hasNumber, isWide),
+          _strengthItem('One special character (!@#\$...)', _hasSpecial, isWide),
+        ],
+      ),
+    );
+  }
+
+  Widget _strengthItem(String label, bool met, bool isWide) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            met ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+            size: 14,
+            color: met ? const Color(0xFF2E7D32) : const Color(0xFFBDBDBD),
           ),
-          SizedBox(width: 2.w),
+          const SizedBox(width: 6),
           Text(
             label,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 13.sp,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
+              fontSize: isWide ? 11 : 8.5.sp,
+              color: met ? const Color(0xFF2E7D32) : const Color(0xFF74777F),
+              fontWeight: met ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
         ],
@@ -1276,25 +753,23 @@ class _SignupScreenState extends State<SignupScreen>
 
   Widget _buildErrorBox(String message) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppTheme.errorContainer,
+        color: const Color(0xFFFFEBEE),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFFCDD2)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: AppTheme.error,
-            size: 18,
-          ),
-          const SizedBox(width: 8),
+          const Icon(Icons.error_outline_rounded, color: Color(0xFFC62828), size: 20),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 10.sp,
-                color: AppTheme.error,
+                color: const Color(0xFFC62828),
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -1303,17 +778,18 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildDivider() {
+  Widget _buildOrDivider() {
     return Row(
       children: [
         const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 3.w),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
-            'or continue with',
+            'or',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 10.sp,
+              fontSize: 12,
               color: const Color(0xFF90A4AE),
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -1322,19 +798,19 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildGoogleButton() {
+  Widget _buildGoogleButton(bool isWide) {
     return GestureDetector(
       onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
       child: Container(
         width: double.infinity,
-        height: 6.5.h,
+        height: isWide ? 50 : 6.5.h,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14.0),
           border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -1355,11 +831,11 @@ class _SignupScreenState extends State<SignupScreen>
                       size: 28,
                       color: Color(0xFF4285F4),
                     ),
-                    SizedBox(width: 2.w),
+                    const SizedBox(width: 8),
                     Text(
                       'Continue with Google',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12.sp,
+                        fontSize: isWide ? 14 : 11.5.sp,
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFF1A1C1E),
                       ),
@@ -1370,20 +846,58 @@ class _SignupScreenState extends State<SignupScreen>
       ),
     );
   }
+
+  Widget _buildLoginLink() {
+    return Center(
+      child: GestureDetector(
+        onTap: () {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.loginScreen,
+            (route) => false,
+          );
+        },
+        child: RichText(
+          text: TextSpan(
+            text: 'Already have an account? ',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: const Color(0xFF74777F),
+            ),
+            children: [
+              TextSpan(
+                text: 'Login',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _RoleChip extends StatelessWidget {
-  final String label;
+// ── Role Card Widget ──────────────────────────────────────────
+class _RoleCard extends StatelessWidget {
   final IconData icon;
+  final String label;
+  final String subtitle;
   final bool isSelected;
   final Color color;
+  final bool isWide;
   final VoidCallback onTap;
 
-  const _RoleChip({
-    required this.label,
+  const _RoleCard({
     required this.icon,
+    required this.label,
+    required this.subtitle,
     required this.isSelected,
     required this.color,
+    required this.isWide,
     required this.onTap,
   });
 
@@ -1393,34 +907,42 @@ class _RoleChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(vertical: 1.5.h, horizontal: 3.w),
+        padding: EdgeInsets.symmetric(
+          vertical: isWide ? 12 : 1.5.h,
+          horizontal: isWide ? 16 : 3.w,
+        ),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(12.0),
+          color: isSelected ? color.withOpacity(0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(14.0),
           border: Border.all(
             color: isSelected ? color : const Color(0xFFE0E0E0),
             width: isSelected ? 2 : 1.5,
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
               icon,
               color: isSelected ? color : const Color(0xFF90A4AE),
-              size: 18,
+              size: 20,
             ),
-            SizedBox(width: 2.w),
-            Flexible(
-              child: Text(
-                label,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10.sp,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? color : const Color(0xFF74777F),
-                ),
-                overflow: TextOverflow.ellipsis,
+            SizedBox(height: isWide ? 6 : 0.8.h),
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: isWide ? 13 : 11.sp,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? color : const Color(0xFF44474E),
               ),
+            ),
+            Text(
+              subtitle,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: isWide ? 11 : 8.5.sp,
+                color: const Color(0xFF90A4AE),
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -1428,4 +950,3 @@ class _RoleChip extends StatelessWidget {
     );
   }
 }
-

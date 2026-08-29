@@ -152,6 +152,64 @@ class SupabaseService {
     }
   }
 
+  Future<Map<String, dynamic>?> getUserProfileByEmail(String email) async {
+    try {
+      final response = await client
+          .from('user_profiles')
+          .select()
+          .ilike('email', email.trim())
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> isEmailRegistered(String email) async {
+    try {
+      final profile = await getUserProfileByEmail(email);
+      return profile != null;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> isPhoneRegistered(String phone, {String? excludeUserId}) async {
+    try {
+      final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+      if (cleanPhone.isEmpty) return false;
+      var query = client.from('user_profiles').select('id, phone').eq('phone', cleanPhone);
+      final response = await query;
+      if (response.isEmpty) return false;
+      if (excludeUserId != null) {
+        return (response as List).any((item) => item['id'] != excludeUserId);
+      }
+      return (response as List).isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> upsertUserProfile({
+    required String userId,
+    required String email,
+    required String fullName,
+    String phone = '',
+    String role = 'customer',
+    String city = 'Pune',
+  }) async {
+    await client.from('user_profiles').upsert({
+      'id': userId,
+      'email': email.trim().toLowerCase(),
+      'full_name': fullName.trim(),
+      'phone': phone.trim(),
+      'role': role,
+      'city': city,
+      'is_active': true,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'id');
+  }
+
   Future<void> updateUserProfile({
     required String userId,
     String? fullName,
@@ -3349,10 +3407,11 @@ class SupabaseService {
         String enquiryStatus = 'quoted';
         if (status == 'accepted') {
           enquiryStatus = 'accepted';
-        } else if (status == 'rejected')
+        } else if (status == 'rejected') {
           enquiryStatus = 'rejected';
-        else if (status == 'negotiating')
+        } else if (status == 'negotiating') {
           enquiryStatus = 'negotiating';
+        }
         await client
             .from('enquiries')
             .update({'status': enquiryStatus})

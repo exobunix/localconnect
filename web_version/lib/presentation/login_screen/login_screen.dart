@@ -344,9 +344,12 @@ class _LoginScreenState extends State<LoginScreen>
       }
 
       const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
+      final effectiveClientId = webClientId.isNotEmpty
+          ? webClientId
+          : '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com';
+
       final googleSignIn = GoogleSignIn(
-        clientId: kIsWeb ? (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId) : null,
-        serverClientId: kIsWeb ? null : (webClientId.isEmpty ? '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com' : webClientId),
+        serverClientId: effectiveClientId,
       );
       googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
@@ -372,9 +375,8 @@ class _LoginScreenState extends State<LoginScreen>
         if (roleStr == 'customer') {
           final profile = await SupabaseService.instance.getUserProfile(user.id);
           if (profile == null) {
-            final email = user.email;
-            final name = user.userMetadata?['full_name'] as String? ?? '';
-            await SupabaseService.instance.signOut();
+            final email = user.email ?? googleUser.email;
+            final name = user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '';
             if (mounted) {
               setState(() {
                 _isGoogleLoading = false;
@@ -390,9 +392,8 @@ class _LoginScreenState extends State<LoginScreen>
         } else {
           final status = await SupabaseService.instance.getProviderRegistrationStatus(user.id);
           if (status == null) {
-            final email = user.email;
-            final name = user.userMetadata?['full_name'] as String? ?? '';
-            await SupabaseService.instance.signOut();
+            final email = user.email ?? googleUser.email;
+            final name = user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '';
             if (mounted) {
               setState(() {
                 _isGoogleLoading = false;
@@ -428,15 +429,27 @@ class _LoginScreenState extends State<LoginScreen>
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => SignupScreen(initialEmail: googleUser?.email),
+              builder: (context) => SignupScreen(
+                initialEmail: googleUser?.email,
+                initialFullName: googleUser?.displayName,
+              ),
             ),
           );
         }
         return;
       }
       if (mounted) {
+        final errStr = e.toString();
+        String displayError = 'Google Sign-In failed. Please try again.';
+        if (errStr.contains('network') || errStr.contains('SocketException')) {
+          displayError = 'Network error. Please check your internet connection.';
+        } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
+          displayError = 'Google Sign-In was cancelled.';
+        } else {
+          displayError = 'Google Sign-In failed: $e';
+        }
         setState(() {
-          _errorMessage = 'Google Sign-In failed: $e';
+          _errorMessage = displayError;
           _isGoogleLoading = false;
         });
       }
@@ -1003,18 +1016,19 @@ class _LoginScreenState extends State<LoginScreen>
               _errorMessage = null;
             });
             try {
+              final redirectUrl = kIsWeb ? '${Uri.base.origin}/#${AppRoutes.resetPasswordScreen}' : null;
               await SupabaseService.instance.resetPassword(
                 email,
-                redirectTo: kIsWeb ? '${Uri.base.origin}/' : null,
+                redirectTo: redirectUrl,
               );
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      'Password reset email sent.',
+                      'Password reset email sent to $email. Please check your inbox.',
                       style: GoogleFonts.plusJakartaSans(fontSize: 10.sp),
                     ),
-                    backgroundColor: AppTheme.primary,
+                    backgroundColor: const Color(0xFF2E7D32),
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10.0),
