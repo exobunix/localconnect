@@ -99,22 +99,34 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
     if (_validMasterPasscodes.contains(normalized) ||
         normalized == 'admin' ||
         normalized == 'localconnect') {
+      bool success = false;
+      String errStr = '';
       try {
         await SupabaseService.instance.signInWithEmail(
           email: 'admin@localconnect.com',
           password: 'Admin@1234',
         );
+        success = true;
       } catch (e) {
         try {
           await SupabaseService.instance.signInWithEmail(
             email: 'admin@localconnect.com',
             password: 'admin123',
           );
+          success = true;
         } catch (e2) {
+          errStr = e2.toString();
           debugPrint('Admin bypass signin failed: $e2');
         }
       }
-      _onSuccessNavigate();
+      if (success) {
+        _onSuccessNavigate();
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Admin authentication failed: $errStr';
+        });
+      }
       return;
     }
 

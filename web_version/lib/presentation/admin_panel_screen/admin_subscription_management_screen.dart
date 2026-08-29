@@ -70,12 +70,16 @@ class _AdminSubscriptionManagementScreenState
   }
 
   Future<void> _loadPlans() async {
-    final result = await SupabaseService.instance.client
-        .from('subscription_plans')
-        .select()
-        .order('display_order', ascending: true);
-    if (mounted) {
-      setState(() => _plans = List<Map<String, dynamic>>.from(result as List));
+    try {
+      final result = await SupabaseService.instance.client
+          .from('subscription_plans')
+          .select()
+          .order('display_order', ascending: true);
+      if (mounted) {
+        setState(() => _plans = List<Map<String, dynamic>>.from(result as List));
+      }
+    } catch (e) {
+      debugPrint('Load plans error: $e');
     }
   }
 

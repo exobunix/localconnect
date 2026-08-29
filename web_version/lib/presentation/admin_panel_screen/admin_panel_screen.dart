@@ -77,16 +77,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   Future<void> _checkAdminRole() async {
-    if (isAdminSessionActive || canAccess(AppRoutes.adminPanelScreen)) {
-      if (mounted) {
-        setState(() {
-          _isAdmin = true;
-          _isCheckingRole = false;
-        });
-      }
-      return;
-    }
     try {
+      final isValid = await SupabaseService.instance.ensureValidSession();
+      if (!isValid) {
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, AppRoutes.adminLoginScreen);
+        }
+        return;
+      }
+
       final userId = SupabaseService.instance.currentUser?.id;
       if (userId == null) {
         if (mounted) {
