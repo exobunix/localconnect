@@ -921,6 +921,401 @@ class _HomeMaintenanceCustomerScreenState
   }
 
   void _showProviderDetail(Map<String, dynamic> provider) {
+    final isWeb = MediaQuery.of(context).size.width > 850;
+    if (isWeb) {
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24.0),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 550, maxHeight: 685),
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Custom Header
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Provider Details',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF1A1C1E),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // Scrollable Body
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(14.0),
+                                child: Image.network(
+                                  provider['image'] as String,
+                                  width: 80,
+                                  height: 80,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 80,
+                                    height: 80,
+                                    color: _activeColor.withValues(alpha: 0.1),
+                                    child: Icon(
+                                      Icons.person_rounded,
+                                      color: _activeColor,
+                                      size: 40,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            provider['name'] as String,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (provider['verified'] == true) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green[50],
+                                              borderRadius: BorderRadius.circular(6.0),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.verified_rounded,
+                                                  size: 12,
+                                                  color: Colors.green[700],
+                                                ),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  'Verified',
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    fontSize: 10,
+                                                    color: Colors.green[700],
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      provider['speciality'] as String,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 13,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.star_rounded,
+                                          size: 15,
+                                          color: Colors.amber[600],
+                                        ),
+                                        Text(
+                                          ' ${provider['rating']}',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        Text(
+                                          ' (${provider['reviews']} reviews)',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 12,
+                                            color: Colors.grey[500],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Contact number row
+                          if ((provider['phone'] as String? ?? '').isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _activeColor.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(12.0),
+                                border: Border.all(
+                                  color: _activeColor.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.phone_rounded, size: 16, color: _activeColor),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    provider['phone'] as String,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF1A1C1E),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _statChip(
+                                  Icons.work_history_rounded,
+                                  '${provider['completedJobs']} Jobs',
+                                  _activeColor,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _statChip(
+                                  Icons.location_on_rounded,
+                                  '${provider['distance']} km',
+                                  Colors.blue[700]!,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _statChip(
+                                  Icons.timer_rounded,
+                                  '${provider['experience']} yrs',
+                                  Colors.orange[700]!,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if ((provider['gallery'] as List).isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            Text(
+                              'Work Gallery',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 100,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: (provider['gallery'] as List).length,
+                                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                itemBuilder: (_, i) => ClipRRect(
+                                  borderRadius: BorderRadius.circular(10.0),
+                                  child: Image.network(
+                                    (provider['gallery'] as List)[i] as String,
+                                    width: 120,
+                                    height: 100,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 120,
+                                      height: 100,
+                                      color: Colors.grey[200],
+                                      child: const Icon(
+                                        Icons.image_rounded,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // Actions footer
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Call, Message, WhatsApp row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _contactActionButton(
+                                icon: Icons.call_rounded,
+                                label: 'Call',
+                                color: Colors.green[700]!,
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _handleCall(provider['phone'] as String? ?? '');
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _contactActionButton(
+                                icon: Icons.chat_bubble_outline_rounded,
+                                label: 'Message',
+                                color: _activeColor,
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  Navigator.pushNamed(
+                                    context,
+                                    AppRoutes.chatDetailScreen,
+                                    arguments: {
+                                      'providerId': provider['id'],
+                                      'providerName': provider['name'],
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _contactActionButton(
+                                icon: Icons.help_outline,
+                                label: 'WhatsApp',
+                                color: const Color(0xFF25D366),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _handleWhatsApp(provider['phone'] as String? ?? '');
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Chat and Book Now row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  'Make Enquiry',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: _activeColor,
+                                  side: BorderSide(color: _activeColor),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10.0),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  UniversalEnquiryDialog.show(
+                                    context,
+                                    providerId: provider['id'] as String? ?? 'p_1',
+                                    providerName: provider['name'] as String? ?? 'Provider',
+                                    providerImage: provider['image'] as String?,
+                                    providerPhone: provider['phone'] as String?,
+                                    providerRating: (provider['rating'] as num?)?.toDouble() ?? 4.8,
+                                    category: 'Home Maintenance',
+                                    subcategory: _activeSubcategory,
+                                    serviceTitle: provider['speciality'] as String? ?? 'Home Maintenance Service',
+                                    basePrice: '₹${provider['charge']}${provider['chargeUnit'] ?? '/visit'}',
+                                    themeColor: _activeColor,
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton.icon(
+                                icon: const Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                                label: Text(
+                                  'Book Now',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _activeColor,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10.0),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  _showBookingSheet(provider);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1582,7 +1977,7 @@ class _HomeMaintenanceCustomerScreenState
       color: const Color(0xFFF8F9FA),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
+          constraints: const BoxConstraints(maxWidth: 1600),
           child: Wrap(
             spacing: 16,
             runSpacing: 16,
@@ -1809,36 +2204,73 @@ class _HomeMaintenanceCustomerScreenState
                         ],
                       ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                      itemCount: providers.length,
-                      itemBuilder: (_, i) => _ProviderCard(
-                        provider: providers[i],
-                        activeColor: activeColor,
-                        isFavourite: _favourites.contains(providers[i]['id']),
-                        onFavourite: () => setState(() {
-                          final id = providers[i]['id'] as String;
-                          _favourites.contains(id)
-                              ? _favourites.remove(id)
-                              : _favourites.add(id);
-                        }),
-                        onTap: () => _showProviderDetail(providers[i]),
-                        onEnquiry: () => UniversalEnquiryDialog.show(
-                          context,
-                          providerId: providers[i]['id'] as String? ?? 'p_1',
-                          providerName: providers[i]['name'] as String? ?? 'Provider',
-                          providerImage: providers[i]['image'] as String?,
-                          providerPhone: providers[i]['phone'] as String?,
-                          providerRating: (providers[i]['rating'] as num?)?.toDouble() ?? 4.8,
-                          category: 'Home Maintenance',
-                          subcategory: _activeSubcategory,
-                          serviceTitle: providers[i]['speciality'] as String? ?? 'Home Maintenance Service',
-                          basePrice: '₹${providers[i]['charge']}${providers[i]['chargeUnit'] ?? '/visit'}',
-                          themeColor: activeColor,
-                        ),
-                        onBook: () => _showBookingSheet(providers[i]),
-                      ),
-                    ),
+                  : (isWeb
+                      ? GridView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: MediaQuery.of(context).size.width > 1200 ? 4 : 3,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: 0.78,
+                          ),
+                          itemCount: providers.length,
+                          itemBuilder: (_, i) => _ProviderCard(
+                            provider: providers[i],
+                            activeColor: activeColor,
+                            isFavourite: _favourites.contains(providers[i]['id']),
+                            onFavourite: () => setState(() {
+                              final id = providers[i]['id'] as String;
+                              _favourites.contains(id)
+                                  ? _favourites.remove(id)
+                                  : _favourites.add(id);
+                            }),
+                            onTap: () => _showProviderDetail(providers[i]),
+                            onEnquiry: () => UniversalEnquiryDialog.show(
+                              context,
+                              providerId: providers[i]['id'] as String? ?? 'p_1',
+                              providerName: providers[i]['name'] as String? ?? 'Provider',
+                              providerImage: providers[i]['image'] as String?,
+                              providerPhone: providers[i]['phone'] as String?,
+                              providerRating: (providers[i]['rating'] as num?)?.toDouble() ?? 4.8,
+                              category: 'Home Maintenance',
+                              subcategory: _activeSubcategory,
+                              serviceTitle: providers[i]['speciality'] as String? ?? 'Home Maintenance Service',
+                              basePrice: '₹${providers[i]['charge']}${providers[i]['chargeUnit'] ?? '/visit'}',
+                              themeColor: activeColor,
+                            ),
+                            onBook: () => _showBookingSheet(providers[i]),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                          itemCount: providers.length,
+                          itemBuilder: (_, i) => _ProviderCard(
+                            provider: providers[i],
+                            activeColor: activeColor,
+                            isFavourite: _favourites.contains(providers[i]['id']),
+                            onFavourite: () => setState(() {
+                              final id = providers[i]['id'] as String;
+                              _favourites.contains(id)
+                                  ? _favourites.remove(id)
+                                  : _favourites.add(id);
+                            }),
+                            onTap: () => _showProviderDetail(providers[i]),
+                            onEnquiry: () => UniversalEnquiryDialog.show(
+                              context,
+                              providerId: providers[i]['id'] as String? ?? 'p_1',
+                              providerName: providers[i]['name'] as String? ?? 'Provider',
+                              providerImage: providers[i]['image'] as String?,
+                              providerPhone: providers[i]['phone'] as String?,
+                              providerRating: (providers[i]['rating'] as num?)?.toDouble() ?? 4.8,
+                              category: 'Home Maintenance',
+                              subcategory: _activeSubcategory,
+                              serviceTitle: providers[i]['speciality'] as String? ?? 'Home Maintenance Service',
+                              basePrice: '₹${providers[i]['charge']}${providers[i]['chargeUnit'] ?? '/visit'}',
+                              themeColor: activeColor,
+                            ),
+                            onBook: () => _showBookingSheet(providers[i]),
+                          ),
+                        )),
             ),
           ],
         ),

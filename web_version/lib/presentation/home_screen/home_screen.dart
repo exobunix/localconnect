@@ -1042,10 +1042,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   OfflineBannerWidget(onRetry: _handleRetry),
                   
-                  // Wrap body sections in 1200px max width centered layout
+                  // Wrap body sections in 1600px max width centered layout
                   Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1200),
+                      constraints: const BoxConstraints(maxWidth: 1600),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

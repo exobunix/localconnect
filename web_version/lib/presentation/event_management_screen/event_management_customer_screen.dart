@@ -1115,7 +1115,7 @@ class _EventManagementCustomerScreenState
       color: const Color(0xFFF8F9FA),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
+          constraints: const BoxConstraints(maxWidth: 1600),
           child: Wrap(
             spacing: 16,
             runSpacing: 16,
@@ -1537,20 +1537,47 @@ class _SubcategoryTab extends StatelessWidget {
                   ),
                 ),
               )
-            : SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => _ProviderCard(
-                    provider: providers[i],
-                    color: color,
-                    isDark: isDark,
-                    isFavourite: favourites.contains(providers[i]['id']),
-                    onFavourite: () =>
-                        onFavouriteToggle(providers[i]['id'] as String),
-                    onTap: () => onProviderTap(providers[i]),
-                  ),
-                  childCount: providers.length,
-                ),
-              ),
+            : (MediaQuery.of(context).size.width > 850
+                ? SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: MediaQuery.of(context).size.width > 1200 ? 4 : 3,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 0.76,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => _ProviderCard(
+                          provider: providers[i],
+                          color: color,
+                          isDark: isDark,
+                          isFavourite: favourites.contains(providers[i]['id']),
+                          onFavourite: () =>
+                              onFavouriteToggle(providers[i]['id'] as String),
+                          onTap: () => onProviderTap(providers[i]),
+                        ),
+                        childCount: providers.length,
+                      ),
+                    ),
+                  )
+                : SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: _ProviderCard(
+                          provider: providers[i],
+                          color: color,
+                          isDark: isDark,
+                          isFavourite: favourites.contains(providers[i]['id']),
+                          onFavourite: () =>
+                              onFavouriteToggle(providers[i]['id'] as String),
+                          onTap: () => onProviderTap(providers[i]),
+                        ),
+                      ),
+                      childCount: providers.length,
+                    ),
+                  )),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
@@ -1750,7 +1777,7 @@ class _ProviderCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        margin: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E2023) : Colors.white,
           borderRadius: BorderRadius.circular(18),

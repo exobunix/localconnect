@@ -697,7 +697,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
       color: Colors.white,
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
+          constraints: const BoxConstraints(maxWidth: 1600),
           child: Wrap(
             spacing: 12,
             runSpacing: 12,
