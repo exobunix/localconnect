@@ -27,6 +27,7 @@ import '../presentation/admin_panel_screen/admin_shop_management_screen.dart';
 import '../presentation/admin_panel_screen/admin_subscription_management_screen.dart';
 import '../presentation/admin_panel_screen/admin_transport_screen.dart';
 import '../presentation/admin_panel_screen/admin_user_management_screen.dart';
+import '../presentation/admin_panel_screen/admin_order_management_screen.dart';
 import '../presentation/all_categories_screen/all_categories_screen.dart';
 import '../presentation/booking_checkout_screen/booking_checkout_screen.dart';
 import '../presentation/booking_confirmation_screen/booking_confirmation_screen.dart';
@@ -187,6 +188,7 @@ class AppRoutes {
   static const String adminReportsScreen = '/admin-reports-screen';
   static const String adminComplaintsScreen = '/admin-complaints-screen';
   static const String adminNotificationHubScreen = '/admin-notification-hub-screen';
+  static const String adminOrderManagementScreen = '/admin-order-management-screen';
   static const String checkoutScreen = '/checkout-screen';
   static const String chatListScreen = '/chat-list-screen';
   static const String chatDetailScreen = '/chat-detail-screen';
@@ -691,6 +693,10 @@ class AppRoutes {
       adminComplaintsScreen: (context) => const RoleGuard(
         requiredRole: 'admin',
         child: AdminComplaintsScreen(),
+      ),
+      adminOrderManagementScreen: (context) => const RoleGuard(
+        requiredRole: 'admin',
+        child: AdminOrderManagementScreen(),
       ),
       adminRentAnalyticsScreen: (context) => const RoleGuard(
         requiredRole: 'admin',

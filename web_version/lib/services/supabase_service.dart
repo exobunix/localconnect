@@ -567,10 +567,18 @@ class SupabaseService {
       final response = await client
           .from('orders')
           .select(
-            '*, provider:provider_id(id, business_name, owner_name, phone, rating, image_url, city, category, address)',
+            '*, '
+            'provider:provider_id(id, business_name, owner_name, phone, rating, image_url, city, category, address), '
+            'customer:customer_id(id, full_name, email, phone)',
           )
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response);
+      return List<Map<String, dynamic>>.from(response).map((o) {
+        final customer = o['customer'] as Map<String, dynamic>?;
+        return {
+          ...o,
+          'customer_name': customer?['full_name'] ?? customer?['email'] ?? o['customer_id'] ?? 'Customer',
+        };
+      }).toList();
     } catch (e) {
       debugPrint('getAdminAllOrders error: $e');
       return [];

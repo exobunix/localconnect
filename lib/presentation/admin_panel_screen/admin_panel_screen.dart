@@ -379,7 +379,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             title: 'All Orders',
             subtitle: 'View and manage all platform orders',
             onTap: () =>
-                Navigator.pushNamed(context, AppRoutes.orderManagementScreen),
+                Navigator.pushNamed(context, AppRoutes.adminOrderManagementScreen),
           ),
           _buildSettingsTile(
             icon: Icons.pending_actions_rounded,
