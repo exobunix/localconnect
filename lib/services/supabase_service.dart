@@ -39,6 +39,21 @@ class SupabaseService {
   User? get currentUser => client.auth.currentUser;
   bool get isLoggedIn => currentUser != null;
 
+  Future<bool> ensureValidSession() async {
+    final session = client.auth.currentSession;
+    if (session == null) return false;
+    if (session.isExpired) {
+      try {
+        final res = await client.auth.refreshSession();
+        return res.session != null;
+      } catch (e) {
+        debugPrint('Session refresh error: $e');
+        return false;
+      }
+    }
+    return true;
+  }
+
   Stream<AuthState> get authStateChanges => client.auth.onAuthStateChange;
 
   Future<AuthResponse> signInWithEmail({
