@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
@@ -167,25 +168,25 @@ class SupabaseService {
 
   Future<bool> isEmailRegistered(String email) async {
     try {
-      final profile = await getUserProfileByEmail(email);
-      return profile != null;
+      final response = await client.rpc('check_email_registered', params: {
+        'email_addr': email.trim(),
+      });
+      return response == true;
     } catch (e) {
+      debugPrint('[SupabaseService] isEmailRegistered error: $e');
       return false;
     }
   }
 
   Future<bool> isPhoneRegistered(String phone, {String? excludeUserId}) async {
     try {
-      final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-      if (cleanPhone.isEmpty) return false;
-      var query = client.from('user_profiles').select('id, phone').eq('phone', cleanPhone);
-      final response = await query;
-      if (response.isEmpty) return false;
-      if (excludeUserId != null) {
-        return (response as List).any((item) => item['id'] != excludeUserId);
-      }
-      return (response as List).isNotEmpty;
+      final response = await client.rpc('check_phone_registered', params: {
+        'phone_num': phone.trim(),
+        'exclude_user_id': excludeUserId,
+      });
+      return response == true;
     } catch (e) {
+      debugPrint('[SupabaseService] isPhoneRegistered error: $e');
       return false;
     }
   }

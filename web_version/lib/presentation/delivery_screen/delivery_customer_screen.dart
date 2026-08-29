@@ -480,6 +480,92 @@ class _DeliveryCustomerScreenState extends State<DeliveryCustomerScreen>
   }
 
   Widget _buildSubcategoryScroll() {
+    final isWeb = MediaQuery.of(context).size.width > 850;
+    if (isWeb) {
+      return Container(
+        color: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: List.generate(_subcategories.length, (i) {
+                final sub = _subcategories[i];
+                final isSelected = _selectedSubIndex == i;
+                final color = sub['color'] as Color;
+                final comingSoon = sub['comingSoon'] == true;
+
+                // Grid items spacing: 3-4 per row on desktop
+                final screenWidth = MediaQuery.of(context).size.width.clamp(0.0, 1200.0);
+                final itemWidth = (screenWidth - 32 - (3 * 12)) / 4;
+
+                return SizedBox(
+                  width: itemWidth > 180 ? itemWidth : 180,
+                  child: InkWell(
+                    onTap: () {
+                      if (!comingSoon) setState(() => _selectedSubIndex = i);
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: isSelected ? color : color.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isSelected ? color : color.withOpacity(0.2),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            sub['icon'] as IconData,
+                            color: isSelected ? Colors.white : color,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  sub['name'] as String,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: isSelected ? Colors.white : color,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (comingSoon)
+                                  Text(
+                                    'Coming Soon',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 9,
+                                      color: isSelected
+                                          ? Colors.white70
+                                          : color.withOpacity(0.6),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+      );
+    }
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 12),

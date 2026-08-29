@@ -1109,17 +1109,93 @@ class _EventManagementCustomerScreenState
     );
   }
 
+  Widget _buildWebSubcategoriesGrid() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      color: Colors.white,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: List.generate(_subcategories.length, (index) {
+              final sub = _subcategories[index];
+              final id = sub['id'] as String;
+              final label = sub['label'] as String;
+              final icon = sub['icon'] as IconData;
+              final color = sub['color'] as Color;
+              final isActive = _activeSubcategory == id;
+
+              // Grid items spacing: 3-4 per row on desktop
+              final screenWidth = MediaQuery.of(context).size.width.clamp(0.0, 1200.0);
+              final itemWidth = (screenWidth - 32 - (3 * 12)) / 4;
+
+              return SizedBox(
+                width: itemWidth > 180 ? itemWidth : 180,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _activeSubcategory = id;
+                      _tabController.index = index;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: isActive ? color : color.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isActive ? color : color.withOpacity(0.2),
+                        width: 2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          icon,
+                          color: isActive ? Colors.white : color,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            label,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isActive ? Colors.white : color,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isWeb = MediaQuery.of(context).size.width > 850;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: NestedScrollView(
         headerSliverBuilder: (ctx, innerScrolled) => [
           SliverAppBar(
-            expandedHeight: 180,
+            expandedHeight: isWeb ? 110 : 180,
             pinned: true,
             backgroundColor: _activeColor,
             foregroundColor: Colors.white,
@@ -1191,7 +1267,7 @@ class _EventManagementCustomerScreenState
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: LayoutBuilder(
+                child: isWeb ? null : LayoutBuilder(
                   builder: (context, constraints) {
                     final double appBarHeight = constraints.maxHeight;
                     final double opacity = ((appBarHeight - 110) / (180 - 110)).clamp(0.0, 1.0);
@@ -1237,75 +1313,103 @@ class _EventManagementCustomerScreenState
                 ),
               ),
             ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(48),
-              child: Container(
-                color: _activeColor,
-                child: TabBar(
-                  controller: _tabController,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white54,
-                  indicatorColor: Colors.white,
-                  indicatorWeight: 3,
-                  labelStyle: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  unselectedLabelStyle: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                  ),
-                  tabs: _subcategories
-                      .map(
-                        (s) => Tab(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(s['icon'] as IconData, size: 14),
-                              const SizedBox(width: 5),
-                              Text(s['label'] as String),
-                            ],
-                          ),
+            bottom: isWeb
+                ? null
+                : PreferredSize(
+                    preferredSize: const Size.fromHeight(48),
+                    child: Container(
+                      color: _activeColor,
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        labelColor: Colors.white,
+                        unselectedLabelColor: Colors.white54,
+                        indicatorColor: Colors.white,
+                        indicatorWeight: 3,
+                        labelStyle: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ),
-          ),
-        ],
-        body: TabBarView(
-          controller: _tabController,
-          children: _subcategories
-              .map(
-                (sub) => _SubcategoryTab(
-                  subcategory: sub,
-                  providers: _filteredProviders,
-                  featuredProviders: _featuredProviders,
-                  favourites: _favourites,
-                  isDark: isDark,
-                  sortBy: _sortBy,
-                  onFavouriteToggle: (id) => setState(() {
-                    if (_favourites.contains(id)) {
-                      _favourites.remove(id);
-                    } else {
-                      _favourites.add(id);
-                    }
-                  }),
-                  onProviderTap: (provider) => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EventProviderDetailScreen(
-                        provider: provider,
-                        subcategory: sub,
+                        unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                        ),
+                        tabs: _subcategories
+                            .map(
+                              (s) => Tab(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(s['icon'] as IconData, size: 14),
+                                    const SizedBox(width: 5),
+                                    Text(s['label'] as String),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
                       ),
                     ),
                   ),
+          ),
+        ],
+        body: isWeb
+            ? _SubcategoryTab(
+                subcategory: _activeSubcategoryData,
+                providers: _filteredProviders,
+                featuredProviders: _featuredProviders,
+                favourites: _favourites,
+                isDark: isDark,
+                sortBy: _sortBy,
+                onFavouriteToggle: (id) => setState(() {
+                  if (_favourites.contains(id)) {
+                    _favourites.remove(id);
+                  } else {
+                    _favourites.add(id);
+                  }
+                }),
+                onProviderTap: (provider) => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EventProviderDetailScreen(
+                      provider: provider,
+                      subcategory: _activeSubcategoryData,
+                    ),
+                  ),
                 ),
+                webSubcategoryGrid: _buildWebSubcategoriesGrid(),
               )
-              .toList(),
-        ),
+            : TabBarView(
+                controller: _tabController,
+                children: _subcategories
+                    .map(
+                      (sub) => _SubcategoryTab(
+                        subcategory: sub,
+                        providers: _filteredProviders,
+                        featuredProviders: _featuredProviders,
+                        favourites: _favourites,
+                        isDark: isDark,
+                        sortBy: _sortBy,
+                        onFavouriteToggle: (id) => setState(() {
+                          if (_favourites.contains(id)) {
+                            _favourites.remove(id);
+                          } else {
+                            _favourites.add(id);
+                          }
+                        }),
+                        onProviderTap: (provider) => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EventProviderDetailScreen(
+                              provider: provider,
+                              subcategory: sub,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
       ),
     );
   }
@@ -1321,6 +1425,7 @@ class _SubcategoryTab extends StatelessWidget {
   final String sortBy;
   final ValueChanged<String> onFavouriteToggle;
   final ValueChanged<Map<String, dynamic>> onProviderTap;
+  final Widget? webSubcategoryGrid;
 
   const _SubcategoryTab({
     required this.subcategory,
@@ -1331,6 +1436,7 @@ class _SubcategoryTab extends StatelessWidget {
     required this.sortBy,
     required this.onFavouriteToggle,
     required this.onProviderTap,
+    this.webSubcategoryGrid,
   });
 
   @override
@@ -1342,6 +1448,10 @@ class _SubcategoryTab extends StatelessWidget {
 
     return CustomScrollView(
       slivers: [
+        if (webSubcategoryGrid != null)
+          SliverToBoxAdapter(
+            child: webSubcategoryGrid,
+          ),
         // Featured Providers Carousel
         if (subFeatured.isNotEmpty) ...[
           SliverToBoxAdapter(

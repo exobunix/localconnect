@@ -691,15 +691,91 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
     );
   }
 
+  Widget _buildWebSubcategoriesGrid(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      color: Colors.white,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: List.generate(_subcategories.length, (index) {
+              final sub = _subcategories[index];
+              final id = sub['id'] as String;
+              final label = sub['label'] as String;
+              final icon = sub['icon'] as IconData;
+              final color = sub['color'] as Color;
+              final isActive = _activeSubcategory == id;
+
+              // Grid items spacing: 3-4 per row on desktop
+              final screenWidth = MediaQuery.of(context).size.width.clamp(0.0, 1200.0);
+              final itemWidth = (screenWidth - 32 - (3 * 12)) / 4;
+
+              return SizedBox(
+                width: itemWidth > 180 ? itemWidth : 180,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _activeSubcategory = id;
+                      _tabController.index = index;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: isActive ? color : color.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isActive ? color : color.withOpacity(0.2),
+                        width: 2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          icon,
+                          color: isActive ? Colors.white : color,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            label,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isActive ? Colors.white : color,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isWeb = MediaQuery.of(context).size.width > 850;
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
-            expandedHeight: 170,
+            expandedHeight: isWeb ? 110 : 170,
             pinned: true,
             backgroundColor: _activeColor,
             leading: IconButton(
@@ -726,7 +802,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: SafeArea(
+                child: isWeb ? null : SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 52, 16, 12),
                     child: Column(
@@ -862,56 +938,60 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                 ),
               ),
             ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(46),
-              child: Container(
-                color: _activeColor,
-                child: TabBar(
-                  controller: _tabController,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  indicatorColor: Colors.white,
-                  indicatorWeight: 3,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
-                  labelStyle: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  unselectedLabelStyle: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  tabs: _subcategories
-                      .map(
-                        (s) => Tab(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(s['icon'] as IconData, size: 14),
-                              const SizedBox(width: 4),
-                              Text(s['label'] as String),
-                            ],
-                          ),
+            bottom: isWeb
+                ? null
+                : PreferredSize(
+                    preferredSize: const Size.fromHeight(46),
+                    child: Container(
+                      color: _activeColor,
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        indicatorColor: Colors.white,
+                        indicatorWeight: 3,
+                        labelColor: Colors.white,
+                        unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
+                        labelStyle: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                         ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ),
+                        unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        tabs: _subcategories
+                            .map(
+                              (s) => Tab(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(s['icon'] as IconData, size: 14),
+                                    const SizedBox(width: 4),
+                                    Text(s['label'] as String),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  ),
           ),
         ],
-        body: TabBarView(
-          controller: _tabController,
-          children: _subcategories
-              .map(
-                (s) => _buildSubcategoryTab(
-                  s['id'] as String,
-                  s['color'] as Color,
-                ),
-              )
-              .toList(),
-        ),
+        body: isWeb
+            ? _buildSubcategoryTab(_activeSubcategory, _activeColor)
+            : TabBarView(
+                controller: _tabController,
+                children: _subcategories
+                    .map(
+                      (s) => _buildSubcategoryTab(
+                        s['id'] as String,
+                        s['color'] as Color,
+                      ),
+                    )
+                    .toList(),
+              ),
       ),
     );
   }
@@ -919,6 +999,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
   Widget _buildSubcategoryTab(String sub, Color color) {
     final listings = _filteredListings(sub);
     final featured = listings.where((l) => l['isFeatured'] == true).toList();
+    final isWeb = MediaQuery.of(context).size.width > 850;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -942,6 +1023,10 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
               constraints: const BoxConstraints(maxWidth: 1400),
               child: CustomScrollView(
                 slivers: [
+                  if (isWeb)
+                    SliverToBoxAdapter(
+                      child: _buildWebSubcategoriesGrid(context),
+                    ),
                   // Sort bar
                   SliverToBoxAdapter(
                     child: Padding(

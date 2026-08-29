@@ -578,14 +578,85 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
     }
   }
 
+  Widget _buildWebVehicleGrid(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      color: Colors.white,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: _vehicleConfig.entries.map((e) {
+              final isActive = _vehicleType == e.key;
+              final label = e.value['label'] as String;
+              final icon = e.value['icon'] as IconData;
+
+              // Grid items spacing: 3-4 per row on desktop
+              final screenWidth = MediaQuery.of(context).size.width.clamp(0.0, 1200.0);
+              final itemWidth = (screenWidth - 32 - (3 * 12)) / 4;
+
+              return SizedBox(
+                width: itemWidth > 180 ? itemWidth : 180,
+                child: InkWell(
+                  onTap: () {
+                    _setVehicleType(e.key);
+                    _loadProviders();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: isActive ? _vehicleColor : _vehicleColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isActive ? _vehicleColor : _vehicleColor.withOpacity(0.2),
+                        width: 2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          icon,
+                          color: isActive ? Colors.white : _vehicleColor,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            label,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isActive ? Colors.white : _vehicleColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isWeb = MediaQuery.of(context).size.width > 850;
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
-            expandedHeight: 130,
+            expandedHeight: isWeb ? 110 : 130,
             pinned: true,
             backgroundColor: _vehicleColor,
             leading: IconButton(
@@ -719,67 +790,68 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(88),
+              preferredSize: Size.fromHeight(isWeb ? 48 : 88),
               child: Column(
                 children: [
                   // Vehicle type switcher
-                  Container(
-                    height: 40,
-                    color: Colors.black.withValues(alpha: 0.15),
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      children: _vehicleConfig.entries.map((e) {
-                        final isActive = _vehicleType == e.key;
-                        return GestureDetector(
-                          onTap: () {
-                            _setVehicleType(e.key);
-                            _loadProviders();
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isActive
-                                  ? Colors.white
-                                  : Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  e.value['icon'] as IconData,
-                                  size: 12,
-                                  color: isActive
-                                      ? _vehicleColor
-                                      : Colors.white,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  e.value['label'] as String,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
+                  if (!isWeb)
+                    Container(
+                      height: 40,
+                      color: Colors.black.withValues(alpha: 0.15),
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        children: _vehicleConfig.entries.map((e) {
+                          final isActive = _vehicleType == e.key;
+                          return GestureDetector(
+                            onTap: () {
+                              _setVehicleType(e.key);
+                              _loadProviders();
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    e.value['icon'] as IconData,
+                                    size: 12,
                                     color: isActive
                                         ? _vehicleColor
                                         : Colors.white,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    e.value['label'] as String,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: isActive
+                                          ? _vehicleColor
+                                          : Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ),
                     ),
-                  ),
                   TabBar(
                     controller: _tabController,
                     indicatorColor: Colors.white,
@@ -811,6 +883,7 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
   }
 
   Widget _buildProvidersTab() {
+    final isWeb = MediaQuery.of(context).size.width > 850;
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -820,6 +893,8 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            if (isWeb)
+              _buildWebVehicleGrid(context),
             Icon(_vehicleIcon, size: 64, color: AppTheme.outline),
             const SizedBox(height: 16),
             Text(
@@ -844,6 +919,8 @@ class _TransportCustomerScreenState extends State<TransportCustomerScreen>
     }
     return Column(
       children: [
+        if (isWeb)
+          _buildWebVehicleGrid(context),
         _buildSortBar(),
         Expanded(
           child: ListView.builder(
