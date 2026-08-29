@@ -1111,71 +1111,26 @@ class _EventManagementCustomerScreenState
 
   Widget _buildWebSubcategoriesGrid() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      color: const Color(0xFFF8F9FA),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Wrap(
-            spacing: 12,
-            runSpacing: 12,
+            spacing: 16,
+            runSpacing: 16,
+            alignment: WrapAlignment.center,
             children: List.generate(_subcategories.length, (index) {
               final sub = _subcategories[index];
-              final id = sub['id'] as String;
-              final label = sub['label'] as String;
-              final icon = sub['icon'] as IconData;
-              final color = sub['color'] as Color;
-              final isActive = _activeSubcategory == id;
-
-              // Grid items spacing: 3-4 per row on desktop
-              final screenWidth = MediaQuery.of(context).size.width.clamp(0.0, 1200.0);
-              final itemWidth = (screenWidth - 32 - (3 * 12)) / 4;
-
-              return SizedBox(
-                width: itemWidth > 180 ? itemWidth : 180,
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _activeSubcategory = id;
-                      _tabController.index = index;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: isActive ? color : color.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isActive ? color : color.withOpacity(0.2),
-                        width: 2,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          icon,
-                          color: isActive ? Colors.white : color,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            label,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: isActive ? Colors.white : color,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              return _WebSubcategoryCard(
+                subcategory: sub,
+                isActive: _activeSubcategory == sub['id'],
+                onTap: () {
+                  setState(() {
+                    _activeSubcategory = sub['id'] as String;
+                    _tabController.index = index;
+                  });
+                },
               );
             }),
           ),
@@ -1353,63 +1308,39 @@ class _EventManagementCustomerScreenState
                   ),
           ),
         ],
-        body: isWeb
-            ? _SubcategoryTab(
-                subcategory: _activeSubcategoryData,
-                providers: _filteredProviders,
-                featuredProviders: _featuredProviders,
-                favourites: _favourites,
-                isDark: isDark,
-                sortBy: _sortBy,
-                onFavouriteToggle: (id) => setState(() {
-                  if (_favourites.contains(id)) {
-                    _favourites.remove(id);
-                  } else {
-                    _favourites.add(id);
-                  }
-                }),
-                onProviderTap: (provider) => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => EventProviderDetailScreen(
-                      provider: provider,
-                      subcategory: _activeSubcategoryData,
+        body: TabBarView(
+          controller: _tabController,
+          physics: isWeb ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
+          children: _subcategories
+              .map(
+                (sub) => _SubcategoryTab(
+                  subcategory: sub,
+                  providers: _filteredProviders,
+                  featuredProviders: _featuredProviders,
+                  favourites: _favourites,
+                  isDark: isDark,
+                  sortBy: _sortBy,
+                  onFavouriteToggle: (id) => setState(() {
+                    if (_favourites.contains(id)) {
+                      _favourites.remove(id);
+                    } else {
+                      _favourites.add(id);
+                    }
+                  }),
+                  onProviderTap: (provider) => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EventProviderDetailScreen(
+                        provider: provider,
+                        subcategory: sub,
+                      ),
                     ),
                   ),
+                  webSubcategoryGrid: isWeb ? _buildWebSubcategoriesGrid() : null,
                 ),
-                webSubcategoryGrid: _buildWebSubcategoriesGrid(),
               )
-            : TabBarView(
-                controller: _tabController,
-                children: _subcategories
-                    .map(
-                      (sub) => _SubcategoryTab(
-                        subcategory: sub,
-                        providers: _filteredProviders,
-                        featuredProviders: _featuredProviders,
-                        favourites: _favourites,
-                        isDark: isDark,
-                        sortBy: _sortBy,
-                        onFavouriteToggle: (id) => setState(() {
-                          if (_favourites.contains(id)) {
-                            _favourites.remove(id);
-                          } else {
-                            _favourites.add(id);
-                          }
-                        }),
-                        onProviderTap: (provider) => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => EventProviderDetailScreen(
-                              provider: provider,
-                              subcategory: sub,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
+              .toList(),
+        ),
       ),
     );
   }
@@ -2595,6 +2526,107 @@ class _FilterToggle extends StatelessWidget {
                   : null,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WebSubcategoryCard extends StatefulWidget {
+  final Map<String, dynamic> subcategory;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _WebSubcategoryCard({
+    required this.subcategory,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  State<_WebSubcategoryCard> createState() => _WebSubcategoryCardState();
+}
+
+class _WebSubcategoryCardState extends State<_WebSubcategoryCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = widget.subcategory;
+    final color = sub['color'] as Color;
+    final label = sub['label'] ?? sub['name'] ?? '';
+    final icon = sub['icon'] as IconData;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          width: 170,
+          height: 110,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: widget.isActive
+                ? color
+                : (_isHovered ? color.withOpacity(0.08) : Colors.white),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: widget.isActive
+                  ? color
+                  : (_isHovered ? color : Colors.grey.withOpacity(0.2)),
+              width: 2,
+            ),
+            boxShadow: [
+              if (widget.isActive)
+                BoxShadow(
+                  color: color.withOpacity(0.4),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                )
+              else if (_isHovered)
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: widget.isActive
+                      ? Colors.white.withOpacity(0.2)
+                      : color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: widget.isActive ? Colors.white : color,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                label,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: widget.isActive ? Colors.white : Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
     );
