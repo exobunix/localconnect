@@ -790,69 +790,243 @@ class _AdminProviderManagementScreenState
     );
   }
 
+  Future<List<Map<String, dynamic>>> _loadProviderDocs(String providerId) async {
+    try {
+      return await SupabaseService.instance.getMyKycDocuments(providerId);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  void _viewDocumentImage(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (url.startsWith('http'))
+              Image.network(
+                url,
+                loadingBuilder: (_, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(child: CircularProgressIndicator());
+                },
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Icon(Icons.broken_image_rounded, size: 64, color: Colors.grey),
+                ),
+              )
+            else
+              Text(
+                'Invalid URL: $url',
+                style: GoogleFonts.plusJakartaSans(),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _viewProviderDetails(Map<String, dynamic> provider) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        maxChildSize: 0.95,
-        minChildSize: 0.5,
-        builder: (_, ctrl) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 10),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Provider Details',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => DraggableScrollableSheet(
+          initialChildSize: 0.8,
+          maxChildSize: 0.95,
+          minChildSize: 0.5,
+          builder: (_, ctrl) => Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-              Expanded(
-                child: ListView(
-                  controller: ctrl,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    _detailRow('Name', provider['full_name'] ?? ''),
-                    _detailRow('Business', provider['business_name'] ?? ''),
-                    _detailRow('Category', provider['category'] ?? ''),
-                    _detailRow('City', provider['city'] ?? ''),
-                    _detailRow('Phone', provider['phone'] ?? ''),
-                    _detailRow('Email', provider['email'] ?? ''),
-                    _detailRow('Status', provider['status'] ?? ''),
-                    _detailRow('Rating', '${provider['rating'] ?? 0} ⭐'),
-                    _detailRow(
-                      'Total Orders',
-                      '${provider['total_orders'] ?? 0}',
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Provider Details',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
                     ),
-                    _detailRow('Earnings', '₹${provider['earnings'] ?? 0}'),
-                    _detailRow(
-                      'Subscription',
-                      provider['subscription'] ?? 'None',
-                    ),
-                    _detailRow('Joined', provider['joined'] ?? ''),
-                    const SizedBox(height: 20),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: ListView(
+                    controller: ctrl,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      _detailRow('Name', provider['full_name'] ?? ''),
+                      _detailRow('Business', provider['business_name'] ?? ''),
+                      _detailRow('Category', provider['category'] ?? ''),
+                      _detailRow('City', provider['city'] ?? ''),
+                      _detailRow('Phone', provider['phone'] ?? ''),
+                      _detailRow('Email', provider['email'] ?? ''),
+                      _detailRow('Status', provider['status'] ?? ''),
+                      _detailRow('Rating', '${provider['rating'] ?? 0} ⭐'),
+                      _detailRow('Total Orders', '${provider['total_orders'] ?? 0}'),
+                      _detailRow('Earnings', '₹${provider['earnings'] ?? 0}'),
+                      _detailRow('Subscription', provider['subscription'] ?? 'None'),
+                      _detailRow('Joined', provider['joined'] ?? ''),
+                      const SizedBox(height: 16),
+                      Text(
+                        'KYC Documents',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                      const Divider(),
+                      FutureBuilder<List<Map<String, dynamic>>>(
+                        future: _loadProviderDocs(provider['id'] as String),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(12.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+                          final docs = snapshot.data ?? [];
+                          if (docs.isEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text(
+                                'No KYC documents uploaded.',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            );
+                          }
+                          return Column(
+                            children: docs.map((doc) {
+                              final type = doc['document_type'] as String? ?? 'document';
+                              final status = doc['status'] as String? ?? 'pending';
+                              final url = doc['document_url'] as String? ?? '';
+                              return ListTile(
+                                leading: const Icon(Icons.description_rounded, color: AppTheme.primary),
+                                title: Text(
+                                  type.toUpperCase().replaceAll('_', ' '),
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  'Status: ${status.toUpperCase()}',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11,
+                                    color: status == 'approved'
+                                        ? Colors.green
+                                        : (status == 'rejected' ? Colors.red : Colors.orange),
+                                  ),
+                                ),
+                                trailing: url.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.open_in_new_rounded, color: AppTheme.primary),
+                                        onPressed: () => _viewDocumentImage(context, url),
+                                      )
+                                    : null,
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          if (provider['status'] == 'pending') ...[
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.success,
+                                  foregroundColor: Colors.white,
+                                ),
+                                icon: const Icon(Icons.check_rounded),
+                                label: const Text('Approve'),
+                                onPressed: () async {
+                                  await _approveProvider(provider);
+                                  setModalState(() {});
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.error,
+                                  foregroundColor: Colors.white,
+                                ),
+                                icon: const Icon(Icons.close_rounded),
+                                label: const Text('Reject'),
+                                onPressed: () async {
+                                  await _rejectProvider(provider);
+                                  setModalState(() {});
+                                },
+                              ),
+                            ),
+                          ] else if (provider['status'] == 'approved') ...[
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.warning,
+                                  foregroundColor: Colors.white,
+                                ),
+                                icon: const Icon(Icons.block_rounded),
+                                label: const Text('Suspend'),
+                                onPressed: () async {
+                                  await _suspendProvider(provider);
+                                  setModalState(() {});
+                                },
+                              ),
+                            ),
+                          ] else if (provider['status'] == 'suspended') ...[
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.success,
+                                  foregroundColor: Colors.white,
+                                ),
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: const Text('Reactivate'),
+                                onPressed: () async {
+                                  await _reactivateProvider(provider);
+                                  setModalState(() {});
+                                },
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

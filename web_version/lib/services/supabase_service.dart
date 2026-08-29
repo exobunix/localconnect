@@ -547,6 +547,28 @@ class SupabaseService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getAdminAllOrders() async {
+    try {
+      final response = await client
+          .from('orders')
+          .select(
+            '*, provider:provider_id(id, business_name, owner_name, phone, rating, image_url, city, category, address)',
+          )
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('getAdminAllOrders error: $e');
+      return [];
+    }
+  }
+
+  Future<void> adminUpdateOrder({
+    required String orderId,
+    required Map<String, dynamic> updates,
+  }) async {
+    await client.from('orders').update(updates).eq('id', orderId);
+  }
+
   // ─── ORDER TRACKING ───────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> getOrderById(String orderId) async {
@@ -1652,6 +1674,7 @@ class SupabaseService {
     String nameMarathi = '',
     bool isActive = true,
     String description = '',
+    String imageUrl = '',
   }) async {
     await client.from('categories').upsert({
       'id': id,
@@ -1659,6 +1682,7 @@ class SupabaseService {
       'name_marathi': nameMarathi,
       'is_active': isActive,
       'description': description,
+      'image_url': imageUrl,
       'updated_at': DateTime.now().toIso8601String(),
     }, onConflict: 'id');
   }
@@ -1685,13 +1709,32 @@ class SupabaseService {
     required String id,
     required String name,
     String nameMarathi = '',
+    String imageUrl = '',
+    String description = '',
   }) async {
     await client.from('subcategories').insert({
       'id': id,
       'category_id': categoryId,
       'name': name,
       'name_marathi': nameMarathi,
+      'image_url': imageUrl,
+      'description': description,
     });
+  }
+
+  Future<void> adminUpdateSubcategory({
+    required String id,
+    required String name,
+    String nameMarathi = '',
+    String imageUrl = '',
+    String description = '',
+  }) async {
+    await client.from('subcategories').update({
+      'name': name,
+      'name_marathi': nameMarathi,
+      'image_url': imageUrl,
+      'description': description,
+    }).eq('id', id);
   }
 
   Future<void> adminDeleteSubcategory(String id) async {

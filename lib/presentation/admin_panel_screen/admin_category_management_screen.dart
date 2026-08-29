@@ -646,22 +646,34 @@ class _AdminCategoryManagementScreenState
                                                         const SizedBox(
                                                           width: 4,
                                                         ),
-                                                        Text(
-                                                          s['name']
-                                                                  as String? ??
-                                                              '',
-                                                          style: GoogleFonts.plusJakartaSans(
-                                                            fontSize: 11,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            color: subActive
-                                                                ? null
-                                                                : Colors.grey,
-                                                            decoration:
-                                                                subActive
-                                                                ? null
-                                                                : TextDecoration
-                                                                      .lineThrough,
+                                                        GestureDetector(
+                                                          onTap: () =>
+                                                              _showEditSubcategoryDialog(
+                                                                context,
+                                                                s,
+                                                              ),
+                                                          child: MouseRegion(
+                                                            cursor:
+                                                                SystemMouseCursors
+                                                                    .click,
+                                                            child: Text(
+                                                              s['name']
+                                                                      as String? ??
+                                                                  '',
+                                                              style: GoogleFonts.plusJakartaSans(
+                                                                fontSize: 11,
+                                                                fontWeight:
+                                                                    FontWeight.w600,
+                                                                color: subActive
+                                                                    ? null
+                                                                    : Colors
+                                                                        .grey,
+                                                                decoration: subActive
+                                                                    ? null
+                                                                    : TextDecoration
+                                                                        .lineThrough,
+                                                              ),
+                                                            ),
                                                           ),
                                                         ),
                                                         const SizedBox(
@@ -801,6 +813,8 @@ class _AdminCategoryManagementScreenState
   void _showAddCategoryDialog(BuildContext context) {
     final nameCtrl = TextEditingController();
     final marathiCtrl = TextEditingController();
+    final imageCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -809,29 +823,52 @@ class _AdminCategoryManagementScreenState
           'Add Category',
           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'Category Name (English)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Category Name (English)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: marathiCtrl,
-              decoration: InputDecoration(
-                labelText: 'Category Name (Marathi)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+              const SizedBox(height: 12),
+              TextField(
+                controller: marathiCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Category Name (Marathi)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: imageCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Photo/Image URL',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Description / Content',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -843,6 +880,8 @@ class _AdminCategoryManagementScreenState
               if (nameCtrl.text.trim().isNotEmpty) {
                 final name = nameCtrl.text.trim();
                 final marathi = marathiCtrl.text.trim();
+                final imageUrl = imageCtrl.text.trim();
+                final description = descCtrl.text.trim();
                 Navigator.pop(context);
                 try {
                   final id = name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '');
@@ -851,6 +890,8 @@ class _AdminCategoryManagementScreenState
                     name: name,
                     nameMarathi: marathi,
                     isActive: true, // Make immediately active and visible
+                    imageUrl: imageUrl,
+                    description: description,
                   );
                   CategoryService.instance.invalidateCache();
                   await _loadCategories();
@@ -893,6 +934,9 @@ class _AdminCategoryManagementScreenState
     final descCtrl = TextEditingController(
       text: cat['description'] as String? ?? '',
     );
+    final imageCtrl = TextEditingController(
+      text: cat['image_url'] as String? ?? '',
+    );
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -926,6 +970,16 @@ class _AdminCategoryManagementScreenState
               ),
               const SizedBox(height: 12),
               TextField(
+                controller: imageCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Photo/Image URL',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
                 controller: descCtrl,
                 maxLines: 2,
                 decoration: InputDecoration(
@@ -952,6 +1006,7 @@ class _AdminCategoryManagementScreenState
                 nameMarathi: marathiCtrl.text,
                 isActive: cat['is_active'] as bool? ?? true,
                 description: descCtrl.text,
+                imageUrl: imageCtrl.text,
               );
               CategoryService.instance.invalidateCache();
               await _loadCategories();
@@ -972,6 +1027,9 @@ class _AdminCategoryManagementScreenState
     Map<String, dynamic> cat,
   ) {
     final nameCtrl = TextEditingController();
+    final marathiCtrl = TextEditingController();
+    final imageCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -983,11 +1041,43 @@ class _AdminCategoryManagementScreenState
             fontSize: 14,
           ),
         ),
-        content: TextField(
-          controller: nameCtrl,
-          decoration: InputDecoration(
-            labelText: 'Subcategory Name',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Subcategory Name (English)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: marathiCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Subcategory Name (Marathi)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: imageCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Photo/Image URL',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Description / Content',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -999,6 +1089,9 @@ class _AdminCategoryManagementScreenState
             onPressed: () async {
               if (nameCtrl.text.trim().isNotEmpty) {
                 final name = nameCtrl.text.trim();
+                final marathi = marathiCtrl.text.trim();
+                final imageUrl = imageCtrl.text.trim();
+                final description = descCtrl.text.trim();
                 Navigator.pop(context);
                 try {
                   final catId = cat['id'] as String;
@@ -1008,6 +1101,9 @@ class _AdminCategoryManagementScreenState
                     categoryId: catId,
                     id: subId,
                     name: name,
+                    nameMarathi: marathi,
+                    imageUrl: imageUrl,
+                    description: description,
                   );
                   CategoryService.instance.invalidateCache();
                   await _loadCategories();
@@ -1034,6 +1130,118 @@ class _AdminCategoryManagementScreenState
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
             child: Text(
               'Add',
+              style: GoogleFonts.plusJakartaSans(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditSubcategoryDialog(
+    BuildContext context,
+    Map<String, dynamic> sub,
+  ) {
+    final nameCtrl = TextEditingController(text: sub['name'] as String? ?? '');
+    final marathiCtrl = TextEditingController(text: sub['name_marathi'] as String? ?? '');
+    final imageCtrl = TextEditingController(text: sub['image_url'] as String? ?? '');
+    final descCtrl = TextEditingController(text: sub['description'] as String? ?? '');
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Edit Subcategory',
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Subcategory Name (English)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: marathiCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Subcategory Name (Marathi)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: imageCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Photo/Image URL',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Description / Content',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameCtrl.text.trim().isNotEmpty) {
+                final name = nameCtrl.text.trim();
+                final marathi = marathiCtrl.text.trim();
+                final imageUrl = imageCtrl.text.trim();
+                final description = descCtrl.text.trim();
+                Navigator.pop(context);
+                try {
+                  await SupabaseService.instance.adminUpdateSubcategory(
+                    id: sub['id'] as String,
+                    name: name,
+                    nameMarathi: marathi,
+                    imageUrl: imageUrl,
+                    description: description,
+                  );
+                  CategoryService.instance.invalidateCache();
+                  await _loadCategories();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Subcategory "$name" updated successfully!'),
+                        backgroundColor: const Color(0xFF00C853),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error updating subcategory: $e'),
+                        backgroundColor: Colors.red.shade700,
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+            child: Text(
+              'Save',
               style: GoogleFonts.plusJakartaSans(color: Colors.white),
             ),
           ),

@@ -48,6 +48,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     'Dashboard',
     'Providers',
     'Customers',
+    'Orders',
     'Shops',
     'Analytics',
     'Subs',
@@ -59,6 +60,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     Icons.dashboard_rounded,
     Icons.store_rounded,
     Icons.people_rounded,
+    Icons.receipt_long_rounded,
     Icons.storefront_rounded,
     Icons.bar_chart_rounded,
     Icons.workspace_premium_rounded,
@@ -194,16 +196,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       case 2:
         return const AdminCustomerManagementScreen();
       case 3:
-        return const AdminShopManagementScreen();
+        return _buildOrdersTab();
       case 4:
-        return const AdminAdvancedReportsScreen();
+        return const AdminShopManagementScreen();
       case 5:
-        return const AdminSubscriptionManagementScreen();
+        return const AdminAdvancedReportsScreen();
       case 6:
-        return _buildDeliveryTab();
+        return const AdminSubscriptionManagementScreen();
       case 7:
-        return const AdminTransportScreen();
+        return _buildDeliveryTab();
       case 8:
+        return const AdminTransportScreen();
+      case 9:
         return _buildSettingsTab();
       default:
         return _buildDashboardTab();
@@ -476,7 +480,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             icon: Icons.workspace_premium_rounded,
             title: 'Subscription Plans',
             subtitle: 'Manage provider subscription tiers',
-            onTap: () => setState(() => _selectedNavIndex = 5),
+            onTap: () => setState(() => _selectedNavIndex = 6),
           ),
           _buildSettingsTile(
             icon: Icons.home_work_rounded,

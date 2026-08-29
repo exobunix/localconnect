@@ -2,6 +2,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_export.dart';
+import '../../core/role_guard.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/supabase_service.dart';
 import '../../services/notification_service.dart';
@@ -48,53 +49,72 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     final userId = SupabaseService.instance.currentUser?.id;
     if (userId == null) return;
 
+    final isAdmin = isAdminSessionActive;
+
     _ordersRealtimeChannel?.unsubscribe();
-    _ordersRealtimeChannel = SupabaseService.instance.client
-        .channel('customer_order_mgmt_$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
-          table: 'orders',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'customer_id',
-            value: userId,
-          ),
-          callback: (payload) {
-            if (mounted && _isOnline) {
-              // Show local notification for status changes
-              final newRow = payload.newRecord;
-              final oldRow = payload.oldRecord;
-              final orderId = newRow['id'] as String? ?? '';
-              final newStatus = newRow['status'] as String? ?? '';
-              final oldStatus = oldRow['status'] as String? ?? '';
-              final providerName = newRow['provider_name'] as String?;
 
-              if (newStatus != oldStatus && newStatus.isNotEmpty) {
-                // Map order status to notification-friendly status
-                final notifStatus = newStatus == 'active'
-                    ? 'accepted'
-                    : newStatus;
-                NotificationService.instance.showOrderStatusNotification(
-                  orderId: orderId,
-                  status: notifStatus,
-                  providerName: providerName,
-                );
-                NotificationService.instance.showBookingStatusToast(
-                  status: notifStatus,
-                  providerName: providerName,
-                );
+    if (isAdmin) {
+      _ordersRealtimeChannel = SupabaseService.instance.client
+          .channel('admin_order_mgmt')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'orders',
+            callback: (payload) {
+              if (mounted && _isOnline) {
+                _loadOrders();
               }
+            },
+          )
+          .subscribe();
+    } else {
+      _ordersRealtimeChannel = SupabaseService.instance.client
+          .channel('customer_order_mgmt_$userId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'orders',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'customer_id',
+              value: userId,
+            ),
+            callback: (payload) {
+              if (mounted && _isOnline) {
+                // Show local notification for status changes
+                final newRow = payload.newRecord;
+                final oldRow = payload.oldRecord;
+                final orderId = newRow['id'] as String? ?? '';
+                final newStatus = newRow['status'] as String? ?? '';
+                final oldStatus = oldRow['status'] as String? ?? '';
+                final providerName = newRow['provider_name'] as String?;
 
-              _loadOrders();
+                if (newStatus != oldStatus && newStatus.isNotEmpty) {
+                  // Map order status to notification-friendly status
+                  final notifStatus = newStatus == 'active'
+                      ? 'accepted'
+                      : newStatus;
+                  NotificationService.instance.showOrderStatusNotification(
+                    orderId: orderId,
+                    status: notifStatus,
+                    providerName: providerName,
+                  );
+                  NotificationService.instance.showBookingStatusToast(
+                    status: notifStatus,
+                    providerName: providerName,
+                  );
+                }
+
+                _loadOrders();
+              }
+            },
+          )
+          .subscribe((status, [error]) {
+            if (error != null) {
+              debugPrint('[OrderMgmt] realtime error: $error');
             }
-          },
-        )
-        .subscribe((status, [error]) {
-          if (error != null) {
-            debugPrint('[OrderMgmt] realtime error: $error');
-          }
-        });
+          });
+    }
   }
 
   Future<void> _loadOrders() async {
@@ -125,7 +145,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     }
 
     try {
-      final data = await SupabaseService.instance.getOrders();
+      final isAdmin = isAdminSessionActive;
+      final data = isAdmin
+          ? await SupabaseService.instance.getAdminAllOrders()
+          : await SupabaseService.instance.getOrders();
       await ConnectivityService.instance.cacheData(_cacheKey, data);
       if (mounted) {
         setState(() {
@@ -148,6 +171,269 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
         });
       }
     }
+  }
+
+  void _showAssignProviderDialog(Map<String, dynamic> order) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String searchQuery = '';
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return FutureBuilder<List<Map<String, dynamic>>>(
+              future: SupabaseService.instance.getProviders(
+                category: order['category'] as String?,
+              ),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const AlertDialog(
+                    content: SizedBox(
+                      height: 100,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  );
+                }
+                final providers = snapshot.data ?? [];
+                final filtered = providers.where((p) {
+                  final bizName = (p['business_name'] as String? ?? '').toLowerCase();
+                  final owner = (p['owner_name'] as String? ?? '').toLowerCase();
+                  return bizName.contains(searchQuery.toLowerCase()) ||
+                      owner.contains(searchQuery.toLowerCase());
+                }).toList();
+
+                return AlertDialog(
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Assign Provider',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search providers...',
+                          prefixIcon: const Icon(Icons.search, size: 18),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.all(8),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onChanged: (val) {
+                          setStateDialog(() {
+                            searchQuery = val;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  content: SizedBox(
+                    width: 400,
+                    height: 300,
+                    child: filtered.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No providers found',
+                              style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: filtered.length,
+                            itemBuilder: (context, idx) {
+                              final p = filtered[idx];
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundImage: p['image_url'] != null &&
+                                          (p['image_url'] as String).isNotEmpty
+                                      ? NetworkImage(p['image_url'] as String)
+                                      : null,
+                                  child: p['image_url'] == null ||
+                                          (p['image_url'] as String).isEmpty
+                                      ? const Icon(Icons.store)
+                                      : null,
+                                ),
+                                title: Text(
+                                  p['business_name'] as String? ?? '',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  'Owner: ${p['owner_name'] ?? ''} • ${p['phone'] ?? ''}',
+                                  style: GoogleFonts.plusJakartaSans(fontSize: 11),
+                                ),
+                                onTap: () async {
+                                  await SupabaseService.instance.adminUpdateOrder(
+                                    orderId: order['id'],
+                                    updates: {
+                                      'provider_id': p['id'],
+                                      'provider_name': p['business_name'],
+                                    },
+                                  );
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    Navigator.pop(context);
+                                    _loadOrders();
+                                  }
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditOrderSpecsDialog(Map<String, dynamic> order) {
+    final dateCtrl = TextEditingController(text: order['scheduled_date'] as String? ?? '');
+    final timeCtrl = TextEditingController(text: order['scheduled_time'] as String? ?? '');
+    
+    var rawAmount = order['amount']?.toString() ?? '';
+    if (rawAmount.startsWith('₹')) {
+      rawAmount = rawAmount.substring(1);
+    }
+    final amountCtrl = TextEditingController(text: rawAmount);
+    final notesCtrl = TextEditingController(text: order['notes'] as String? ?? '');
+    final otpCtrl = TextEditingController(
+      text: order['completion_otp'] != null && order['completion_otp'].toString().isNotEmpty
+          ? order['completion_otp'].toString()
+          : (RegExp(r'Completion OTP:\s*(\d{4})').firstMatch(order['notes'] as String? ?? '')?.group(1) ?? ''),
+    );
+    String paymentStatus = order['payment_status'] as String? ?? 'pending';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: Text(
+                'Modify Order Details',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: SizedBox(
+                  width: 400,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: dateCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Scheduled Date (YYYY-MM-DD)',
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: timeCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Scheduled Time (HH:MM AM/PM)',
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: amountCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Amount (₹)',
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: otpCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Completion OTP (4 digits)',
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: paymentStatus,
+                        decoration: const InputDecoration(
+                          labelText: 'Payment Status',
+                          isDense: true,
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                          DropdownMenuItem(value: 'paid', child: Text('Paid')),
+                          DropdownMenuItem(value: 'refunded', child: Text('Refunded')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setStateDialog(() {
+                              paymentStatus = val;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: notesCtrl,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes',
+                          isDense: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final double? parsedAmount = double.tryParse(amountCtrl.text);
+                    await SupabaseService.instance.adminUpdateOrder(
+                      orderId: order['id'],
+                      updates: {
+                        'scheduled_date': dateCtrl.text,
+                        'scheduled_time': timeCtrl.text,
+                        'amount': parsedAmount ?? order['amount'],
+                        'notes': notesCtrl.text,
+                        'completion_otp': otpCtrl.text,
+                        'payment_status': paymentStatus,
+                      },
+                    );
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      Navigator.pop(context);
+                      _loadOrders();
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -618,6 +904,133 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         children: [_ProviderDetailRow(provider: provider)],
                       ),
 
+                    if (isAdminSessionActive) ...[
+                      const SizedBox(height: 12),
+                      _SectionCard(
+                        title: 'Customer Details',
+                        icon: Icons.person_rounded,
+                        children: [
+                          _DetailRow(
+                            icon: Icons.person_outline_rounded,
+                            label: 'Customer Name',
+                            value: order['customer_name'] as String? ?? 'N/A',
+                          ),
+                          _DetailRow(
+                            icon: Icons.phone_rounded,
+                            label: 'Customer Phone',
+                            value: order['customer']?['phone'] as String? ?? 'N/A',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _SectionCard(
+                        title: 'Admin Controls',
+                        icon: Icons.admin_panel_settings_rounded,
+                        children: [
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Text(
+                                'Order Status:',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF44474E),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: AppTheme.outline),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: ['pending', 'active', 'completed', 'cancelled'].contains(status) ? status : 'pending',
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: 'pending',
+                                          child: Text('Pending'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'active',
+                                          child: Text('Active (Accepted)'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'completed',
+                                          child: Text('Completed'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'cancelled',
+                                          child: Text('Cancelled'),
+                                        ),
+                                      ],
+                                      onChanged: (val) async {
+                                        if (val != null) {
+                                          await SupabaseService.instance.adminUpdateOrder(
+                                            orderId: order['id'],
+                                            updates: {'status': val},
+                                          );
+                                          if (context.mounted) {
+                                            Navigator.pop(context);
+                                            _loadOrders();
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showAssignProviderDialog(order),
+                              icon: const Icon(Icons.person_add_rounded, size: 18),
+                              label: Text(
+                                provider != null ? 'Reassign Provider' : 'Assign Provider',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showEditOrderSpecsDialog(order),
+                              icon: const Icon(Icons.edit_note_rounded, size: 18),
+                              label: Text(
+                                'Modify Order Details',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
                     if (order['rating'] != null) ...[
                       const SizedBox(height: 12),
                       _SectionCard(
@@ -640,7 +1053,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                       ),
                     ],
 
-                    if (canTrack) ...[
+                    if (canTrack && !isAdminSessionActive) ...[
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
@@ -673,7 +1086,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                       ),
                     ],
 
-                    if (canReview) ...[
+                    if (canReview && !isAdminSessionActive) ...[
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
@@ -722,7 +1135,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                       ),
                     ],
 
-                    if (canReorder) ...[
+                    if (canReorder && !isAdminSessionActive) ...[
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
@@ -875,7 +1288,9 @@ class _OrderList extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    order['provider_name'] as String? ?? '',
+                                    (order['provider_name'] as String? ?? '').isNotEmpty
+                                        ? order['provider_name'] as String
+                                        : 'Unassigned Provider',
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
@@ -899,6 +1314,29 @@ class _OrderList extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
+                            if (isAdminSessionActive) ...[
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.person_rounded,
+                                    size: 12,
+                                    color: Color(0xFF90A4AE),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      'Customer: ${order['customer_name'] ?? 'Guest'}',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 11,
+                                        color: const Color(0xFF455A64),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                            ],
                             // Provider details row
                             if (provider != null) ...[
                               Row(
@@ -981,7 +1419,7 @@ class _OrderList extends StatelessWidget {
                   ),
                 ),
                 // Reorder quick action
-                if (canReorder)
+                if (canReorder && !isAdminSessionActive)
                   InkWell(
                     onTap: isReordering ? null : () => onReorder(order),
                     borderRadius: const BorderRadius.vertical(
