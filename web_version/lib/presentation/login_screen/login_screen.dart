@@ -116,13 +116,12 @@ class _LoginScreenState extends State<LoginScreen>
         if (profile == null) {
           final email = user.email;
           final name = user.userMetadata?['full_name'] as String? ?? '';
-          await SupabaseService.instance.signOut();
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,
               AppRoutes.signupScreen,
               (route) => false,
-              arguments: {'email': email, 'fullName': name},
+              arguments: {'email': email, 'fullName': name, 'isGoogleAuth': true},
             );
           }
           return;
@@ -141,13 +140,12 @@ class _LoginScreenState extends State<LoginScreen>
         if (status == null) {
           final email = user.email;
           final name = user.userMetadata?['full_name'] as String? ?? '';
-          await SupabaseService.instance.signOut();
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,
               AppRoutes.providerRegistrationScreen,
               (route) => false,
-              arguments: {'email': email, 'ownerName': name},
+              arguments: {'email': email, 'ownerName': name, 'isGoogleAuth': true},
             );
           }
           return;

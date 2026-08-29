@@ -148,6 +148,7 @@ class _SplashScreenState extends State<SplashScreen>
         }
         return;
       }
+      if (!mounted) return;
       if (kIsWeb) {
         Navigator.pushNamedAndRemoveUntil(
           context,
@@ -184,17 +185,15 @@ class _SplashScreenState extends State<SplashScreen>
       if (googleSignInRole == 'customer') {
         final profile = await SupabaseService.instance.getUserProfile(userId);
         if (profile == null) {
-          // Customer does NOT exist in DB!
-          // Sign out of auth and redirect to signup pre-filled with email & name!
+          // Keep user signed in and redirect to signup to complete profile details!
           final email = user?.email;
           final name = user?.userMetadata?['full_name'] as String? ?? '';
-          await SupabaseService.instance.signOut();
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,
               AppRoutes.signupScreen,
               (route) => false,
-              arguments: {'email': email, 'fullName': name},
+              arguments: {'email': email, 'fullName': name, 'isGoogleAuth': true},
             );
           }
           return;
@@ -202,17 +201,15 @@ class _SplashScreenState extends State<SplashScreen>
       } else if (googleSignInRole == 'provider') {
         final status = await SupabaseService.instance.getProviderRegistrationStatus(userId);
         if (status == null) {
-          // Provider does NOT exist in DB!
-          // Sign out of auth and redirect to provider registration pre-filled with email & name!
+          // Keep user signed in and redirect to provider registration to complete details!
           final email = user?.email;
           final name = user?.userMetadata?['full_name'] as String? ?? '';
-          await SupabaseService.instance.signOut();
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,
               AppRoutes.providerRegistrationScreen,
               (route) => false,
-              arguments: {'email': email, 'ownerName': name},
+              arguments: {'email': email, 'ownerName': name, 'isGoogleAuth': true},
             );
           }
           return;
