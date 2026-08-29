@@ -103,14 +103,14 @@ class AuthLeftBanner extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Connect directly with trusted neighborhood providers for home services, transport, rentals, events, and quick deliveries.',
+                'Connect directly with trusted neighborhood providers\nfor home services, transport, rentals, events & more.',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
-                  color: Colors.white.withValues(alpha: 0.75),
+                  color: Colors.white.withValues(alpha: 0.8),
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
               // Feature Badges
               _buildFeatureItem(
@@ -119,21 +119,21 @@ class AuthLeftBanner extends StatelessWidget {
                 title: '100% Verified Partners',
                 subtitle: 'Background-checked local experts & technicians',
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
               _buildFeatureItem(
                 icon: Icons.flash_on_rounded,
                 iconColor: const Color(0xFFFFD54F),
                 title: 'Book Now & Direct Enquiry',
                 subtitle: 'Instant booking or custom quotation with vendor',
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
               _buildFeatureItem(
                 icon: Icons.shield_rounded,
                 iconColor: const Color(0xFF64B5F6),
                 title: 'Transparent Pricing',
                 subtitle: 'No hidden charges with direct vendor chats',
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
               _buildFeatureItem(
                 icon: Icons.chat_bubble_rounded,
                 iconColor: const Color(0xFFCE93D8),

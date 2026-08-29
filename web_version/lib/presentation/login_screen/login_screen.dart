@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:html' as html;
+import 'package:universal_html/html.dart' as html;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:google_sign_in/google_sign_in.dart';
@@ -13,9 +12,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
-import '../signup_screen/signup_screen.dart';
 import '../../widgets/auth_left_banner.dart';
-import '../../widgets/auth_features_footer.dart';
+import '../signup_screen/signup_screen.dart';
 
 // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -468,24 +466,28 @@ class _LoginScreenState extends State<LoginScreen>
         child: Center(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1050),
-                child: Column(
-                  children: [
+                constraints: const BoxConstraints(maxWidth: 1060),
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: SlideTransition(
+                    position: _slideAnim,
+                    child: Column(
+                      children: [
                     if (isWide) ...[
-                      // Split Screen Card for Desktop
+                      // Split Screen Card for Desktop (50% / 50% Half-Half)
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(24.0),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 24,
-                              offset: const Offset(0, 6),
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 30,
+                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),
@@ -493,12 +495,20 @@ class _LoginScreenState extends State<LoginScreen>
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              const AuthLeftBanner(),
+                              const Expanded(
+                                flex: 1,
+                                child: AuthLeftBanner(),
+                              ),
                               Expanded(
+                                flex: 1,
                                 child: Padding(
-                                  padding: const EdgeInsets.all(40.0),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 40.0,
+                                    vertical: 36.0,
+                                  ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Welcome Back!',
@@ -518,7 +528,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       ),
                                       const SizedBox(height: 24),
                                       _buildRoleSelector(),
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: 18),
                                       _buildEmailPasswordForm(),
                                     ],
                                   ),
@@ -530,18 +540,18 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ] else ...[
                       // Mobile View
-                      SizedBox(height: 2.h),
+                      const SizedBox(height: 20),
                       _buildBranding(),
-                      SizedBox(height: 3.h),
+                      const SizedBox(height: 24),
                       _buildLoginCard(),
-                      SizedBox(height: 3.h),
+                      const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             'By continuing, you agree to our ',
                             style: GoogleFonts.inter(
-                              fontSize: 9.sp,
+                              fontSize: 12,
                               color: const Color(0xFF90A4AE),
                             ),
                           ),
@@ -554,7 +564,7 @@ class _LoginScreenState extends State<LoginScreen>
                             child: Text(
                               'Terms',
                               style: GoogleFonts.inter(
-                                fontSize: 9.sp,
+                                fontSize: 12,
                                 color: const Color(0xFF1A237E),
                                 fontWeight: FontWeight.w600,
                                 decoration: TextDecoration.underline,
@@ -564,7 +574,7 @@ class _LoginScreenState extends State<LoginScreen>
                           Text(
                             ' & ',
                             style: GoogleFonts.inter(
-                              fontSize: 9.sp,
+                              fontSize: 12,
                               color: const Color(0xFF90A4AE),
                             ),
                           ),
@@ -577,7 +587,7 @@ class _LoginScreenState extends State<LoginScreen>
                             child: Text(
                               'Privacy Policy',
                               style: GoogleFonts.inter(
-                                fontSize: 9.sp,
+                                fontSize: 12,
                                 color: const Color(0xFF1A237E),
                                 fontWeight: FontWeight.w600,
                                 decoration: TextDecoration.underline,
@@ -587,7 +597,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ],
                       ),
                     ],
-                    SizedBox(height: 1.5.h),
+                    const SizedBox(height: 16),
                     Center(
                       child: TextButton.icon(
                         onPressed: () => Navigator.pushNamed(
@@ -602,14 +612,13 @@ class _LoginScreenState extends State<LoginScreen>
                         label: Text(
                           'Administrator Portal Access →',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 9.5.sp,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFF3949AB),
                           ),
                         ),
                       ),
                     ),
-                    const AuthFeaturesFooter(),
                   ],
                 ),
               ),
@@ -617,15 +626,17 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildBranding() {
     return Column(
       children: [
         Container(
-          width: 22.w,
-          height: 22.w,
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24.0),
             boxShadow: [
@@ -654,21 +665,21 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ),
-        SizedBox(height: 2.h),
+        const SizedBox(height: 16),
         Text(
           'LocalConnect',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 18.sp,
+            fontSize: 24,
             fontWeight: FontWeight.w800,
             color: const Color(0xFF1A1C1E),
             letterSpacing: -0.5,
           ),
         ),
-        SizedBox(height: 0.6.h),
+        const SizedBox(height: 6),
         Text(
           'Connect with local service providers',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 11.sp,
+            fontSize: 13.5,
             fontWeight: FontWeight.w400,
             color: const Color(0xFF74777F),
           ),
@@ -679,7 +690,6 @@ class _LoginScreenState extends State<LoginScreen>
 
   Widget _buildLoginCard() {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 4.w),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24.0),
@@ -692,29 +702,29 @@ class _LoginScreenState extends State<LoginScreen>
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(5.w),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Welcome Back!',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 18.sp,
+                fontSize: 22,
                 fontWeight: FontWeight.w800,
                 color: const Color(0xFF1A1C1E),
               ),
             ),
-            SizedBox(height: 0.5.h),
+            const SizedBox(height: 4),
             Text(
               'Login to your account',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 11.sp,
+                fontSize: 13.5,
                 color: const Color(0xFF74777F),
               ),
             ),
-            SizedBox(height: 2.5.h),
+            const SizedBox(height: 20),
             _buildRoleSelector(),
-            SizedBox(height: 2.h),
+            const SizedBox(height: 18),
             _buildEmailPasswordForm(),
           ],
         ),
@@ -729,12 +739,12 @@ class _LoginScreenState extends State<LoginScreen>
         Text(
           'Login as',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 11.sp,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
             color: const Color(0xFF44474E),
           ),
         ),
-        SizedBox(height: 1.h),
+        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
@@ -750,7 +760,7 @@ class _LoginScreenState extends State<LoginScreen>
                 }),
               ),
             ),
-            SizedBox(width: 3.w),
+            const SizedBox(width: 14),
             Expanded(
               child: _RoleCard(
                 icon: Icons.handyman_rounded,
@@ -778,45 +788,59 @@ class _LoginScreenState extends State<LoginScreen>
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 11.sp,
+            fontSize: 14,
             color: const Color(0xFF1D1B20),
           ),
           decoration: InputDecoration(
             hintText: 'Enter your email',
             hintStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              color: const Color(0xFF74777F),
+              fontSize: 13.5,
+              color: const Color(0xFF90A4AE),
             ),
             labelText: 'Email Address',
             labelStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
+              fontSize: 13.5,
               color: const Color(0xFF44474E),
             ),
-            prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.primary),
+            prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.primary, size: 20),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+            ),
           ),
         ),
-        SizedBox(height: 1.5.h),
+        const SizedBox(height: 14),
         TextFormField(
           controller: _passwordController,
           obscureText: _obscurePassword,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 11.sp,
+            fontSize: 14,
             color: const Color(0xFF1D1B20),
           ),
           decoration: InputDecoration(
             hintText: 'Enter your password',
             hintStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
-              color: const Color(0xFF74777F),
+              fontSize: 13.5,
+              color: const Color(0xFF90A4AE),
             ),
             labelText: 'Password',
             labelStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
+              fontSize: 13.5,
               color: const Color(0xFF44474E),
             ),
             prefixIcon: const Icon(
               Icons.lock_outline_rounded,
               color: AppTheme.primary,
+              size: 20,
             ),
             suffixIcon: IconButton(
               icon: Icon(
@@ -824,99 +848,101 @@ class _LoginScreenState extends State<LoginScreen>
                     ? Icons.visibility_off_outlined
                     : Icons.visibility_outlined,
                 color: AppTheme.outline,
+                size: 20,
               ),
               onPressed: () =>
                   setState(() => _obscurePassword = !_obscurePassword),
             ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+            ),
           ),
         ),
-
-        SizedBox(height: 1.h),
+        const SizedBox(height: 12),
         _buildRememberMe(),
-
         if (_errorMessage != null) ...[
-          SizedBox(height: 1.5.h),
+          const SizedBox(height: 12),
           _buildErrorBox(_errorMessage!),
         ],
-
-        SizedBox(height: 2.5.h),
-
-        GestureDetector(
-          onTap: _isLoading ? null : _handleEmailAuth,
-          child: Container(
-            width: double.infinity,
-            height: 6.5.h,
-            decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              borderRadius: BorderRadius.circular(14.0),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _handleEmailAuth,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 2,
             ),
-            child: Center(
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.login_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Login',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
+            child: _isLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
                     ),
-            ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.login_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Login',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
-
+        const SizedBox(height: 18),
         Row(
           children: [
             const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 3.w),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Text(
                 'or',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10.sp,
+                  fontSize: 12,
                   color: const Color(0xFF90A4AE),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
             const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
           ],
         ),
-
-        SizedBox(height: 2.h),
-
+        const SizedBox(height: 18),
         _buildGoogleButton(),
-
-        SizedBox(height: 2.h),
-
+        const SizedBox(height: 16),
         if (_selectedRole == 1) ...[
           Container(
             width: double.infinity,
-            padding: EdgeInsets.symmetric(vertical: 1.2.h, horizontal: 3.w),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
             decoration: BoxDecoration(
               color: AppTheme.secondary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12.0),
@@ -928,11 +954,11 @@ class _LoginScreenState extends State<LoginScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.store_rounded, color: AppTheme.secondary, size: 16),
-                SizedBox(width: 2.w),
+                const SizedBox(width: 8),
                 Text(
                   'New provider? ',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10.sp,
+                    fontSize: 12,
                     color: const Color(0xFF74777F),
                   ),
                 ),
@@ -944,7 +970,7 @@ class _LoginScreenState extends State<LoginScreen>
                   child: Text(
                     'Register here',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10.sp,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.secondary,
                       decoration: TextDecoration.underline,
@@ -954,70 +980,59 @@ class _LoginScreenState extends State<LoginScreen>
               ],
             ),
           ),
-          SizedBox(height: 1.5.h),
+          const SizedBox(height: 14),
         ],
-
         Center(
-          child: GestureDetector(
-            onTap: () => Navigator.pushNamed(context, AppRoutes.signupScreen),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  "Don't have an account? ",
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11.sp,
-                    color: const Color(0xFF74777F),
-                  ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                "Don't have an account? ",
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: const Color(0xFF74777F),
                 ),
-                Text(
+              ),
+              GestureDetector(
+                onTap: () => Navigator.pushNamed(context, AppRoutes.signupScreen),
+                child: Text(
                   'Sign Up',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11.sp,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppTheme.primary,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-        SizedBox(height: 1.h),
       ],
     );
   }
 
-
-
   Widget _buildRememberMe() {
     return Row(
       children: [
-        GestureDetector(
-          onTap: () => setState(() => _rememberMe = !_rememberMe),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: _rememberMe ? AppTheme.primary : Colors.white,
-              borderRadius: BorderRadius.circular(6.0),
-              border: Border.all(
-                color: _rememberMe ? AppTheme.primary : const Color(0xFFBDBDBD),
-                width: 2,
-              ),
+        SizedBox(
+          width: 20,
+          height: 20,
+          child: Checkbox(
+            value: _rememberMe,
+            onChanged: (v) => setState(() => _rememberMe = v ?? false),
+            activeColor: AppTheme.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4.0),
             ),
-            child: _rememberMe
-                ? const Icon(Icons.check_rounded, color: Colors.white, size: 14)
-                : null,
           ),
         ),
-        SizedBox(width: 2.w),
+        const SizedBox(width: 8),
         GestureDetector(
           onTap: () => setState(() => _rememberMe = !_rememberMe),
           child: Text(
             'Remember me',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 11.sp,
+              fontSize: 12.5,
               color: const Color(0xFF44474E),
               fontWeight: FontWeight.w500,
             ),
@@ -1048,7 +1063,7 @@ class _LoginScreenState extends State<LoginScreen>
                   SnackBar(
                     content: Text(
                       'Password reset email sent to $email. Please check your inbox.',
-                      style: GoogleFonts.plusJakartaSans(fontSize: 10.sp),
+                      style: GoogleFonts.plusJakartaSans(fontSize: 12),
                     ),
                     backgroundColor: const Color(0xFF2E7D32),
                     behavior: SnackBarBehavior.floating,
@@ -1075,7 +1090,7 @@ class _LoginScreenState extends State<LoginScreen>
           child: Text(
             'Forgot password?',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 10.sp,
+              fontSize: 12.5,
               color: AppTheme.primary,
               fontWeight: FontWeight.w600,
             ),
@@ -1104,7 +1119,7 @@ class _LoginScreenState extends State<LoginScreen>
             child: Text(
               message,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 10.sp,
+                fontSize: 12,
                 color: AppTheme.error,
               ),
             ),
@@ -1119,15 +1134,15 @@ class _LoginScreenState extends State<LoginScreen>
       onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
       child: Container(
         width: double.infinity,
-        height: 6.5.h,
+        height: 48,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14.0),
+          borderRadius: BorderRadius.circular(12.0),
           border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
@@ -1147,11 +1162,11 @@ class _LoginScreenState extends State<LoginScreen>
                       size: 28,
                       color: Color(0xFF4285F4),
                     ),
-                    SizedBox(width: 2.w),
+                    const SizedBox(width: 8),
                     Text(
                       'Continue with Google',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12.sp,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFF1A1C1E),
                       ),
@@ -1188,7 +1203,7 @@ class _RoleCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(vertical: 1.5.h, horizontal: 3.w),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
         decoration: BoxDecoration(
           color: isSelected ? color.withValues(alpha: 0.08) : Colors.white,
           borderRadius: BorderRadius.circular(14.0),
@@ -1203,23 +1218,27 @@ class _RoleCard extends StatelessWidget {
             Icon(
               icon,
               color: isSelected ? color : const Color(0xFF90A4AE),
-              size: 20,
+              size: 22,
             ),
-            SizedBox(height: 0.8.h),
+            const SizedBox(height: 6),
             Text(
               label,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 11.sp,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w700,
-                color: isSelected ? color : const Color(0xFF44474E),
+                color: isSelected ? color : const Color(0xFF1A1C1E),
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+            const SizedBox(height: 2),
             Text(
               subtitle,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 8.5.sp,
-                color: const Color(0xFF90A4AE),
+                fontSize: 11,
+                color: const Color(0xFF74777F),
               ),
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ],

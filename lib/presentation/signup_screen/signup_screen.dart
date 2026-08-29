@@ -405,21 +405,39 @@ class _SignupScreenState extends State<SignupScreen>
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1080),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Expanded(
-                      flex: 5,
-                      child: AuthLeftBanner(),
-                    ),
-                    const SizedBox(width: 32),
-                    Expanded(
-                      flex: 6,
-                      child: formContent,
+              constraints: const BoxConstraints(maxWidth: 1060),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
                     ),
                   ],
+                ),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Expanded(
+                        flex: 1,
+                        child: AuthLeftBanner(),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 40.0,
+                            vertical: 36.0,
+                          ),
+                          child: formContent,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
