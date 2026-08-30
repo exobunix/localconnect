@@ -1255,8 +1255,16 @@ class NotificationService {
         broadcastRow['user_id'] = null;
       }
 
-      await SupabaseService.instance.client.from('notifications').insert(broadcastRow);
-      sentCount = 1;
+      try {
+        await SupabaseService.instance.client.from('notifications').insert(broadcastRow);
+        sentCount = 1;
+      } catch (insertErr) {
+        debugPrint('[NotificationService] Broadcast insert error, trying fallback: $insertErr');
+        // Fallback without target_audience
+        final basicRow = Map<String, dynamic>.from(broadcastRow)..remove('target_audience');
+        await SupabaseService.instance.client.from('notifications').insert(basicRow);
+        sentCount = 1;
+      }
 
       // 2. Also insert individual rows for users if broadcasting to a group
       if (targetType != 'specific_user') {
