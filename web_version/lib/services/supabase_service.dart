@@ -922,26 +922,20 @@ class SupabaseService {
           final response = await client
               .from('notifications')
               .select()
-              .or('user_id.eq.$userId,user_id.is.null,target_audience.eq.all,target_audience.eq.all_users,target_audience.eq.all_customers,target_audience.eq.all_vendors')
-              .order('created_at', ascending: false)
-              .limit(60);
-          final list = _deduplicateNotifications(response);
-          if (list.isNotEmpty) return list;
-        } catch (_) {
-          final response = await client
-              .from('notifications')
-              .select()
               .or('user_id.eq.$userId,user_id.is.null')
               .order('created_at', ascending: false)
               .limit(60);
           final list = _deduplicateNotifications(response);
           if (list.isNotEmpty) return list;
+        } catch (e) {
+          debugPrint('[SupabaseService] getNotifications error: $e');
         }
       }
 
       final fallback = await client
           .from('notifications')
           .select()
+          .filter('user_id', 'is', null)
           .order('created_at', ascending: false)
           .limit(40);
       return _deduplicateNotifications(fallback);
