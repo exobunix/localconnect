@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/supabase_service.dart';
 import '../../services/quotation_realtime_service.dart';
 import '../../theme/app_theme.dart';
+import '../../routes/app_routes.dart';
 import './provider_quotation_builder_screen.dart';
 
 /// Provider side: View incoming customer enquiries, reply with messages/quotes, and manage leads

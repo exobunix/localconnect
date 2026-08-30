@@ -3488,11 +3488,7 @@ class SupabaseService {
             title: '💬 Partner Replied to Your Enquiry',
             body: '$providerName replied: "$replyText"',
             type: 'general',
-            data: {
-              'enquiry_id': enquiryId,
-              'type': 'enquiry_reply',
-              'action': 'view_enquiry',
-            },
+            relatedId: enquiryId,
           );
         } catch (_) {}
       }
