@@ -437,7 +437,9 @@ class _LoginScreenState extends State<LoginScreen>
       if (mounted) {
         final errStr = e.toString();
         String displayError = 'Google Sign-In failed. Please try again.';
-        if (errStr.contains('network') || errStr.contains('SocketException')) {
+        if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
+          displayError = 'Google Sign-In setup issue: App SHA-1 fingerprint is not configured in Google Cloud Console.';
+        } else if (errStr.contains('network') || errStr.contains('SocketException')) {
           displayError = 'Network error. Please check your internet connection.';
         } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
           displayError = 'Google Sign-In was cancelled.';

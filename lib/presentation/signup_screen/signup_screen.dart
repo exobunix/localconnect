@@ -347,9 +347,16 @@ class _SignupScreenState extends State<SignupScreen>
       }
     } catch (e) {
       if (mounted) {
+        final errStr = e.toString();
+        String displayError = 'Google Sign-In failed: $e';
+        if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
+          displayError = 'Google Sign-In setup issue: App SHA-1 fingerprint is not configured in Google Cloud Console.';
+        } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
+          displayError = 'Google Sign-In was cancelled.';
+        }
         setState(() {
           _isGoogleLoading = false;
-          _errorMessage = 'Google Sign-In failed: $e';
+          _errorMessage = displayError;
         });
       }
     }
