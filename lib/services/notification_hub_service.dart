@@ -67,14 +67,24 @@ class NotificationHubService extends ChangeNotifier {
   }
 
   void _subscribeRealtime() {
-    final userId = SupabaseService.instance.currentUser?.id ?? 'guest';
-
     _channel = SupabaseService.instance.client
-        .channel('notif_hub_stream_$userId')
+        .channel('notifications_global_channel')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'notifications',
+          callback: (payload) {
+            _fetchCounts();
+          },
+        )
+        .onBroadcast(
+          event: 'notification_deleted',
+          callback: (payload) {
+            _fetchCounts();
+          },
+        )
+        .onBroadcast(
+          event: 'notification_created',
           callback: (payload) {
             _fetchCounts();
           },

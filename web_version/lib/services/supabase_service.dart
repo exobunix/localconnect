@@ -2437,19 +2437,39 @@ class SupabaseService {
 
   RealtimeChannel subscribeToNotifications({
     required void Function() onUpdate,
+    void Function(Map<String, dynamic> payload)? onDelete,
   }) {
-    final userId = currentUser?.id ?? 'guest';
-    return client
-        .channel('notifications_stream_$userId')
+    final channel = client.channel('notifications_global_channel');
+    channel
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'notifications',
           callback: (payload) {
+            debugPrint('[Realtime] Postgres change on notifications: ${payload.eventType}');
+            onUpdate();
+          },
+        )
+        .onBroadcast(
+          event: 'notification_deleted',
+          callback: (payload) {
+            debugPrint('[Realtime] Broadcast notification_deleted: $payload');
+            if (onDelete != null) {
+              onDelete(payload);
+            }
+            onUpdate();
+          },
+        )
+        .onBroadcast(
+          event: 'notification_created',
+          callback: (payload) {
+            debugPrint('[Realtime] Broadcast notification_created: $payload');
             onUpdate();
           },
         )
         .subscribe();
+
+    return channel;
   }
 
   /// Permanently delete a notification by ID and/or title+body across all platforms
@@ -2465,6 +2485,19 @@ class SupabaseService {
           await client.from('notifications').delete().eq('title', title);
         }
       }
+
+      // Broadcast real-time deletion event to all connected clients immediately
+      try {
+        final ch = client.channel('notifications_global_channel');
+        await ch.sendBroadcastMessage(
+          event: 'notification_deleted',
+          payload: {
+            if (id != null) 'id': id,
+            if (title != null) 'title': title,
+            if (body != null) 'body': body,
+          },
+        );
+      } catch (_) {}
     } catch (e) {
       debugPrint('[SupabaseService] deleteNotification error: $e');
     }

@@ -28,23 +28,31 @@ class _NotificationScreenState extends State<NotificationScreen>
     _TabDef('Reviews', 'review', Icons.star_rounded),
   ];
 
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _loadNotifications();
     _subscribeToNotifications();
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) _loadNotifications(isSilent: true);
+    });
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _channel?.unsubscribe();
     _tabController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadNotifications() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadNotifications({bool isSilent = false}) async {
+    if (!isSilent && _notifications.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     final data = await SupabaseService.instance.getNotifications();
     if (mounted) {
       setState(() {
@@ -57,7 +65,23 @@ class _NotificationScreenState extends State<NotificationScreen>
   void _subscribeToNotifications() {
     _channel = SupabaseService.instance.subscribeToNotifications(
       onUpdate: () {
-        if (mounted) _loadNotifications();
+        if (mounted) _loadNotifications(isSilent: true);
+      },
+      onDelete: (payload) {
+        final id = payload['id'] as String?;
+        final title = payload['title'] as String?;
+        final body = payload['body'] as String?;
+        if (mounted) {
+          setState(() {
+            _notifications.removeWhere((n) {
+              if (id != null && id.isNotEmpty && n['id'] == id) return true;
+              if (title != null && title.isNotEmpty && n['title'] == title) {
+                if (body == null || body.isEmpty || n['body'] == body) return true;
+              }
+              return false;
+            });
+          });
+        }
       },
     );
   }
