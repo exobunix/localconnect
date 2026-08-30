@@ -5,8 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
+import '../../routes/app_routes.dart';
 
-/// Customer side: send enquiries and view received quotations
+/// Customer side: View all submitted enquiries, partner replies, and quotations
 class CustomerEnquiryScreen extends StatefulWidget {
   final Map<String, dynamic>? provider;
   const CustomerEnquiryScreen({super.key, this.provider});
@@ -19,14 +20,25 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
+  List<Map<String, dynamic>> _enquiries = [];
   List<Map<String, dynamic>> _quotations = [];
   String? _error;
+  String _selectedStatusFilter = 'all';
+
+  final List<String> _statusFilters = [
+    'all',
+    'pending',
+    'quoted',
+    'accepted',
+    'completed',
+    'rejected',
+  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadQuotations();
+    _loadAllData();
   }
 
   @override
@@ -35,227 +47,50 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
     super.dispose();
   }
 
-  Future<void> _loadQuotations() async {
+  Future<void> _loadAllData() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
-      final data = await SupabaseService.instance.getCustomerQuotations();
-      if (mounted) setState(() => _quotations = data);
+      final enquiries = await SupabaseService.instance.getCustomerEnquiries();
+      final quotations = await SupabaseService.instance.getCustomerQuotations();
+      if (mounted) {
+        setState(() {
+          _enquiries = enquiries;
+          _quotations = quotations;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Failed to load quotations.');
+      if (mounted) {
+        setState(() => _error = 'Failed to load enquiries. Please pull to refresh.');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _sendEnquiry() {
-    if (widget.provider == null) {
-      _showSendEnquiryDialog(null);
-      return;
-    }
-    _showSendEnquiryDialog(widget.provider);
-  }
-
-  void _showSendEnquiryDialog(Map<String, dynamic>? provider) {
-    final titleCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          left: 4.w,
-          right: 4.w,
-          top: 3.h,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.send_rounded, color: AppTheme.primary),
-                SizedBox(width: 2.w),
-                Text(
-                  'Send Enquiry',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            if (provider != null) ...[
-              SizedBox(height: 1.h),
-              Text(
-                'To: ${provider['business_name'] ?? 'Provider'}',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10.sp,
-                  color: AppTheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            SizedBox(height: 2.h),
-            _sheetField(
-              titleCtrl,
-              'Service Title *',
-              'e.g. Fix leaking pipe in bathroom',
-            ),
-            SizedBox(height: 2.h),
-            _sheetField(
-              descCtrl,
-              'Describe your requirement *',
-              'Provide details about what you need, location, urgency, etc.',
-              maxLines: 4,
-            ),
-            SizedBox(height: 2.h),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  if (titleCtrl.text.trim().isEmpty ||
-                      descCtrl.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Please fill all required fields.',
-                          style: GoogleFonts.plusJakartaSans(),
-                        ),
-                        backgroundColor: AppTheme.error,
-                      ),
-                    );
-                    return;
-                  }
-                  Navigator.pop(ctx);
-                  try {
-                    await SupabaseService.instance.sendEnquiry(
-                      providerId: provider?['id'] as String? ?? '',
-                      title: titleCtrl.text.trim(),
-                      description: descCtrl.text.trim(),
-                      category: provider?['category'] as String? ?? '',
-                      subcategory: provider?['subcategory'] as String? ?? '',
-                    );
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Enquiry sent! Provider will respond soon.',
-                            style: GoogleFonts.plusJakartaSans(),
-                          ),
-                          backgroundColor: AppTheme.success,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      );
-                      _loadQuotations();
-                    }
-                  } catch (_) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Failed to send enquiry.',
-                            style: GoogleFonts.plusJakartaSans(),
-                          ),
-                          backgroundColor: AppTheme.error,
-                        ),
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Icons.send_rounded, size: 18),
-                label: Text(
-                  'Send Enquiry',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: EdgeInsets.symmetric(vertical: 1.5.h),
-                ),
-              ),
-            ),
-            SizedBox(height: 2.h),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _sheetField(
-    TextEditingController ctrl,
-    String label,
-    String hint, {
-    int maxLines = 1,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 10.sp,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        SizedBox(height: 0.8.h),
-        TextFormField(
-          controller: ctrl,
-          maxLines: maxLines,
-          style: GoogleFonts.plusJakartaSans(fontSize: 11.sp),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 10.sp,
-              color: const Color(0xFFB0BEC5),
-            ),
-            filled: true,
-            fillColor: const Color(0xFFF5F7FF),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
-            ),
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: 3.w,
-              vertical: 1.5.h,
-            ),
-          ),
-        ),
-      ],
-    );
+  List<Map<String, dynamic>> get _filteredEnquiries {
+    if (_selectedStatusFilter == 'all') return _enquiries;
+    return _enquiries.where((e) {
+      final status = (e['status'] ?? '').toString().toLowerCase();
+      if (_selectedStatusFilter == 'quoted') {
+        return status == 'quoted' || (e['provider_reply'] != null && e['provider_reply'].toString().trim().isNotEmpty);
+      }
+      return status == _selectedStatusFilter;
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4FF),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: AppTheme.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          'My Quotations',
+          'My Enquiries & Quotations',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 14.sp,
             fontWeight: FontWeight.w700,
@@ -265,217 +100,615 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadQuotations,
+            onPressed: _loadAllData,
+            tooltip: 'Refresh',
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
+          indicatorWeight: 3,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
+          unselectedLabelColor: Colors.white70,
           labelStyle: GoogleFonts.plusJakartaSans(
-            fontSize: 10.sp,
-            fontWeight: FontWeight.w600,
+            fontSize: 11.sp,
+            fontWeight: FontWeight.w700,
           ),
-          tabs: const [
-            Tab(text: 'Received Quotes'),
-            Tab(text: 'My Enquiries'),
+          tabs: [
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.send_rounded, size: 16),
+                  const SizedBox(width: 6),
+                  Text('My Enquiries (${_enquiries.length})'),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.request_quote_rounded, size: 16),
+                  const SizedBox(width: 6),
+                  Text('Quotations (${_quotations.length})'),
+                ],
+              ),
+            ),
           ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _sendEnquiry,
-        backgroundColor: AppTheme.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.send_rounded),
-        label: Text(
-          'New Enquiry',
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
         ),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : _error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.error_outline_rounded,
-                    color: AppTheme.error,
-                    size: 40,
-                  ),
-                  SizedBox(height: 1.h),
-                  Text(_error!, style: GoogleFonts.plusJakartaSans()),
-                  SizedBox(height: 1.h),
-                  ElevatedButton(
-                    onPressed: _loadQuotations,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                    ),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            )
-          : TabBarView(
-              controller: _tabController,
-              children: [_buildQuotationsList(), _buildEnquiriesList()],
-            ),
+              ? _buildErrorView()
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildEnquiriesTab(),
+                    _buildQuotationsTab(),
+                  ],
+                ),
     );
   }
 
-  Widget _buildQuotationsList() {
-    final quotes = _quotations.where((q) => q['status'] != 'draft').toList();
-    if (quotes.isEmpty) {
-      return Center(
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.request_quote_rounded,
-              color: Colors.grey[300],
-              size: 60,
-            ),
-            SizedBox(height: 1.h),
+            const Icon(Icons.error_outline_rounded, color: AppTheme.error, size: 48),
+            const SizedBox(height: 12),
             Text(
-              'No quotations yet',
-              style: GoogleFonts.plusJakartaSans(color: Colors.grey),
-            ),
-            SizedBox(height: 0.5.h),
-            Text(
-              'Send an enquiry to a provider to receive quotes',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 9.sp,
-                color: Colors.grey,
-              ),
+              _error ?? 'An error occurred',
               textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadAllData,
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+              child: const Text('Retry'),
             ),
           ],
         ),
-      );
-    }
-    return RefreshIndicator(
-      onRefresh: _loadQuotations,
-      child: ListView.builder(
-        padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
-        itemCount: quotes.length,
-        itemBuilder: (ctx, i) => _buildQuotationCard(quotes[i]),
       ),
     );
   }
 
-  Widget _buildEnquiriesList() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: SupabaseService.instance.getCustomerEnquiries(),
-      builder: (ctx, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(color: AppTheme.primary),
-          );
-        }
-        final enquiries = snap.data ?? [];
-        if (enquiries.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.inbox_rounded, color: Colors.grey[300], size: 60),
-                SizedBox(height: 1.h),
-                Text(
-                  'No enquiries sent yet',
-                  style: GoogleFonts.plusJakartaSans(color: Colors.grey),
+  Widget _buildEnquiriesTab() {
+    final list = _filteredEnquiries;
+
+    return Column(
+      children: [
+        // Status filter chips
+        Container(
+          height: 48,
+          color: Colors.white,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            scrollDirection: Axis.horizontal,
+            itemCount: _statusFilters.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (ctx, i) {
+              final filter = _statusFilters[i];
+              final isSelected = _selectedStatusFilter == filter;
+              return ChoiceChip(
+                label: Text(
+                  filter == 'all' ? 'All (${_enquiries.length})' : filter.toUpperCase(),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? Colors.white : const Color(0xFF475569),
+                  ),
                 ),
-              ],
-            ),
-          );
-        }
-        return ListView.builder(
-          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
-          itemCount: enquiries.length,
-          itemBuilder: (ctx, i) => _buildEnquiryCard(enquiries[i]),
-        );
-      },
+                selected: isSelected,
+                selectedColor: AppTheme.primary,
+                backgroundColor: const Color(0xFFF1F5F9),
+                onSelected: (_) => setState(() => _selectedStatusFilter = filter),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              );
+            },
+          ),
+        ),
+
+        Expanded(
+          child: list.isEmpty
+              ? _buildEmptyEnquiriesView()
+              : RefreshIndicator(
+                  onRefresh: _loadAllData,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: list.length,
+                    itemBuilder: (ctx, i) => _buildCustomerEnquiryCard(list[i]),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
-  Widget _buildQuotationCard(Map<String, dynamic> quotation) {
-    final status = quotation['status'] ?? 'sent';
-    final provider = quotation['provider'] as Map<String, dynamic>? ?? {};
-    final providerName = provider['business_name'] ?? 'Provider';
-    final providerWhatsapp =
-        provider['whatsapp_number'] ?? provider['whatsapp'] ?? '';
-    final providerPhone = provider['phone'] ?? '';
-    final total = (quotation['total_amount'] ?? 0).toDouble();
-    final validityDays = quotation['validity_days'] ?? 7;
-    final enquiry = quotation['enquiry'] as Map<String, dynamic>? ?? {};
+  Widget _buildEmptyEnquiriesView() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.inbox_rounded, size: 40, color: AppTheme.primary),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _selectedStatusFilter == 'all'
+                  ? 'No Enquiries Yet'
+                  : 'No ${_selectedStatusFilter.toUpperCase()} Enquiries',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Browse service partners in Home Maintenance, Transport, Shop, or Events and send requirements directly!',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.allCategoriesScreen),
+              icon: const Icon(Icons.search_rounded, size: 18),
+              label: const Text('Browse Categories'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomerEnquiryCard(Map<String, dynamic> item) {
+    final enquiryId = item['id']?.toString() ?? '';
+    final refDisplay = enquiryId.length > 12
+        ? '#ENQ-${enquiryId.substring(0, 8)}'
+        : (enquiryId.isNotEmpty ? '#$enquiryId' : '#ENQ');
+    final serviceTitle = item['service_title'] as String? ?? item['title'] as String? ?? 'Service Requirement';
+    final providerName = item['provider_name'] as String? ?? 'Service Partner';
+    final category = item['category'] as String? ?? '';
+    final subcategory = item['subcategory'] as String? ?? '';
+    final preferredDate = item['preferred_date'] as String? ?? '';
+    final preferredTime = item['preferred_time'] as String? ?? '';
+    final message = item['message'] as String? ?? item['description'] as String? ?? '';
+    final status = (item['status'] as String? ?? 'pending').toLowerCase();
+    final providerReply = item['provider_reply'] as String? ?? '';
+    final repliedAt = item['replied_at'] != null ? _formatDate(item['replied_at']) : '';
+    final createdAt = _formatDate(item['created_at']);
 
     return Container(
-      margin: EdgeInsets.only(bottom: 2.h),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: providerReply.isNotEmpty
+              ? const Color(0xFF0284C7).withValues(alpha: 0.3)
+              : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
-        border: Border.all(
-          color: status == 'accepted'
-              ? Colors.green.withValues(alpha: 0.3)
-              : Colors.transparent,
-          width: 1.5,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header banner
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _statusColor(status).withValues(alpha: 0.06),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    refDisplay,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (category.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      subcategory.isNotEmpty ? '$category • $subcategory' : category,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                const Spacer(),
+                _statusBadge(status),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Service Title
+                Text(
+                  serviceTitle,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+
+                // Partner info row
+                Row(
+                  children: [
+                    const Icon(Icons.storefront_rounded, size: 16, color: Color(0xFF64748B)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Partner: ',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12.5,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        providerName,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1E293B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Schedule chip
+                if (preferredDate.isNotEmpty || preferredTime.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_month_rounded, size: 15, color: Color(0xFF2563EB)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Preferred: $preferredDate ($preferredTime)',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF334155),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
+                // Customer Requirement Details Box
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your Requirement:',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        message.isNotEmpty ? message : 'Enquiry sent to partner.',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12.5,
+                          color: const Color(0xFF1E293B),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // PARTNER REPLY SECTION (Highlighted)
+                if (providerReply.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.mark_chat_read_rounded, size: 16, color: Color(0xFF16A34A)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Partner Reply / Quotation',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF15803D),
+                              ),
+                            ),
+                            const Spacer(),
+                            if (repliedAt.isNotEmpty)
+                              Text(
+                                repliedAt,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 10,
+                                  color: const Color(0xFF16A34A),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          providerReply,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF14532D),
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ] else ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.hourglass_top_rounded, size: 14, color: Color(0xFFD97706)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Awaiting partner reply & estimation...',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          fontStyle: FontStyle.italic,
+                          color: const Color(0xFFB45309),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // Action buttons & date
+                Row(
+                  children: [
+                    Text(
+                      'Sent $createdAt',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ),
+                    const Spacer(),
+                    if (status == 'pending')
+                      TextButton.icon(
+                        onPressed: () => _confirmCancelEnquiry(enquiryId),
+                        icon: const Icon(Icons.cancel_outlined, size: 14, color: Color(0xFFEF4444)),
+                        label: Text(
+                          'Cancel',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFFEF4444),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmCancelEnquiry(String enquiryId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Cancel Enquiry',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
         ),
+        content: Text(
+          'Are you sure you want to cancel this enquiry?',
+          style: GoogleFonts.plusJakartaSans(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: const Text('Cancel Enquiry'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await SupabaseService.instance.updateEnquiryStatus(
+        enquiryId: enquiryId,
+        status: 'cancelled',
+      );
+      _loadAllData();
+    }
+  }
+
+  Widget _buildQuotationsTab() {
+    if (_quotations.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.request_quote_rounded, color: Colors.grey[300], size: 60),
+              const SizedBox(height: 12),
+              Text(
+                'No quotations yet',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'When partners send formal itemized quotes for your enquiries, they will appear here.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(fontSize: 12.5, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadAllData,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _quotations.length,
+        itemBuilder: (ctx, i) => _buildQuotationCard(_quotations[i]),
+      ),
+    );
+  }
+
+  Widget _buildQuotationCard(Map<String, dynamic> q) {
+    final status = q['status'] ?? 'sent';
+    final provider = q['provider'] as Map<String, dynamic>? ?? {};
+    final providerName = provider['business_name'] ?? 'Provider';
+    final providerPhone = provider['phone'] ?? '';
+    final total = (q['total_amount'] ?? 0).toDouble();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: status == 'accepted' ? Colors.green.withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         children: [
           // Header
           Container(
-            padding: EdgeInsets.all(4.w),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: _statusColor(status).withValues(alpha: 0.08),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Row(
               children: [
                 CircleAvatar(
-                  radius: 20,
+                  radius: 18,
                   backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
                   child: Text(
-                    providerName.isNotEmpty
-                        ? providerName[0].toUpperCase()
-                        : 'P',
+                    providerName.isNotEmpty ? providerName[0].toUpperCase() : 'P',
                     style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w700,
                       color: AppTheme.primary,
                     ),
                   ),
                 ),
-                SizedBox(width: 3.w),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        providerName,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        enquiry['title'] ?? 'Service Request',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 9.sp,
-                          color: Colors.grey,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                  child: Text(
+                    providerName,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 _statusBadge(status),
@@ -483,359 +716,84 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
             ),
           ),
 
-          // Quotation details
           Padding(
-            padding: EdgeInsets.all(4.w),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Total amount highlight
-                Container(
-                  padding: EdgeInsets.all(3.w),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppTheme.primary.withValues(alpha: 0.08),
-                        AppTheme.secondary.withValues(alpha: 0.08),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total Amount',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        '₹${total.toStringAsFixed(2)}',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 1.5.h),
-
-                // Breakdown
-                if ((quotation['labour_charges'] ?? 0) > 0)
-                  _detailRow('Labour', quotation['labour_charges']),
-                if ((quotation['material_charges'] ?? 0) > 0)
-                  _detailRow('Material', quotation['material_charges']),
-                if ((quotation['visiting_charges'] ?? 0) > 0)
-                  _detailRow('Visiting', quotation['visiting_charges']),
-                if ((quotation['transportation_charges'] ?? 0) > 0)
-                  _detailRow('Transport', quotation['transportation_charges']),
-                if ((quotation['equipment_charges'] ?? 0) > 0)
-                  _detailRow('Equipment', quotation['equipment_charges']),
-                if ((quotation['discount'] ?? 0) > 0)
-                  _detailRow(
-                    'Discount',
-                    -(quotation['discount'] as num).toDouble(),
-                    isDiscount: true,
-                  ),
-                if ((quotation['tax_amount'] ?? 0) > 0)
-                  _detailRow('Tax', quotation['tax_amount']),
-
-                SizedBox(height: 1.h),
-
-                // Meta
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if ((quotation['expected_completion_time'] ?? '')
-                        .isNotEmpty)
-                      _metaChip(
-                        Icons.schedule_rounded,
-                        quotation['expected_completion_time'],
-                        Colors.blue,
+                    Text(
+                      'Total Quotation Value',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
                       ),
-                    SizedBox(width: 2.w),
-                    _metaChip(
-                      Icons.event_available_rounded,
-                      'Valid $validityDays days',
-                      Colors.orange,
+                    ),
+                    Text(
+                      '₹${total.toStringAsFixed(0)}',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.primary,
+                      ),
                     ),
                   ],
                 ),
-
-                if ((quotation['additional_notes'] ?? '').isNotEmpty) ...[
-                  SizedBox(height: 1.h),
-                  Container(
-                    padding: EdgeInsets.all(2.5.w),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5F7FF),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.notes_rounded, size: 14, color: Colors.grey),
-                        SizedBox(width: 1.5.w),
-                        Expanded(
-                          child: Text(
-                            quotation['additional_notes'],
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 9.5.sp,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
-                SizedBox(height: 1.5.h),
-
-                // Action buttons
+                const SizedBox(height: 12),
                 if (status == 'sent') ...[
                   Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _updateQuotationStatus(
-                            quotation['id'],
-                            'rejected',
-                          ),
-                          icon: const Icon(Icons.close_rounded, size: 16),
-                          label: Text(
-                            'Reject',
-                            style: GoogleFonts.plusJakartaSans(fontSize: 10.sp),
-                          ),
+                        child: OutlinedButton(
+                          onPressed: () => _updateQuotationStatus(q['id'], 'rejected'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppTheme.error,
-                            side: BorderSide(color: AppTheme.error),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            padding: EdgeInsets.symmetric(vertical: 1.h),
+                            side: const BorderSide(color: AppTheme.error),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
+                          child: const Text('Decline'),
                         ),
                       ),
-                      SizedBox(width: 2.w),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _updateQuotationStatus(
-                            quotation['id'],
-                            'accepted',
-                          ),
-                          icon: const Icon(Icons.check_rounded, size: 16),
-                          label: Text(
-                            'Accept',
-                            style: GoogleFonts.plusJakartaSans(fontSize: 10.sp),
-                          ),
+                        child: ElevatedButton(
+                          onPressed: () => _updateQuotationStatus(q['id'], 'accepted'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            padding: EdgeInsets.symmetric(vertical: 1.h),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
+                          child: const Text('Accept Quote'),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 1.h),
+                  const SizedBox(height: 10),
                 ],
-
-                // Negotiate row
-                Row(
-                  children: [
-                    if (providerPhone.isNotEmpty)
-                      _actionBtn(
-                        icon: Icons.call_rounded,
-                        label: 'Call',
-                        color: Colors.green,
-                        onTap: () => _launchUrl('tel:$providerPhone'),
-                      ),
-                    SizedBox(width: 2.w),
-                    if (providerWhatsapp.isNotEmpty)
-                      _actionBtn(
-                        icon: Icons.chat_rounded,
-                        label: 'WhatsApp',
-                        color: const Color(0xFF25D366),
-                        onTap: () => _launchUrl(
-                          'https://wa.me/${providerWhatsapp.replaceAll('+', '')}',
-                        ),
-                      ),
-                    if (status == 'sent') ...[
-                      SizedBox(width: 2.w),
-                      _actionBtn(
-                        icon: Icons.handshake_rounded,
-                        label: 'Negotiate',
-                        color: Colors.purple,
-                        onTap: () => _updateQuotationStatus(
-                          quotation['id'],
-                          'negotiating',
-                        ),
+                if (providerPhone.isNotEmpty)
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _launchUrl('tel:$providerPhone'),
+                        icon: const Icon(Icons.call_rounded, size: 15, color: Colors.green),
+                        label: const Text('Call Partner', style: TextStyle(color: Colors.green)),
                       ),
                     ],
-                  ],
-                ),
+                  ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildEnquiryCard(Map<String, dynamic> enquiry) {
-    final status = enquiry['status'] ?? 'pending';
-    final provider = enquiry['provider'] as Map<String, dynamic>? ?? {};
-    return Container(
-      margin: EdgeInsets.only(bottom: 1.5.h),
-      padding: EdgeInsets.all(4.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(2.5.w),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.inbox_rounded, color: AppTheme.primary, size: 20),
-          ),
-          SizedBox(width: 3.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  enquiry['title'] ?? 'Service Request',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  'To: ${provider['business_name'] ?? 'Provider'}',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9.sp,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _statusBadge(status),
-        ],
-      ),
-    );
-  }
-
-  Widget _detailRow(String label, dynamic amount, {bool isDiscount = false}) {
-    final val = (amount as num?)?.toDouble() ?? 0;
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 0.3.h),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 9.5.sp,
-              color: Colors.grey[600],
-            ),
-          ),
-          Text(
-            isDiscount
-                ? '-₹${val.toStringAsFixed(0)}'
-                : '₹${val.toStringAsFixed(0)}',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 9.5.sp,
-              color: isDiscount ? Colors.green : Colors.black87,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _metaChip(IconData icon, String label, Color color) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 0.4.h),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          SizedBox(width: 1.w),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 8.5.sp,
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _actionBtn({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 2.5.w, vertical: 0.8.h),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 14),
-            SizedBox(width: 1.w),
-            Text(
-              label,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 9.sp,
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
 
   Widget _statusBadge(String status) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 2.5.w, vertical: 0.4.h),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: _statusColor(status).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
@@ -844,7 +802,7 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
       child: Text(
         status.toUpperCase(),
         style: GoogleFonts.plusJakartaSans(
-          fontSize: 8.5.sp,
+          fontSize: 10,
           fontWeight: FontWeight.w700,
           color: _statusColor(status),
         ),
@@ -856,20 +814,17 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
     switch (status.toLowerCase()) {
       case 'pending':
         return Colors.orange;
-      case 'sent':
-        return Colors.blue;
       case 'quoted':
-        return Colors.blue;
+        return const Color(0xFF0284C7);
       case 'accepted':
         return Colors.green;
-      case 'rejected':
-        return Colors.red;
       case 'completed':
-        return AppTheme.secondary;
-      case 'negotiating':
-        return Colors.purple;
+        return const Color(0xFF059669);
+      case 'rejected':
+      case 'cancelled':
+        return Colors.red;
       default:
-        return Colors.grey;
+        return Colors.blueGrey;
     }
   }
 
@@ -879,28 +834,7 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
         quotationId: quotationId,
         status: status,
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              status == 'accepted'
-                  ? 'Quotation accepted! Provider will contact you.'
-                  : status == 'rejected'
-                  ? 'Quotation rejected.'
-                  : 'Status updated.',
-              style: GoogleFonts.plusJakartaSans(),
-            ),
-            backgroundColor: status == 'accepted'
-                ? Colors.green
-                : AppTheme.primary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-        _loadQuotations();
-      }
+      _loadAllData();
     } catch (_) {}
   }
 
@@ -908,5 +842,15 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
     try {
       await launchUrl(Uri.parse(url));
     } catch (_) {}
+  }
+
+  String _formatDate(dynamic date) {
+    if (date == null) return '';
+    try {
+      final dt = DateTime.parse(date.toString()).toLocal();
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return '';
+    }
   }
 }

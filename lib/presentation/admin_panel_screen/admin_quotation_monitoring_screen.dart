@@ -1010,67 +1010,346 @@ class _AdminQuotationMonitoringScreenState
   }
 
   Widget _buildAdminEnquiryCard(Map<String, dynamic> e) {
-    final status = e['status'] ?? 'pending';
-    final provider = e['provider'] as Map<String, dynamic>? ?? {};
-    final customer = e['customer'] as Map<String, dynamic>? ?? {};
+    final enquiryId = e['id']?.toString() ?? '';
+    final refDisplay = enquiryId.length > 12
+        ? '#ENQ-${enquiryId.substring(0, 8)}'
+        : (enquiryId.isNotEmpty ? '#$enquiryId' : '#ENQ');
+    final customerName = e['customer_name'] as String? ?? (e['customer'] as Map<String, dynamic>?)?['full_name'] as String? ?? 'Customer';
+    final customerPhone = e['customer_phone'] as String? ?? '';
+    final providerName = e['provider_name'] as String? ?? (e['provider'] as Map<String, dynamic>?)?['business_name'] as String? ?? 'Provider';
+    final serviceTitle = e['service_title'] as String? ?? e['title'] as String? ?? 'Service Request';
+    final category = e['category'] as String? ?? '';
+    final subcategory = e['subcategory'] as String? ?? '';
+    final preferredDate = e['preferred_date'] as String? ?? '';
+    final preferredTime = e['preferred_time'] as String? ?? '';
+    final message = e['message'] as String? ?? e['description'] as String? ?? '';
+    final status = (e['status'] as String? ?? 'pending').toLowerCase();
+    final providerReply = e['provider_reply'] as String? ?? '';
+    final repliedAt = e['replied_at'] != null ? _formatDate(e['replied_at']) : '';
+    final createdAt = _formatDate(e['created_at']);
 
     return Container(
-      margin: EdgeInsets.only(bottom: 1.5.h),
-      padding: EdgeInsets.all(4.w),
+      margin: EdgeInsets.only(bottom: 2.h),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: providerReply.isNotEmpty
+              ? const Color(0xFF10B981).withValues(alpha: 0.3)
+              : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Container(
-            padding: EdgeInsets.all(2.5.w),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: _statusColor(status).withValues(alpha: 0.08),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
-            child: Icon(Icons.inbox_rounded, color: AppTheme.primary, size: 20),
-          ),
-          SizedBox(width: 3.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  e['title'] ?? 'Service Request',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w700,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '${customer['full_name'] ?? 'Customer'} → ${provider['business_name'] ?? 'Provider'}',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9.sp,
-                    color: Colors.grey,
-                  ),
-                ),
-                if ((e['category'] ?? '').isNotEmpty)
-                  Text(
-                    e['category'],
+                  child: Text(
+                    refDisplay,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 9.sp,
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w700,
                       color: AppTheme.primary,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+                SizedBox(width: 2.w),
+                if (category.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      subcategory.isNotEmpty ? '$category • $subcategory' : category,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 9.sp,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                const Spacer(),
+                _statusBadge(status),
               ],
             ),
           ),
-          _statusBadge(status),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Service Title
+                Text(
+                  serviceTitle,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12.5.sp,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                SizedBox(height: 1.h),
+
+                // Customer & Partner info rows
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.person_rounded, size: 16, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Customer: ',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 9.5.sp,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '$customerName ${customerPhone.isNotEmpty ? '($customerPhone)' : ''}',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
+                          if (customerPhone.isNotEmpty)
+                            InkWell(
+                              onTap: () => _launchUrl('tel:$customerPhone'),
+                              child: const Icon(Icons.call_rounded, size: 16, color: Colors.green),
+                            ),
+                        ],
+                      ),
+                      const Divider(height: 12, color: Color(0xFFE2E8F0)),
+                      Row(
+                        children: [
+                          const Icon(Icons.storefront_rounded, size: 16, color: Color(0xFF7C3AED)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Partner: ',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 9.5.sp,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              providerName,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 1.h),
+
+                // Schedule
+                if (preferredDate.isNotEmpty || preferredTime.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today_rounded, size: 13, color: Color(0xFF2563EB)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Requested: $preferredDate ($preferredTime)',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9.5.sp,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF334155),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 0.8.h),
+                ],
+
+                // Customer message
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Requirement: ${message.isNotEmpty ? message : "Enquiry initiated."}',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 9.5.sp,
+                      color: const Color(0xFF334155),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 1.h),
+
+                // Partner reply (if available)
+                if (providerReply.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.reply_rounded, size: 14, color: Color(0xFF16A34A)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Partner Reply:',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 9.5.sp,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF15803D),
+                              ),
+                            ),
+                            const Spacer(),
+                            if (repliedAt.isNotEmpty)
+                              Text(
+                                repliedAt,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 8.5.sp,
+                                  color: const Color(0xFF16A34A),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          providerReply,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9.5.sp,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF14532D),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 1.h),
+                ],
+
+                // Admin action row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Created: $createdAt',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 8.5.sp,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        PopupMenuButton<String>(
+                          onSelected: (val) async {
+                            await SupabaseService.instance.updateEnquiryStatus(
+                              enquiryId: enquiryId,
+                              status: val,
+                            );
+                            _loadData();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Set Status',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 9.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF475569),
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_drop_down_rounded, size: 16, color: Color(0xFF475569)),
+                              ],
+                            ),
+                          ),
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(value: 'pending', child: Text('Pending')),
+                            const PopupMenuItem(value: 'quoted', child: Text('Quoted')),
+                            const PopupMenuItem(value: 'accepted', child: Text('Accepted')),
+                            const PopupMenuItem(value: 'completed', child: Text('Completed')),
+                            const PopupMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Delete Enquiry'),
+                                content: const Text('Are you sure you want to delete this enquiry record?'),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true) {
+                              await SupabaseService.instance.deleteEnquiry(enquiryId);
+                              _loadData();
+                            }
+                          },
+                          tooltip: 'Delete Enquiry',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1102,10 +1381,11 @@ class _AdminQuotationMonitoringScreenState
       case 'sent':
         return Colors.blue;
       case 'quoted':
-        return Colors.blue;
+        return const Color(0xFF0284C7);
       case 'accepted':
         return Colors.green;
       case 'rejected':
+      case 'cancelled':
         return Colors.red;
       case 'completed':
         return AppTheme.secondary;
@@ -1116,10 +1396,16 @@ class _AdminQuotationMonitoringScreenState
     }
   }
 
+  Future<void> _launchUrl(String url) async {
+    try {
+      await launchUrl(Uri.parse(url));
+    } catch (_) {}
+  }
+
   String _formatDate(dynamic date) {
     if (date == null) return '';
     try {
-      final dt = DateTime.parse(date.toString());
+      final dt = DateTime.parse(date.toString()).toLocal();
       return '${dt.day}/${dt.month}/${dt.year}';
     } catch (_) {
       return '';

@@ -1159,6 +1159,41 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
           ),
           const SizedBox(height: 16),
           _sectionCard(
+            title: 'My Activity & Enquiries',
+            icon: Icons.history_rounded,
+            child: Column(
+              children: [
+                _actionRow(
+                  icon: Icons.send_rounded,
+                  label: 'My Enquiries & Partner Replies',
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    AppRoutes.customerEnquiryScreen,
+                  ),
+                ),
+                const Divider(height: 1),
+                _actionRow(
+                  icon: Icons.receipt_long_rounded,
+                  label: 'My Bookings & Quotations',
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    AppRoutes.customerQuotationBookingsScreen,
+                  ),
+                ),
+                const Divider(height: 1),
+                _actionRow(
+                  icon: Icons.shopping_bag_outlined,
+                  label: 'Order Management',
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    AppRoutes.orderManagementScreen,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _sectionCard(
             title: 'Account',
             icon: Icons.manage_accounts_outlined,
             child: Column(

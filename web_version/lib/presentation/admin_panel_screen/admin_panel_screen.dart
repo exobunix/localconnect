@@ -382,6 +382,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 Navigator.pushNamed(context, AppRoutes.adminOrderManagementScreen),
           ),
           _buildSettingsTile(
+            icon: Icons.contact_mail_rounded,
+            title: 'Enquiries & Quotations',
+            subtitle: 'Monitor all customer leads, enquiries, partner replies & quotes',
+            color: const Color(0xFF1E88E5),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AdminQuotationMonitoringScreen(),
+              ),
+            ),
+          ),
+          _buildSettingsTile(
             icon: Icons.pending_actions_rounded,
             title: 'Pending Approvals',
             subtitle: 'Review provider approval requests',

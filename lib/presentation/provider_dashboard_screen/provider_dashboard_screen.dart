@@ -1748,6 +1748,76 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                 ],
               ),
             ),
+          const SizedBox(height: 8),
+          // ── Customer Enquiries (Direct Leads & Messages) ─────────────────
+          GestureDetector(
+            onTap: () => Navigator.pushNamed(
+              context,
+              AppRoutes.providerEnquiriesScreen,
+            ).then((_) => _loadDashboard()),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0D47A1), Color(0xFF1976D2)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1976D2).withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.contact_mail_rounded,
+                    color: Colors.white,
+                    size: 15,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Customer Enquiries & Leads',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'View Leads',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: Colors.white,
+                    size: 12,
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 8),
           // ── Virtual Shop Edit Button ──────────────────────────────────────

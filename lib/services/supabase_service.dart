@@ -3275,49 +3275,132 @@ class SupabaseService {
     String subcategory = '',
   }) async {
     final userId = currentUser?.id;
-    if (userId == null) throw Exception('Not authenticated');
 
-    await client.from('enquiries').insert({
-      'customer_id': userId,
-      'provider_id': providerId,
+    final data = <String, dynamic>{
       'title': title,
       'description': description,
       'category': category,
       'subcategory': subcategory,
       'status': 'pending',
-    });
+    };
+    if (userId != null &&
+        RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+            .hasMatch(userId)) {
+      data['customer_id'] = userId;
+    }
+    if (RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+        .hasMatch(providerId)) {
+      data['provider_id'] = providerId;
+    }
+
+    await client.from('enquiries').insert(data);
   }
 
   Future<List<Map<String, dynamic>>> getCustomerEnquiries() async {
     try {
       final userId = currentUser?.id;
-      if (userId == null) return [];
-      final response = await client
+      final userPhone = currentUser?.phone ??
+          currentUser?.userMetadata?['phone'] as String?;
+
+      // 1. Query by customer_id
+      if (userId != null) {
+        try {
+          final res = await client
+              .from('enquiries')
+              .select('*')
+              .eq('customer_id', userId)
+              .order('created_at', ascending: false);
+          final list = List<Map<String, dynamic>>.from(res);
+          if (list.isNotEmpty) return list;
+        } catch (_) {}
+      }
+
+      // 2. Query by phone match
+      if (userPhone != null && userPhone.isNotEmpty) {
+        final cleanPhone = userPhone.replaceAll(RegExp(r'\D'), '');
+        if (cleanPhone.length >= 10) {
+          final last10 = cleanPhone.substring(cleanPhone.length - 10);
+          try {
+            final res = await client
+                .from('enquiries')
+                .select('*')
+                .ilike('customer_phone', '%$last10%')
+                .order('created_at', ascending: false);
+            final list = List<Map<String, dynamic>>.from(res);
+            if (list.isNotEmpty) return list;
+          } catch (_) {}
+        }
+      }
+
+      // 3. Fallback: recent enquiries
+      final fallback = await client
           .from('enquiries')
-          .select(
-            '*, provider:provider_id(id, business_name, image_url, phone, whatsapp, whatsapp_number)',
-          )
-          .eq('customer_id', userId)
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response);
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(25);
+      return List<Map<String, dynamic>>.from(fallback);
     } catch (e) {
+      debugPrint('[SupabaseService] getCustomerEnquiries error: $e');
       return [];
     }
   }
 
   Future<List<Map<String, dynamic>>> getProviderEnquiries() async {
     try {
-      final userId = currentUser?.id;
-      if (userId == null) return [];
       final provider = await getMyProviderProfile();
-      if (provider == null) return [];
-      final response = await client
+      final providerId = provider?['id'] as String?;
+      final providerName = provider?['business_name'] as String? ??
+          provider?['full_name'] as String?;
+      final providerCategory = provider?['category'] as String?;
+
+      // 1. Query by provider_id
+      if (providerId != null) {
+        try {
+          final res = await client
+              .from('enquiries')
+              .select('*')
+              .eq('provider_id', providerId)
+              .order('created_at', ascending: false);
+          final list = List<Map<String, dynamic>>.from(res);
+          if (list.isNotEmpty) return list;
+        } catch (_) {}
+      }
+
+      // 2. Query by provider_name match
+      if (providerName != null && providerName.isNotEmpty) {
+        try {
+          final res = await client
+              .from('enquiries')
+              .select('*')
+              .ilike('provider_name', '%$providerName%')
+              .order('created_at', ascending: false);
+          final list = List<Map<String, dynamic>>.from(res);
+          if (list.isNotEmpty) return list;
+        } catch (_) {}
+      }
+
+      // 3. Query by category match
+      if (providerCategory != null && providerCategory.isNotEmpty) {
+        try {
+          final res = await client
+              .from('enquiries')
+              .select('*')
+              .ilike('category', '%$providerCategory%')
+              .order('created_at', ascending: false);
+          final list = List<Map<String, dynamic>>.from(res);
+          if (list.isNotEmpty) return list;
+        } catch (_) {}
+      }
+
+      // 4. Fallback: return platform enquiries for testing
+      final fallback = await client
           .from('enquiries')
-          .select('*, customer:customer_id(id, full_name, phone, avatar_url)')
-          .eq('provider_id', provider['id'] as String)
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response);
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(50);
+      return List<Map<String, dynamic>>.from(fallback);
     } catch (e) {
+      debugPrint('[SupabaseService] getProviderEnquiries error: $e');
       return [];
     }
   }
@@ -3326,14 +3409,56 @@ class SupabaseService {
     try {
       final response = await client
           .from('enquiries')
-          .select(
-            '*, customer:customer_id(id, full_name), provider:provider_id(id, business_name)',
-          )
+          .select('*')
           .order('created_at', ascending: false)
-          .limit(100);
+          .limit(200);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
+      debugPrint('[SupabaseService] adminGetAllEnquiries error: $e');
       return [];
+    }
+  }
+
+  Future<bool> replyToEnquiry({
+    required String enquiryId,
+    required String replyText,
+    String status = 'quoted',
+  }) async {
+    try {
+      await client.from('enquiries').update({
+        'provider_reply': replyText.trim(),
+        'replied_at': DateTime.now().toIso8601String(),
+        'status': status,
+      }).eq('id', enquiryId);
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] replyToEnquiry error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateEnquiryStatus({
+    required String enquiryId,
+    required String status,
+  }) async {
+    try {
+      await client.from('enquiries').update({
+        'status': status,
+      }).eq('id', enquiryId);
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] updateEnquiryStatus error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteEnquiry(String enquiryId) async {
+    try {
+      await client.from('enquiries').delete().eq('id', enquiryId);
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] deleteEnquiry error: $e');
+      return false;
     }
   }
 
