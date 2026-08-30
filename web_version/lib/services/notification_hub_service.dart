@@ -55,21 +55,13 @@ class NotificationHubService extends ChangeNotifier {
 
   Future<void> _fetchCounts() async {
     try {
-      final userId = SupabaseService.instance.currentUser?.id;
-      if (userId == null) return;
-
-      final rows = await SupabaseService.instance.client
-          .from('notifications')
-          .select('type')
-          .or('user_id.eq.$userId,target_audience.eq.all,target_audience.eq.all_users,target_audience.eq.all_customers,target_audience.eq.broadcast,user_id.is.null')
-          .eq('is_read', false);
-
-      final list = List<Map<String, dynamic>>.from(rows);
-      _unreadCount = list.length;
-      _quotationUnread = list.where((n) => n['type'] == 'quotation').length;
-      _bookingUnread = list.where((n) => n['type'] == 'booking').length;
-      _responseUnread = list.where((n) => n['type'] == 'message').length;
-      _reviewUnread = list.where((n) => n['type'] == 'review').length;
+      final notifs = await SupabaseService.instance.getNotifications();
+      final unreadList = notifs.where((n) => n['is_read'] == false).toList();
+      _unreadCount = unreadList.length;
+      _quotationUnread = unreadList.where((n) => n['type'] == 'quotation').length;
+      _bookingUnread = unreadList.where((n) => n['type'] == 'booking').length;
+      _responseUnread = unreadList.where((n) => n['type'] == 'message').length;
+      _reviewUnread = unreadList.where((n) => n['type'] == 'review').length;
       notifyListeners();
     } catch (_) {}
   }

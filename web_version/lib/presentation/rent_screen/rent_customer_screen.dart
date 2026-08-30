@@ -693,73 +693,70 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
 
   Widget _buildWebSubcategoriesGrid(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       color: Colors.white,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1600),
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: List.generate(_subcategories.length, (index) {
-              final sub = _subcategories[index];
-              final id = sub['id'] as String;
-              final label = sub['label'] as String;
-              final icon = sub['icon'] as IconData;
-              final color = sub['color'] as Color;
-              final isActive = _activeSubcategory == id;
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_subcategories.length, (index) {
+                final sub = _subcategories[index];
+                final id = sub['id'] as String;
+                final label = sub['label'] as String;
+                final icon = sub['icon'] as IconData;
+                final color = sub['color'] as Color;
+                final isActive = _activeSubcategory == id;
 
-              // Grid items spacing: 3-4 per row on desktop
-              final screenWidth = MediaQuery.of(context).size.width.clamp(0.0, 1200.0);
-              final itemWidth = (screenWidth - 32 - (3 * 12)) / 4;
-
-              return SizedBox(
-                width: itemWidth > 180 ? itemWidth : 180,
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _activeSubcategory = id;
-                      _tabController.index = index;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: isActive ? color : color.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isActive ? color : color.withOpacity(0.2),
-                        width: 2,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          icon,
-                          color: isActive ? Colors.white : color,
-                          size: 16,
+                return Padding(
+                  padding: EdgeInsets.only(right: index == _subcategories.length - 1 ? 0 : 10),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _activeSubcategory = id;
+                        _tabController.index = index;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
+                      decoration: BoxDecoration(
+                        color: isActive ? color : color.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isActive ? color : color.withOpacity(0.2),
+                          width: 1.5,
                         ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            icon,
+                            color: isActive ? Colors.white : color,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
                             label,
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: isActive ? Colors.white : color,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
       ),

@@ -665,6 +665,14 @@ class _AdminNotificationHubScreenState
                                         ],
                                       ),
                                     ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_forever_rounded, size: 18, color: Color(0xFFEF4444)),
+                                      tooltip: 'Delete notification from all users & partners',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => _confirmDeleteNotification(item, i),
+                                    ),
                                   ],
                                 ),
                               ],
@@ -680,6 +688,76 @@ class _AdminNotificationHubScreenState
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteNotification(Map<String, dynamic> item, int index) async {
+    final title = item['title'] as String? ?? 'Notification';
+    final body = item['body'] as String? ?? '';
+    final id = item['id'] as String?;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Delete Notification',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Are you sure you want to permanently delete "$title"? It will be removed from all users, partners, and admin views across App and Web.',
+          style: GoogleFonts.plusJakartaSans(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete_rounded, size: 16),
+            label: const Text('Delete Everywhere'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _notificationHistory.removeAt(index));
+
+      try {
+        if (id != null && id.isNotEmpty) {
+          await SupabaseService.instance.client
+              .from('notifications')
+              .delete()
+              .eq('id', id);
+        }
+        if (title.isNotEmpty && body.isNotEmpty) {
+          await SupabaseService.instance.client
+              .from('notifications')
+              .delete()
+              .eq('title', title)
+              .eq('body', body);
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefBroadcastKey, jsonEncode(_notificationHistory));
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Notification permanently deleted from all platforms'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('[AdminNotificationHub] Delete error: $e');
+      }
+    }
   }
 
   Widget _buildTargetChip(String label, String value, IconData icon) {

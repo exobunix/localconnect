@@ -121,8 +121,17 @@ class CategoryService {
           .order('sort_order', ascending: true);
 
       final subsByCategory = <String, List<DynamicSubCategory>>{};
+      final seenSubNames = <String, Set<String>>{};
       for (final s in List<Map<String, dynamic>>.from(subs)) {
         final catId = s['category_id'] as String? ?? '';
+        final subName = (s['name'] as String? ?? '').toLowerCase().trim();
+        seenSubNames.putIfAbsent(catId, () => {});
+        if (subName.isNotEmpty && seenSubNames[catId]!.contains(subName)) {
+          continue; // skip duplicate subcategory
+        }
+        if (subName.isNotEmpty) {
+          seenSubNames[catId]!.add(subName);
+        }
         subsByCategory
             .putIfAbsent(catId, () => [])
             .add(DynamicSubCategory.fromMap(s));
@@ -166,8 +175,17 @@ class CategoryService {
           .order('sort_order', ascending: true);
 
       final subsByCategory = <String, List<DynamicSubCategory>>{};
+      final seenSubNames = <String, Set<String>>{};
       for (final s in List<Map<String, dynamic>>.from(subs)) {
         final catId = s['category_id'] as String? ?? '';
+        final subName = (s['name'] as String? ?? '').toLowerCase().trim();
+        seenSubNames.putIfAbsent(catId, () => {});
+        if (subName.isNotEmpty && seenSubNames[catId]!.contains(subName)) {
+          continue; // skip duplicate subcategory
+        }
+        if (subName.isNotEmpty) {
+          seenSubNames[catId]!.add(subName);
+        }
         subsByCategory
             .putIfAbsent(catId, () => [])
             .add(DynamicSubCategory.fromMap(s));

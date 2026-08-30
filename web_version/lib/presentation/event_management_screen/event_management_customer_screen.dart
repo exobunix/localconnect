@@ -1111,28 +1111,34 @@ class _EventManagementCustomerScreenState
 
   Widget _buildWebSubcategoriesGrid() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       color: const Color(0xFFF8F9FA),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1600),
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            alignment: WrapAlignment.center,
-            children: List.generate(_subcategories.length, (index) {
-              final sub = _subcategories[index];
-              return _WebSubcategoryCard(
-                subcategory: sub,
-                isActive: _activeSubcategory == sub['id'],
-                onTap: () {
-                  setState(() {
-                    _activeSubcategory = sub['id'] as String;
-                    _tabController.index = index;
-                  });
-                },
-              );
-            }),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_subcategories.length, (index) {
+                final sub = _subcategories[index];
+                return Padding(
+                  padding: EdgeInsets.only(right: index == _subcategories.length - 1 ? 0 : 10),
+                  child: _WebSubcategoryCard(
+                    subcategory: sub,
+                    isActive: _activeSubcategory == sub['id'],
+                    onTap: () {
+                      setState(() {
+                        _activeSubcategory = sub['id'] as String;
+                        _tabController.index = index;
+                      });
+                    },
+                  ),
+                );
+              }),
+            ),
           ),
         ),
       ),
@@ -2593,32 +2599,32 @@ class _WebSubcategoryCardState extends State<_WebSubcategoryCard> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
-          width: 170,
-          height: 110,
-          padding: const EdgeInsets.all(12),
+          width: 135,
+          height: 86,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
             color: widget.isActive
                 ? color
                 : (_isHovered ? color.withOpacity(0.08) : Colors.white),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: widget.isActive
                   ? color
                   : (_isHovered ? color : Colors.grey.withOpacity(0.2)),
-              width: 2,
+              width: 1.5,
             ),
             boxShadow: [
               if (widget.isActive)
                 BoxShadow(
-                  color: color.withOpacity(0.4),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
+                  color: color.withOpacity(0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 )
               else if (_isHovered)
                 BoxShadow(
                   color: Colors.black.withOpacity(0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
             ],
           ),
@@ -2627,7 +2633,7 @@ class _WebSubcategoryCardState extends State<_WebSubcategoryCard> {
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: widget.isActive
                       ? Colors.white.withOpacity(0.2)
@@ -2637,14 +2643,14 @@ class _WebSubcategoryCardState extends State<_WebSubcategoryCard> {
                 child: Icon(
                   icon,
                   color: widget.isActive ? Colors.white : color,
-                  size: 20,
+                  size: 18,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               Text(
                 label,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: widget.isActive ? Colors.white : Colors.black87,
                 ),

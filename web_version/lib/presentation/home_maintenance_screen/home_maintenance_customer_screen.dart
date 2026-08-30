@@ -479,7 +479,16 @@ class _HomeMaintenanceCustomerScreenState
           .order('rating', ascending: false);
 
       final Map<String, List<Map<String, dynamic>>> grouped = {};
+      final Set<String> seenIds = {};
+      final Set<String> seenNames = {};
+
       for (final row in response) {
+        final id = (row['id'] as String? ?? '').trim();
+        final name = (row['business_name'] ?? row['owner_name'] ?? row['full_name'] ?? 'Provider').toString().trim();
+        if (id.isEmpty || seenIds.contains(id) || seenNames.contains(name.toLowerCase())) continue;
+        seenIds.add(id);
+        seenNames.add(name.toLowerCase());
+
         final sub = (row['subcategory'] as String? ?? '').toLowerCase().trim();
         String subKey = 'plumber';
         if (sub.contains('plumb')) subKey = 'plumber';
@@ -488,17 +497,31 @@ class _HomeMaintenanceCustomerScreenState
         else if (sub.contains('mason')) subKey = 'mason';
         else if (sub.contains('carpent')) subKey = 'carpenter';
         else if (sub.contains('wage') || sub.contains('labour') || sub.contains('labor') || sub.contains('helper')) subKey = 'daily_wage';
+        else if (sub.contains('maid') || sub.contains('housekeep')) subKey = 'maid';
         else if (sub.contains('clean')) subKey = 'cleaning';
         else if (sub.contains('waterproof')) subKey = 'waterproofing';
+        else if (sub.contains('pest')) subKey = 'pest_control';
+        else if (sub.contains('ac') || sub.contains('air')) subKey = 'ac_repair';
+        else if (sub.contains('appliance')) subKey = 'appliance_repair';
+        else if (sub.contains('ro') || sub.contains('purifier') || sub.contains('filter')) subKey = 'ro_purifier';
+        else if (sub.contains('cctv') || sub.contains('security')) subKey = 'cctv_security';
+        else if (sub.contains('lock')) subKey = 'locksmith';
+        else if (sub.contains('garden')) subKey = 'gardening';
+        else subKey = sub.isNotEmpty ? sub : 'plumber';
 
         final charges = (row['charges'] as List?) ?? [];
         final firstCharge = charges.isNotEmpty ? charges.first : null;
         final chargeVal = firstCharge != null ? (firstCharge['base_price'] as num?)?.toDouble() ?? 300.0 : 300.0;
         final chargeUnit = firstCharge != null ? (firstCharge['unit'] as String? ?? '/visit') : '/visit';
 
+        String img = (row['image_url'] as String? ?? '').trim();
+        if (img.isEmpty || img.contains('placeholder') || img.contains('undefined')) {
+          img = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600&auto=format&fit=crop&q=80';
+        }
+
         final mapped = {
-          'id': row['id'],
-          'name': row['business_name'] ?? row['owner_name'] ?? 'Provider',
+          'id': id,
+          'name': name,
           'rating': (row['rating'] as num?)?.toDouble() ?? 4.8,
           'reviews': (row['review_count'] as num?)?.toInt() ?? 100,
           'distance': 1.8,
@@ -508,10 +531,10 @@ class _HomeMaintenanceCustomerScreenState
           'verified': row['is_verified'] == true || row['registration_status'] == 'approved',
           'emergency': true,
           'available': row['is_open'] != false,
-          'speciality': row['description'] ?? '${row['subcategory']} Services',
+          'speciality': row['description'] ?? '${row['subcategory'] ?? "Home Maintenance"} Services',
           'completedJobs': (row['completed_orders'] as num?)?.toInt() ?? 250,
           'phone': row['phone'] ?? '+919876543210',
-          'image': row['image_url'] ?? '',
+          'image': img,
           'gallery': row['gallery_photos'] ?? [],
           'charges': charges,
         };
@@ -1973,27 +1996,33 @@ class _HomeMaintenanceCustomerScreenState
 
   Widget _buildWebSubcategoriesGrid(BuildContext context, List<Map<String, dynamic>> subs, Color activeColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       color: const Color(0xFFF8F9FA),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1600),
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            alignment: WrapAlignment.center,
-            children: List.generate(subs.length, (index) {
-              final sub = subs[index];
-              return _WebSubcategoryCard(
-                subcategory: sub,
-                isActive: _activeSubcategory == sub['id'],
-                onTap: () {
-                  setState(() {
-                    _activeSubcategory = sub['id'] as String;
-                  });
-                },
-              );
-            }),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(subs.length, (index) {
+                final sub = subs[index];
+                return Padding(
+                  padding: EdgeInsets.only(right: index == subs.length - 1 ? 0 : 10),
+                  child: _WebSubcategoryCard(
+                    subcategory: sub,
+                    isActive: _activeSubcategory == sub['id'],
+                    onTap: () {
+                      setState(() {
+                        _activeSubcategory = sub['id'] as String;
+                      });
+                    },
+                  ),
+                );
+              }),
+            ),
           ),
         ),
       ),
@@ -2211,7 +2240,7 @@ class _HomeMaintenanceCustomerScreenState
                             crossAxisCount: MediaQuery.of(context).size.width > 1200 ? 4 : 3,
                             mainAxisSpacing: 16,
                             crossAxisSpacing: 16,
-                            childAspectRatio: 0.78,
+                            childAspectRatio: MediaQuery.of(context).size.width > 1200 ? 1.15 : 1.05,
                           ),
                           itemCount: providers.length,
                           itemBuilder: (_, i) => _ProviderCard(
@@ -2600,32 +2629,32 @@ class _WebSubcategoryCardState extends State<_WebSubcategoryCard> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
-          width: 170,
-          height: 110,
-          padding: const EdgeInsets.all(12),
+          width: 135,
+          height: 86,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
             color: widget.isActive
                 ? color
                 : (_isHovered ? color.withOpacity(0.08) : Colors.white),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: widget.isActive
                   ? color
                   : (_isHovered ? color : Colors.grey.withOpacity(0.2)),
-              width: 2,
+              width: 1.5,
             ),
             boxShadow: [
               if (widget.isActive)
                 BoxShadow(
-                  color: color.withOpacity(0.4),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
+                  color: color.withOpacity(0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 )
               else if (_isHovered)
                 BoxShadow(
                   color: Colors.black.withOpacity(0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
             ],
           ),
@@ -2634,7 +2663,7 @@ class _WebSubcategoryCardState extends State<_WebSubcategoryCard> {
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: widget.isActive
                       ? Colors.white.withOpacity(0.2)
@@ -2644,14 +2673,14 @@ class _WebSubcategoryCardState extends State<_WebSubcategoryCard> {
                 child: Icon(
                   icon,
                   color: widget.isActive ? Colors.white : color,
-                  size: 20,
+                  size: 18,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               Text(
                 label,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: widget.isActive ? Colors.white : Colors.black87,
                 ),

@@ -479,7 +479,16 @@ class _HomeMaintenanceCustomerScreenState
           .order('rating', ascending: false);
 
       final Map<String, List<Map<String, dynamic>>> grouped = {};
+      final Set<String> seenIds = {};
+      final Set<String> seenNames = {};
+
       for (final row in response) {
+        final id = (row['id'] as String? ?? '').trim();
+        final name = (row['business_name'] ?? row['owner_name'] ?? row['full_name'] ?? 'Provider').toString().trim();
+        if (id.isEmpty || seenIds.contains(id) || seenNames.contains(name.toLowerCase())) continue;
+        seenIds.add(id);
+        seenNames.add(name.toLowerCase());
+
         final sub = (row['subcategory'] as String? ?? '').toLowerCase().trim();
         String subKey = 'plumber';
         if (sub.contains('plumb')) subKey = 'plumber';
@@ -488,17 +497,31 @@ class _HomeMaintenanceCustomerScreenState
         else if (sub.contains('mason')) subKey = 'mason';
         else if (sub.contains('carpent')) subKey = 'carpenter';
         else if (sub.contains('wage') || sub.contains('labour') || sub.contains('labor') || sub.contains('helper')) subKey = 'daily_wage';
+        else if (sub.contains('maid') || sub.contains('housekeep')) subKey = 'maid';
         else if (sub.contains('clean')) subKey = 'cleaning';
         else if (sub.contains('waterproof')) subKey = 'waterproofing';
+        else if (sub.contains('pest')) subKey = 'pest_control';
+        else if (sub.contains('ac') || sub.contains('air')) subKey = 'ac_repair';
+        else if (sub.contains('appliance')) subKey = 'appliance_repair';
+        else if (sub.contains('ro') || sub.contains('purifier') || sub.contains('filter')) subKey = 'ro_purifier';
+        else if (sub.contains('cctv') || sub.contains('security')) subKey = 'cctv_security';
+        else if (sub.contains('lock')) subKey = 'locksmith';
+        else if (sub.contains('garden')) subKey = 'gardening';
+        else subKey = sub.isNotEmpty ? sub : 'plumber';
 
         final charges = (row['charges'] as List?) ?? [];
         final firstCharge = charges.isNotEmpty ? charges.first : null;
         final chargeVal = firstCharge != null ? (firstCharge['base_price'] as num?)?.toDouble() ?? 300.0 : 300.0;
         final chargeUnit = firstCharge != null ? (firstCharge['unit'] as String? ?? '/visit') : '/visit';
 
+        String img = (row['image_url'] as String? ?? '').trim();
+        if (img.isEmpty || img.contains('placeholder') || img.contains('undefined')) {
+          img = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600&auto=format&fit=crop&q=80';
+        }
+
         final mapped = {
-          'id': row['id'],
-          'name': row['business_name'] ?? row['owner_name'] ?? 'Provider',
+          'id': id,
+          'name': name,
           'rating': (row['rating'] as num?)?.toDouble() ?? 4.8,
           'reviews': (row['review_count'] as num?)?.toInt() ?? 100,
           'distance': 1.8,
@@ -508,10 +531,10 @@ class _HomeMaintenanceCustomerScreenState
           'verified': row['is_verified'] == true || row['registration_status'] == 'approved',
           'emergency': true,
           'available': row['is_open'] != false,
-          'speciality': row['description'] ?? '${row['subcategory']} Services',
+          'speciality': row['description'] ?? '${row['subcategory'] ?? "Home Maintenance"} Services',
           'completedJobs': (row['completed_orders'] as num?)?.toInt() ?? 250,
           'phone': row['phone'] ?? '+919876543210',
-          'image': row['image_url'] ?? '',
+          'image': img,
           'gallery': row['gallery_photos'] ?? [],
           'charges': charges,
         };

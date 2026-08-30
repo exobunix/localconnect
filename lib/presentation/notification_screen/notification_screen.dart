@@ -265,21 +265,15 @@ class _NotificationScreenState extends State<NotificationScreen>
   }
 
   int _tabUnread(int tabIndex) {
-    final hub = NotificationHubService.instance;
-    switch (tabIndex) {
-      case 0:
-        return hub.unreadCount;
-      case 1:
-        return hub.quotationUnread;
-      case 2:
-        return hub.bookingUnread;
-      case 3:
-        return hub.responseUnread;
-      case 4:
-        return hub.reviewUnread;
-      default:
-        return 0;
+    if (tabIndex == 0) {
+      return _notifications.where((n) => n['is_read'] == false).length;
     }
+    if (tabIndex < _tabs.length) {
+      final tab = _tabs[tabIndex];
+      final filtered = _filteredFor(tab.typeFilter);
+      return filtered.where((n) => n['is_read'] == false).length;
+    }
+    return 0;
   }
 
   @override
@@ -627,7 +621,7 @@ class _NotificationScreenState extends State<NotificationScreen>
                           ),
                         ),
                         const Spacer(),
-                        if (!isRead)
+                        if (!isRead) ...[
                           GestureDetector(
                             onTap: () => _markRead(n, index),
                             child: Text(
@@ -639,6 +633,16 @@ class _NotificationScreenState extends State<NotificationScreen>
                               ),
                             ),
                           ),
+                          const SizedBox(width: 10),
+                        ],
+                        GestureDetector(
+                          onTap: () => _deleteNotification(n['id'] as String? ?? '', index),
+                          child: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 15,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
                       ],
                     ),
                   ],
