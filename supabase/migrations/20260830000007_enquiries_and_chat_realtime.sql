@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Enquiries, Conversations, and Messages RLS and Permissions Fix
--- Ensures real-time chat, enquiry replies, and notifications work seamlessly
+-- Idempotent script safe to run multiple times without 42710 errors
 -- ============================================================================
 
 -- 1. ENQUIRIES TABLE
@@ -101,10 +101,24 @@ CREATE POLICY "allow_all_messages"
 
 GRANT ALL ON public.messages TO anon, authenticated, service_role;
 
--- 4. Enable Supabase Realtime for these tables
-ALTER PUBLICATION supabase_realtime ADD TABLE public.enquiries;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.conversations;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+-- 4. Safe Publication Addition (Catches duplicate_object if already added)
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.enquiries;
+  EXCEPTION WHEN duplicate_object THEN END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.conversations;
+  EXCEPTION WHEN duplicate_object THEN END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+  EXCEPTION WHEN duplicate_object THEN END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+  EXCEPTION WHEN duplicate_object THEN END;
+END $$;
 
 NOTIFY pgrst, 'reload schema';
