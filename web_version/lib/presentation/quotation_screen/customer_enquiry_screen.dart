@@ -34,17 +34,41 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
     'rejected',
   ];
 
+  RealtimeChannel? _enquiriesSubscription;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadAllData();
+    _subscribeToEnquiries();
   }
 
   @override
   void dispose() {
+    _enquiriesSubscription?.unsubscribe();
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _subscribeToEnquiries() {
+    try {
+      final client = SupabaseService.instance.client;
+      _enquiriesSubscription = client
+          .channel('public:enquiries_customer_${DateTime.now().millisecondsSinceEpoch}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'enquiries',
+            callback: (payload) {
+              debugPrint('[CustomerEnquiryScreen] Realtime change: ${payload.eventType}');
+              _loadAllData();
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('[CustomerEnquiryScreen] Subscription error: $e');
+    }
   }
 
   Future<void> _loadAllData() async {
@@ -546,18 +570,30 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
                   const SizedBox(height: 12),
                 ],
 
-                // Action buttons & date
+                // Action buttons & Live Chat with Partner
                 Row(
                   children: [
-                    Text(
-                      'Sent $createdAt',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        color: const Color(0xFF94A3B8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _openChatWithPartner(item),
+                        icon: const Icon(Icons.chat_rounded, size: 15),
+                        label: Text(
+                          providerReply.isNotEmpty ? '💬 Live Chat with Partner' : '💬 Chat with Partner',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
                       ),
                     ),
-                    const Spacer(),
-                    if (status == 'pending')
+                    if (status == 'pending') ...[
+                      const SizedBox(width: 8),
                       TextButton.icon(
                         onPressed: () => _confirmCancelEnquiry(enquiryId),
                         icon: const Icon(Icons.cancel_outlined, size: 14, color: Color(0xFFEF4444)),
@@ -570,7 +606,16 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
                           ),
                         ),
                       ),
+                    ],
                   ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Sent $createdAt',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10.5,
+                    color: const Color(0xFF94A3B8),
+                  ),
                 ),
               ],
             ),
@@ -578,6 +623,50 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
         ],
       ),
     );
+  }
+
+  Future<void> _openChatWithPartner(Map<String, dynamic> enquiry) async {
+    final providerId = enquiry['provider_id']?.toString() ?? '';
+    final providerName = enquiry['provider_name']?.toString() ?? 'Service Partner';
+    final providerUserId = enquiry['provider_user_id']?.toString() ?? providerId;
+
+    if (providerUserId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connecting to partner...')),
+      );
+    }
+
+    final conv = await SupabaseService.instance.getOrCreateConversation(
+      providerUserId: providerUserId.isNotEmpty ? providerUserId : providerId,
+      providerServiceId: providerId,
+    );
+
+    if (!mounted) return;
+
+    if (conv != null) {
+      Navigator.pushNamed(
+        context,
+        AppRoutes.chatDetailScreen,
+        arguments: {
+          'conversationId': conv['id'],
+          'otherUserId': providerUserId,
+          'otherUserName': providerName,
+          'otherUserAvatar': '',
+        },
+      );
+    } else {
+      // Direct fallback to ChatDetailScreen
+      Navigator.pushNamed(
+        context,
+        AppRoutes.chatDetailScreen,
+        arguments: {
+          'conversationId': 'conv_${enquiry['id']}',
+          'otherUserId': providerUserId,
+          'otherUserName': providerName,
+          'otherUserAvatar': '',
+        },
+      );
+    }
   }
 
   Future<void> _confirmCancelEnquiry(String enquiryId) async {

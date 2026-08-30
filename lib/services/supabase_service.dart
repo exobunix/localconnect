@@ -3459,11 +3459,61 @@ class SupabaseService {
     String status = 'quoted',
   }) async {
     try {
+      final now = DateTime.now().toIso8601String();
       await client.from('enquiries').update({
         'provider_reply': replyText.trim(),
-        'replied_at': DateTime.now().toIso8601String(),
+        'replied_at': now,
         'status': status,
+        'updated_at': now,
       }).eq('id', enquiryId);
+
+      // Fetch enquiry to get customer_id & provider details
+      final enquiry = await client
+          .from('enquiries')
+          .select('*')
+          .eq('id', enquiryId)
+          .maybeSingle();
+
+      final customerId = enquiry?['customer_id'] as String?;
+      final providerName = enquiry?['provider_name'] as String? ?? 'Partner';
+      final serviceTitle = enquiry?['service_title'] as String? ?? 'your enquiry';
+      final providerId = enquiry?['provider_id'] as String?;
+      final currentUserId = currentUser?.id;
+
+      // 1. Create in-app notification for the customer
+      if (customerId != null && customerId.isNotEmpty) {
+        try {
+          await createNotification(
+            userId: customerId,
+            title: '💬 Partner Replied to Your Enquiry',
+            body: '$providerName replied: "$replyText"',
+            type: 'general',
+            data: {
+              'enquiry_id': enquiryId,
+              'type': 'enquiry_reply',
+              'action': 'view_enquiry',
+            },
+          );
+        } catch (_) {}
+      }
+
+      // 2. Automatically sync message to live chat conversation
+      if (customerId != null && customerId.isNotEmpty && currentUserId != null) {
+        try {
+          final conv = await getOrCreateConversation(
+            providerUserId: currentUserId,
+            providerServiceId: providerId,
+          );
+          if (conv != null) {
+            final convId = conv['id'] as String;
+            await sendMessage(
+              conversationId: convId,
+              content: '📋 Enquiry Reply ($serviceTitle):\n$replyText',
+            );
+          }
+        } catch (_) {}
+      }
+
       return true;
     } catch (e) {
       debugPrint('[SupabaseService] replyToEnquiry error: $e');

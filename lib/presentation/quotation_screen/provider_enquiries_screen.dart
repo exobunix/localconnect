@@ -32,6 +32,8 @@ class _ProviderEnquiriesScreenState extends State<ProviderEnquiriesScreen>
     'Completed',
   ];
 
+  RealtimeChannel? _enquiriesSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -43,13 +45,35 @@ class _ProviderEnquiriesScreenState extends State<ProviderEnquiriesScreen>
       if (tabIndex >= 0) _tabController.index = tabIndex;
     }
     _loadEnquiries();
+    _subscribeToEnquiries();
     QuotationRealtimeService.instance.startListening();
   }
 
   @override
   void dispose() {
+    _enquiriesSubscription?.unsubscribe();
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _subscribeToEnquiries() {
+    try {
+      final client = SupabaseService.instance.client;
+      _enquiriesSubscription = client
+          .channel('public:enquiries_provider_${DateTime.now().millisecondsSinceEpoch}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'enquiries',
+            callback: (payload) {
+              debugPrint('[ProviderEnquiriesScreen] Realtime change: ${payload.eventType}');
+              _loadEnquiries();
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('[ProviderEnquiriesScreen] Subscription error: $e');
+    }
   }
 
   Future<void> _loadEnquiries() async {
@@ -590,6 +614,26 @@ class _ProviderEnquiriesScreenState extends State<ProviderEnquiriesScreen>
                     ),
                     const SizedBox(width: 8),
 
+                    // Live Chat Button
+                    ElevatedButton.icon(
+                      onPressed: () => _openChatWithCustomer(item),
+                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
+                      label: Text(
+                        'Live Chat',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF16A34A),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
                     // Quotation Builder button
                     OutlinedButton.icon(
                       onPressed: () {
@@ -604,7 +648,7 @@ class _ProviderEnquiriesScreenState extends State<ProviderEnquiriesScreen>
                       },
                       icon: const Icon(Icons.request_quote_rounded, size: 16),
                       label: Text(
-                        'Full Quote',
+                        'Quote',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -613,7 +657,7 @@ class _ProviderEnquiriesScreenState extends State<ProviderEnquiriesScreen>
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.primary,
                         side: BorderSide(color: AppTheme.primary),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
@@ -757,12 +801,22 @@ class _ProviderEnquiriesScreenState extends State<ProviderEnquiriesScreen>
                   final text = replyCtrl.text.trim();
                   if (text.isEmpty) return;
                   Navigator.pop(ctx);
-                  await SupabaseService.instance.replyToEnquiry(
+                  final ok = await SupabaseService.instance.replyToEnquiry(
                     enquiryId: enquiryId,
                     replyText: text,
                     status: 'quoted',
                   );
-                  _loadEnquiries();
+                  if (mounted) {
+                    if (ok) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Reply sent to customer and synced to Live Chat!'),
+                          backgroundColor: Color(0xFF16A34A),
+                        ),
+                      );
+                    }
+                    _loadEnquiries();
+                  }
                 },
                 icon: const Icon(Icons.send_rounded, size: 18),
                 label: Text(
@@ -783,6 +837,51 @@ class _ProviderEnquiriesScreenState extends State<ProviderEnquiriesScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _openChatWithCustomer(Map<String, dynamic> enquiry) async {
+    final customerId = enquiry['customer_id']?.toString() ?? '';
+    final customerName = enquiry['customer_name']?.toString() ?? 'Customer';
+    final providerId = enquiry['provider_id']?.toString() ?? '';
+    final currentUserId = SupabaseService.instance.currentUser?.id;
+
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in as a provider to chat')),
+      );
+      return;
+    }
+
+    final conv = await SupabaseService.instance.getOrCreateConversation(
+      providerUserId: currentUserId,
+      providerServiceId: providerId,
+    );
+
+    if (!mounted) return;
+
+    if (conv != null) {
+      Navigator.pushNamed(
+        context,
+        AppRoutes.chatDetailScreen,
+        arguments: {
+          'conversationId': conv['id'],
+          'otherUserId': customerId,
+          'otherUserName': customerName,
+          'otherUserAvatar': '',
+        },
+      );
+    } else {
+      Navigator.pushNamed(
+        context,
+        AppRoutes.chatDetailScreen,
+        arguments: {
+          'conversationId': 'conv_${enquiry['id']}',
+          'otherUserId': customerId,
+          'otherUserName': customerName,
+          'otherUserAvatar': '',
+        },
+      );
+    }
   }
 
   Widget _statusBadge(String status) {
