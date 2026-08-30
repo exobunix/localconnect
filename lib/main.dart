@@ -25,8 +25,10 @@ void main() async {
   // Initialize ConnectivityService
   await ConnectivityService.instance.initialize();
 
-  // Initialize NotificationService
+  // Initialize NotificationService & Broadcast Listener
   await NotificationService.instance.initialize();
+  NotificationService.instance.startListeningToBroadcastNotifications();
+  NotificationHubService.instance.initialize();
 
   // Initialize ThemeProvider
   await ThemeProvider.instance.initialize();

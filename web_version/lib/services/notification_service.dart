@@ -1152,6 +1152,78 @@ class NotificationService {
     } catch (_) {}
   }
 
+  RealtimeChannel? _broadcastChannel;
+
+  /// Starts listening to real-time admin broadcast alerts and notifications
+  void startListeningToBroadcastNotifications() {
+    if (_broadcastChannel != null) return;
+    try {
+      _broadcastChannel = SupabaseService.instance.client
+          .channel('public:global_admin_broadcast')
+          .onBroadcast(
+            event: 'admin_push_notification',
+            callback: (payload) {
+              final title = payload['title'] as String? ?? 'Notification';
+              final body = payload['body'] as String? ?? '';
+              final targetType = payload['target_type'] as String? ?? 'all_users';
+              final targetUserId = payload['target_user_id'] as String?;
+              final currentUserId = SupabaseService.instance.currentUser?.id;
+
+              bool applies = false;
+              if (targetType == 'all_users' || targetType == 'all') {
+                applies = true;
+              } else if (targetType == 'all_customers') {
+                applies = true;
+              } else if (targetType == 'all_vendors') {
+                applies = true;
+              } else if (targetType == 'specific_user') {
+                applies = currentUserId != null && currentUserId == targetUserId;
+              }
+
+              if (applies) {
+                playNotificationSound();
+                showInAppToast(
+                  title: title,
+                  subtitle: body,
+                  icon: Icons.campaign_rounded,
+                  iconColor: const Color(0xFF1E3A8A),
+                  bgColor: const Color(0xFFF1F5F9),
+                );
+              }
+            },
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'notifications',
+            callback: (payload) {
+              final newRecord = payload.newRecord;
+              final uid = newRecord['user_id'] as String?;
+              final currentUserId = SupabaseService.instance.currentUser?.id;
+
+              bool applies = false;
+              if (uid == null || (currentUserId != null && uid == currentUserId)) {
+                applies = true;
+              }
+
+              if (applies) {
+                playNotificationSound();
+                showInAppToast(
+                  title: newRecord['title'] as String? ?? 'Notification',
+                  subtitle: newRecord['body'] as String? ?? '',
+                  icon: Icons.notifications_active_rounded,
+                  iconColor: const Color(0xFF1E3A8A),
+                  bgColor: const Color(0xFFF1F5F9),
+                );
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('[NotificationService] Broadcast listener error: $e');
+    }
+  }
+
   /// Admin broadcast push notification to all customers, all vendors, or a specific user
   Future<int> broadcastAdminPushNotification({
     required String targetType,
@@ -1165,54 +1237,77 @@ class NotificationService {
     try {
       final now = DateTime.now().toIso8601String();
 
+      // 1. Insert primary broadcast row
+      final broadcastRow = <String, dynamic>{
+        'title': title,
+        'body': body,
+        'type': 'admin_broadcast',
+        'target_audience': targetType,
+        'is_read': false,
+        'created_at': now,
+      };
+
       if (targetType == 'specific_user' && targetUserId != null) {
-        await SupabaseService.instance.client.from('notifications').insert({
-          'user_id': targetUserId,
-          'title': title,
-          'body': body,
-          'type': 'admin_broadcast',
-          'is_read': false,
-          'created_at': now,
-        });
-        sentCount = 1;
+        broadcastRow['user_id'] = targetUserId;
+        broadcastRow['target_audience'] = 'specific';
       } else {
-        var query = SupabaseService.instance.client.from('user_profiles').select('id, role');
-        if (targetType == 'all_customers') {
-          query = query.eq('role', 'customer');
-        } else if (targetType == 'all_vendors') {
-          query = query.eq('role', 'provider');
-        }
+        broadcastRow['user_id'] = null;
+      }
 
-        final users = await query;
-        final rows = <Map<String, dynamic>>[];
-        for (final u in users) {
-          final uid = u['id'] as String?;
-          if (uid != null) {
-            rows.add({
-              'user_id': uid,
-              'title': title,
-              'body': body,
-              'type': 'admin_broadcast',
-              'is_read': false,
-              'created_at': now,
-            });
+      await SupabaseService.instance.client.from('notifications').insert(broadcastRow);
+      sentCount = 1;
+
+      // 2. Also insert individual rows for users if broadcasting to a group
+      if (targetType != 'specific_user') {
+        try {
+          var query = SupabaseService.instance.client.from('user_profiles').select('id, role');
+          if (targetType == 'all_customers') {
+            query = query.eq('role', 'customer');
+          } else if (targetType == 'all_vendors') {
+            query = query.eq('role', 'provider');
           }
-        }
 
-        if (rows.isNotEmpty) {
-          await SupabaseService.instance.client.from('notifications').insert(rows);
-          sentCount = rows.length;
-        } else {
-          await SupabaseService.instance.client.from('notifications').insert({
-            'user_id': targetType,
+          final users = await query;
+          final userList = List<Map<String, dynamic>>.from(users);
+          final rows = <Map<String, dynamic>>[];
+          for (final u in userList) {
+            final uid = u['id'] as String?;
+            if (uid != null && uid.isNotEmpty) {
+              rows.add({
+                'user_id': uid,
+                'title': title,
+                'body': body,
+                'type': 'admin_broadcast',
+                'target_audience': targetType,
+                'is_read': false,
+                'created_at': now,
+              });
+            }
+          }
+          if (rows.isNotEmpty) {
+            await SupabaseService.instance.client.from('notifications').insert(rows);
+            sentCount += rows.length;
+          }
+        } catch (e) {
+          debugPrint('[NotificationService] Individual row insert: $e');
+        }
+      }
+
+      // 3. Dispatch realtime broadcast event to all active clients
+      try {
+        final broadcastChannel = SupabaseService.instance.client.channel('public:global_admin_broadcast');
+        await broadcastChannel.sendBroadcastMessage(
+          event: 'admin_push_notification',
+          payload: {
             'title': title,
             'body': body,
-            'type': 'admin_broadcast',
-            'is_read': false,
-            'created_at': now,
-          });
-          sentCount = 1;
-        }
+            'target_type': targetType,
+            'target_user_id': targetUserId,
+            'timestamp': now,
+          },
+        );
+      } catch (e) {
+        debugPrint('[NotificationService] Realtime channel broadcast: $e');
       }
 
       showInAppToast(

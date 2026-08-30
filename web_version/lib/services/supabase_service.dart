@@ -892,16 +892,37 @@ class SupabaseService {
   Future<List<Map<String, dynamic>>> getNotifications() async {
     try {
       final userId = currentUser?.id;
-      if (userId == null) return [];
 
-      final response = await client
+      if (userId != null) {
+        try {
+          final response = await client
+              .from('notifications')
+              .select()
+              .or('user_id.eq.$userId,target_audience.eq.all,target_audience.eq.all_users,target_audience.eq.all_customers,target_audience.eq.broadcast,user_id.is.null')
+              .order('created_at', ascending: false)
+              .limit(60);
+          final list = List<Map<String, dynamic>>.from(response);
+          if (list.isNotEmpty) return list;
+        } catch (_) {
+          final response = await client
+              .from('notifications')
+              .select()
+              .eq('user_id', userId)
+              .order('created_at', ascending: false)
+              .limit(60);
+          final list = List<Map<String, dynamic>>.from(response);
+          if (list.isNotEmpty) return list;
+        }
+      }
+
+      final fallback = await client
           .from('notifications')
           .select()
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
-
-      return List<Map<String, dynamic>>.from(response);
+          .order('created_at', ascending: false)
+          .limit(30);
+      return List<Map<String, dynamic>>.from(fallback);
     } catch (e) {
+      debugPrint('[SupabaseService] getNotifications error: $e');
       return [];
     }
   }
@@ -2399,18 +2420,13 @@ class SupabaseService {
   RealtimeChannel subscribeToNotifications({
     required void Function() onUpdate,
   }) {
-    final userId = currentUser?.id ?? '';
+    final userId = currentUser?.id ?? 'guest';
     return client
-        .channel('notifications_$userId')
+        .channel('notifications_stream_$userId')
         .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
+          event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'notifications',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
           callback: (payload) {
             onUpdate();
           },

@@ -25,8 +25,10 @@ void main() async {
   // Initialize ConnectivityService
   await ConnectivityService.instance.initialize();
 
-  // Initialize NotificationService
+  // Initialize NotificationService & Broadcast Listener
   await NotificationService.instance.initialize();
+  NotificationService.instance.startListeningToBroadcastNotifications();
+  NotificationHubService.instance.initialize();
 
   // Initialize ThemeProvider
   await ThemeProvider.instance.initialize();
@@ -89,7 +91,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    Widget sizerWidget = Sizer(
+    return Sizer(
       builder: (context, orientation, screenType) {
         return MaterialApp(
           title: 'LocalConnect',
@@ -111,8 +113,6 @@ class _MyAppState extends State<MyApp> {
         );
       },
     );
-
-    return sizerWidget;
   }
 }
 

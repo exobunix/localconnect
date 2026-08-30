@@ -61,7 +61,7 @@ class NotificationHubService extends ChangeNotifier {
       final rows = await SupabaseService.instance.client
           .from('notifications')
           .select('type')
-          .eq('user_id', userId)
+          .or('user_id.eq.$userId,target_audience.eq.all,target_audience.eq.all_users,target_audience.eq.all_customers,target_audience.eq.broadcast,user_id.is.null')
           .eq('is_read', false);
 
       final list = List<Map<String, dynamic>>.from(rows);
@@ -75,33 +75,14 @@ class NotificationHubService extends ChangeNotifier {
   }
 
   void _subscribeRealtime() {
-    final userId = SupabaseService.instance.currentUser?.id ?? '';
-    if (userId.isEmpty) return;
+    final userId = SupabaseService.instance.currentUser?.id ?? 'guest';
 
     _channel = SupabaseService.instance.client
-        .channel('notif_hub_$userId')
+        .channel('notif_hub_stream_$userId')
         .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
+          event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'notifications',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
-          callback: (payload) {
-            _fetchCounts();
-          },
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
-          table: 'notifications',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
           callback: (payload) {
             _fetchCounts();
           },

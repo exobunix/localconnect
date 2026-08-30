@@ -21,6 +21,7 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   static const _tabs = [
     _TabDef('All', null, Icons.notifications_rounded),
+    _TabDef('Announcements', 'admin_broadcast', Icons.campaign_rounded),
     _TabDef('Quotations', 'quotation', Icons.request_quote_rounded),
     _TabDef('Bookings', 'booking', Icons.event_available_rounded),
     _TabDef('Responses', 'message', Icons.chat_bubble_rounded),
@@ -99,11 +100,21 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   List<Map<String, dynamic>> _filteredFor(String? typeFilter) {
     if (typeFilter == null) return _notifications;
+    if (typeFilter == 'admin_broadcast') {
+      return _notifications.where((n) {
+        final t = n['type'] as String?;
+        return t == 'admin_broadcast' || t == 'broadcast' || t == 'announcement';
+      }).toList();
+    }
     return _notifications.where((n) => n['type'] == typeFilter).toList();
   }
 
   IconData _getIcon(String? type) {
     switch (type) {
+      case 'admin_broadcast':
+      case 'broadcast':
+      case 'announcement':
+        return Icons.campaign_rounded;
       case 'quotation':
         return Icons.request_quote_rounded;
       case 'booking':
@@ -127,6 +138,10 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   Color _getColor(String? type) {
     switch (type) {
+      case 'admin_broadcast':
+      case 'broadcast':
+      case 'announcement':
+        return const Color(0xFFE11D48); // Bold Crimson / Rose for Admin Announcements
       case 'quotation':
         return const Color(0xFF7C3AED);
       case 'booking':
@@ -150,6 +165,10 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   String _typeLabel(String? type) {
     switch (type) {
+      case 'admin_broadcast':
+      case 'broadcast':
+      case 'announcement':
+        return 'ANNOUNCEMENT';
       case 'quotation':
         return 'QUOTATION';
       case 'booking':
