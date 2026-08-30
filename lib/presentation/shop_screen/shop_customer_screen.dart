@@ -529,13 +529,17 @@ class _ShopCustomerScreenState extends State<ShopCustomerScreen> {
       );
     }
 
+    final width = MediaQuery.of(context).size.width;
+    final crossCount = width > 1200 ? 5 : (width > 800 ? 4 : (width > 500 ? 3 : 2));
+    final aspect = width > 800 ? 0.78 : 0.72;
+
     return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+      padding: EdgeInsets.symmetric(horizontal: width > 1200 ? 24 : 12, vertical: 12),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossCount,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 0.72,
+        childAspectRatio: aspect,
       ),
       itemCount: products.length,
       itemBuilder: (ctx, i) {

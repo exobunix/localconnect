@@ -1732,13 +1732,13 @@ class _ProviderCard extends StatelessWidget {
               child: Stack(
                 children: [
                   SizedBox(
-                    height: 160,
+                    height: 140,
                     width: double.infinity,
                     child: Image.network(
                       provider['image'] as String,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) =>
-                          Container(height: 160, color: color.withAlpha(30)),
+                          Container(height: 140, color: color.withAlpha(30)),
                       semanticLabel:
                           '${provider['name']} event service provider cover image',
                     ),
@@ -1891,7 +1891,7 @@ class _ProviderCard extends StatelessWidget {
             ),
             // Info
             Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

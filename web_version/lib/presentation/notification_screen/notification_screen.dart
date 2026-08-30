@@ -86,15 +86,18 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   Future<void> _deleteNotification(String id, int index) async {
     final n = _notifications[index];
+    final title = n['title'] as String? ?? '';
+    final body = n['body'] as String? ?? '';
     final type = n['type'] as String?;
     final wasUnread = n['is_read'] == false;
     setState(() => _notifications.removeAt(index));
     if (wasUnread) NotificationHubService.instance.decrementUnread(type: type);
     try {
-      await SupabaseService.instance.client
-          .from('notifications')
-          .delete()
-          .eq('id', id);
+      await SupabaseService.instance.deleteNotification(
+        id: id.isNotEmpty ? id : null,
+        title: title.isNotEmpty ? title : null,
+        body: body.isNotEmpty ? body : null,
+      );
     } catch (_) {}
   }
 

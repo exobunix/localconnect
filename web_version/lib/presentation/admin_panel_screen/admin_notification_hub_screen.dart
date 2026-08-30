@@ -729,19 +729,11 @@ class _AdminNotificationHubScreenState
       setState(() => _notificationHistory.removeAt(index));
 
       try {
-        if (id != null && id.isNotEmpty) {
-          await SupabaseService.instance.client
-              .from('notifications')
-              .delete()
-              .eq('id', id);
-        }
-        if (title.isNotEmpty && body.isNotEmpty) {
-          await SupabaseService.instance.client
-              .from('notifications')
-              .delete()
-              .eq('title', title)
-              .eq('body', body);
-        }
+        await SupabaseService.instance.deleteNotification(
+          id: (id != null && id.isNotEmpty) ? id : null,
+          title: title.isNotEmpty ? title : null,
+          body: body.isNotEmpty ? body : null,
+        );
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_prefBroadcastKey, jsonEncode(_notificationHistory));

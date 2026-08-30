@@ -198,73 +198,86 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    final isDesktop = MediaQuery.of(context).size.width > 800;
-    final crossCount = isDesktop ? 4 : 2;
-    final aspect = isDesktop ? 1.05 : 0.82;
-
-    Widget bodyContent = CustomScrollView(
-      slivers: [
-        _buildSliverAppBar(),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: _buildSearchBar(),
-          ),
-        ),
-        if (_isProvider) SliverToBoxAdapter(child: _buildProviderBanner()),
-        // Customer-only quick action buttons
-        if (!_isProvider)
-          SliverToBoxAdapter(child: _buildCustomerQuickActions()),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              'Shop Categories',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1A1C1E),
-              ),
-            ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverGrid(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _SubcategoryCard(
-                subcategory: filtered[index],
-                onTap: () => _openSubcategory(filtered[index]),
-              ),
-              childCount: filtered.length,
-            ),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossCount,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 14,
-              childAspectRatio: aspect,
-            ),
-          ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 32)),
-      ],
-    );
-
-    if (isDesktop) {
-      bodyContent = Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
-          child: bodyContent,
-        ),
-      );
-    }
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossCount = screenWidth > 1200 ? 4 : (screenWidth > 700 ? 3 : 2);
+    final aspect = screenWidth > 1200 ? 1.15 : (screenWidth > 700 ? 1.05 : 0.82);
+    final horizPadding = screenWidth > 1200 ? 24.0 : 16.0;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: bodyContent,
+      body: CustomScrollView(
+        slivers: [
+          _buildSliverAppBar(),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(horizPadding, 16, horizPadding, 8),
+              child: _buildSearchBar(),
+            ),
+          ),
+          if (_isProvider)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizPadding),
+                child: _buildProviderBanner(),
+              ),
+            ),
+          // Customer-only quick action buttons
+          if (!_isProvider)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizPadding),
+                child: _buildCustomerQuickActions(),
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(horizPadding, 20, horizPadding, 12),
+              child: Row(
+                children: [
+                  Text(
+                    'Shop Categories',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1A1C1E),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${filtered.length} Categories',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: horizPadding),
+            sliver: SliverGrid(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _SubcategoryCard(
+                  subcategory: filtered[index],
+                  onTap: () => _openSubcategory(filtered[index]),
+                ),
+                childCount: filtered.length,
+              ),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossCount,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: aspect,
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 40)),
+        ],
+      ),
     );
   }
 

@@ -2452,6 +2452,24 @@ class SupabaseService {
         .subscribe();
   }
 
+  /// Permanently delete a notification by ID and/or title+body across all platforms
+  Future<void> deleteNotification({String? id, String? title, String? body}) async {
+    try {
+      if (id != null && id.isNotEmpty) {
+        await client.from('notifications').delete().eq('id', id);
+      }
+      if (title != null && title.isNotEmpty) {
+        if (body != null && body.isNotEmpty) {
+          await client.from('notifications').delete().eq('title', title).eq('body', body);
+        } else {
+          await client.from('notifications').delete().eq('title', title);
+        }
+      }
+    } catch (e) {
+      debugPrint('[SupabaseService] deleteNotification error: $e');
+    }
+  }
+
   // ─── PROVIDER DASHBOARD ───────────────────────────────────────────────────
 
   /// Get the service_providers record for the currently logged-in provider user
