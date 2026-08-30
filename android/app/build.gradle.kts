@@ -31,22 +31,13 @@ android {
 
     signingConfigs {
         create("release") {
-            // Keystore credentials are injected via environment variables at CI/CD build time.
-            // Set these in your build environment or local.properties (never commit secrets):
-            //   KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
-            val keystorePath = System.getenv("KEYSTORE_PATH") ?: ""
-            val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-            val keyAlias = System.getenv("KEY_ALIAS") ?: ""
-            val keyPassword = System.getenv("KEY_PASSWORD") ?: ""
-
-            if (keystorePath.isNotEmpty()) {
-                storeFile = file(keystorePath)
-                storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
+            val keystoreFile = file("localconnect.keystore")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = "localconnect123"
+                keyAlias = "localconnect"
+                keyPassword = "localconnect123"
             }
-            // If env vars are not set (local dev), the release build will fall back to
-            // unsigned — this is intentional to prevent accidental debug-signed releases.
         }
     }
 
@@ -59,17 +50,15 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Use release signing if env vars are present; otherwise, fall back to debug signing
-            val keystorePath = System.getenv("KEYSTORE_PATH") ?: ""
-            if (keystorePath.isNotEmpty()) {
-                signingConfig = signingConfigs.getByName("release")
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isMinifyEnabled = false
             isShrinkResources = false
+            val keystoreFile = file("localconnect.keystore")
+            if (keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }

@@ -8,6 +8,7 @@ import './core/role_guard.dart';
 import './core/theme_provider.dart';
 import './services/booking_realtime_service.dart';
 import './services/connectivity_service.dart';
+import './services/notification_hub_service.dart';
 import './services/notification_service.dart';
 import './services/quotation_realtime_service.dart';
 import './services/supabase_service.dart';
