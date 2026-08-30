@@ -133,12 +133,12 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
 
     try {
       final user = SupabaseService.instance.currentUser;
-      final customerId = user?.id ?? 'guest_customer_${DateTime.now().millisecondsSinceEpoch}';
-      final enquiryId = 'ENQ-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+      // customer_id must be a valid UUID — only use auth user id
+      final customerId = user?.id;
 
-      final enquiryData = {
-        'id': enquiryId,
-        'customer_id': customerId,
+      // 1. Save to Supabase enquiries table
+      // NOTE: Do NOT send 'id' (UUID) or 'created_at' — Supabase auto-generates both
+      final insertData = <String, dynamic>{
         'customer_name': name,
         'customer_phone': phone,
         'provider_id': widget.providerId,
@@ -152,21 +152,28 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
         'preferred_time': _selectedSlot,
         'message': message.isNotEmpty ? message : 'Customer requested quotation and details.',
         'status': 'pending',
-        'created_at': DateTime.now().toIso8601String(),
       };
+      if (customerId != null) insertData['customer_id'] = customerId;
 
-      // 1. Save to Supabase enquiries table
+      String enquiryId = 'ENQ-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
       try {
-        await SupabaseService.instance.client.from('enquiries').insert(enquiryData);
+        final result = await SupabaseService.instance.client
+            .from('enquiries')
+            .insert(insertData)
+            .select('id')
+            .single();
+        enquiryId = result['id']?.toString() ?? enquiryId;
       } catch (e) {
-        debugPrint('[UniversalEnquiry] Supabase direct insert note: $e');
+        debugPrint('[UniversalEnquiry] Supabase insert error: $e');
+        // Re-throw so the outer catch shows the error toast
+        rethrow;
       }
 
       // 2. Dispatch real-time notifications with audio chime
       await NotificationService.instance.notifyEnquirySubmitted(
         enquiryId: enquiryId,
         subcategory: widget.subcategory,
-        customerId: customerId,
+        customerId: customerId ?? '',
         customerName: name,
         customerPhone: phone,
         providerId: widget.providerId,
