@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/supabase_service.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
@@ -28,6 +30,8 @@ class _AdminNotificationHubScreenState
   List<Map<String, dynamic>> _notificationHistory = [];
   bool _isLoadingHistory = true;
 
+  static const String _prefBroadcastKey = 'admin_broadcast_history';
+
   @override
   void initState() {
     super.initState();
@@ -41,22 +45,63 @@ class _AdminNotificationHubScreenState
     super.dispose();
   }
 
+  Future<List<Map<String, dynamic>>> _getLocalHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefBroadcastKey);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return List<Map<String, dynamic>>.from(decoded);
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> _saveToLocalHistory(Map<String, dynamic> item) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = await _getLocalHistory();
+      list.insert(0, item);
+      if (list.length > 50) list.removeRange(50, list.length);
+      await prefs.setString(_prefBroadcastKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
   Future<void> _loadNotificationHistory() async {
     setState(() => _isLoadingHistory = true);
+    final localList = await _getLocalHistory();
     try {
       final res = await SupabaseService.instance.client
           .from('notifications')
           .select()
           .order('created_at', ascending: false)
-          .limit(30);
+          .limit(40);
+      final dbList = List<Map<String, dynamic>>.from(res);
+      final combined = <Map<String, dynamic>>[...localList];
+      for (final item in dbList) {
+        if (!combined.any((c) =>
+            (c['id'] != null && c['id'] == item['id']) ||
+            (c['title'] == item['title'] && c['body'] == item['body']))) {
+          combined.add(item);
+        }
+      }
+      combined.sort((a, b) =>
+          (b['created_at'] ?? '').toString().compareTo((a['created_at'] ?? '').toString()));
       if (mounted) {
         setState(() {
-          _notificationHistory = List<Map<String, dynamic>>.from(res);
+          _notificationHistory = combined;
           _isLoadingHistory = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoadingHistory = false);
+      if (mounted) {
+        setState(() {
+          _notificationHistory = localList;
+          _isLoadingHistory = false;
+        });
+      }
     }
   }
 
@@ -111,11 +156,32 @@ class _AdminNotificationHubScreenState
     try {
       String targetType = _selectedTarget;
       String? targetUserId;
+      String targetLabel = 'All Users (Everyone)';
 
-      if (_selectedTarget == 'specific_customer' || _selectedTarget == 'specific_vendor') {
+      if (_selectedTarget == 'all_customers') {
+        targetLabel = '👥 All Customers';
+      } else if (_selectedTarget == 'all_vendors') {
+        targetLabel = '🏢 All Vendors / Partners';
+      } else if (_selectedTarget == 'specific_customer' || _selectedTarget == 'specific_vendor') {
         targetType = 'specific_user';
         targetUserId = _selectedSpecificUser!['id'] as String;
+        final name = _selectedSpecificUser!['full_name'] ?? _selectedSpecificUser!['email'] ?? 'User';
+        targetLabel = '👤 Specific: $name';
       }
+
+      final record = <String, dynamic>{
+        'id': 'ADMIN-${DateTime.now().millisecondsSinceEpoch}',
+        'title': title,
+        'body': body,
+        'type': 'general',
+        'target_audience': targetType,
+        'target_label': targetLabel,
+        'created_at': DateTime.now().toIso8601String(),
+        'is_read': false,
+      };
+
+      // Save to local history immediately so admin always retains record
+      await _saveToLocalHistory(record);
 
       final sentCount = await NotificationService.instance.broadcastAdminPushNotification(
         targetType: targetType,
@@ -476,6 +542,15 @@ class _AdminNotificationHubScreenState
                     final body = item['body'] as String? ?? '';
                     final type = item['type'] as String? ?? 'general';
                     final time = item['created_at'] as String? ?? '';
+                    final targetAudience = item['target_audience'] as String?;
+                    final targetLabel = item['target_label'] as String? ??
+                        (targetAudience == 'all_customers'
+                            ? '👥 All Customers'
+                            : (targetAudience == 'all_vendors'
+                                ? '🏢 All Vendors / Partners'
+                                : (targetAudience == 'specific' || targetAudience == 'specific_user'
+                                    ? '👤 Specific User'
+                                    : '🌍 All Users')));
 
                     return Container(
                       padding: const EdgeInsets.all(16),
@@ -483,20 +558,27 @@ class _AdminNotificationHubScreenState
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
                               color: const Color(0xFF1E3A8A).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(
-                              Icons.notifications_active_rounded,
+                              Icons.campaign_rounded,
                               color: Color(0xFF1E3A8A),
-                              size: 20,
+                              size: 24,
                             ),
                           ),
                           const SizedBox(width: 14),
@@ -510,47 +592,81 @@ class _AdminNotificationHubScreenState
                                       child: Text(
                                         title,
                                         style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 14,
+                                          fontSize: 14.5,
                                           fontWeight: FontWeight.w700,
                                           color: const Color(0xFF0F172A),
                                         ),
                                       ),
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFF1F5F9),
+                                        color: const Color(0xFFEFF6FF),
                                         borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFBFDBFE)),
                                       ),
                                       child: Text(
-                                        type,
+                                        targetLabel,
                                         style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 10,
-                                          color: const Color(0xFF64748B),
-                                          fontWeight: FontWeight.w600,
+                                          fontSize: 10.5,
+                                          color: const Color(0xFF1D4ED8),
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 6),
                                 Text(
                                   body,
                                   style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12.5,
+                                    fontSize: 13,
                                     color: const Color(0xFF475569),
+                                    height: 1.4,
                                   ),
                                 ),
-                                if (time.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    time.length > 19 ? time.substring(0, 19).replaceAll('T', ' ') : time,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 10.5,
-                                      color: const Color(0xFF94A3B8),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.access_time_rounded, size: 13, color: Color(0xFF94A3B8)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      time.isNotEmpty
+                                          ? (time.length > 19
+                                              ? time.substring(0, 19).replaceAll('T', ' ')
+                                              : time)
+                                          : 'Just now',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: const Color(0xFF94A3B8),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFECFDF5),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.check_circle_rounded, size: 10, color: Color(0xFF059669)),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            'DISPATCHED',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: const Color(0xFF059669),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
                           ),

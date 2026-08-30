@@ -98,18 +98,29 @@ class _NotificationScreenState extends State<NotificationScreen>
     } catch (_) {}
   }
 
+  bool _isBroadcast(Map<String, dynamic> n) {
+    final t = n['type'] as String?;
+    final meta = n['metadata'];
+    final aud = n['target_audience'] as String?;
+    return t == 'admin_broadcast' ||
+        t == 'broadcast' ||
+        t == 'announcement' ||
+        (meta is Map && (meta['is_broadcast'] == true || meta['subtype'] == 'admin_broadcast')) ||
+        (aud != null && aud.isNotEmpty && aud != 'specific');
+  }
+
   List<Map<String, dynamic>> _filteredFor(String? typeFilter) {
     if (typeFilter == null) return _notifications;
     if (typeFilter == 'admin_broadcast') {
-      return _notifications.where((n) {
-        final t = n['type'] as String?;
-        return t == 'admin_broadcast' || t == 'broadcast' || t == 'announcement';
-      }).toList();
+      return _notifications.where(_isBroadcast).toList();
     }
     return _notifications.where((n) => n['type'] == typeFilter).toList();
   }
 
-  IconData _getIcon(String? type) {
+  IconData _getIcon(String? type, [Map<String, dynamic>? item]) {
+    if (item != null && _isBroadcast(item)) {
+      return Icons.campaign_rounded;
+    }
     switch (type) {
       case 'admin_broadcast':
       case 'broadcast':
@@ -136,7 +147,10 @@ class _NotificationScreenState extends State<NotificationScreen>
     }
   }
 
-  Color _getColor(String? type) {
+  Color _getColor(String? type, [Map<String, dynamic>? item]) {
+    if (item != null && _isBroadcast(item)) {
+      return const Color(0xFFE11D48); // Bold Crimson / Rose
+    }
     switch (type) {
       case 'admin_broadcast':
       case 'broadcast':
@@ -163,7 +177,10 @@ class _NotificationScreenState extends State<NotificationScreen>
     }
   }
 
-  String _typeLabel(String? type) {
+  String _typeLabel(String? type, [Map<String, dynamic>? item]) {
+    if (item != null && _isBroadcast(item)) {
+      return 'ANNOUNCEMENT';
+    }
     switch (type) {
       case 'admin_broadcast':
       case 'broadcast':
@@ -481,8 +498,8 @@ class _NotificationScreenState extends State<NotificationScreen>
   Widget _buildNotificationCard(Map<String, dynamic> n, int index) {
     final isRead = n['is_read'] as bool? ?? true;
     final type = n['type'] as String?;
-    final color = _getColor(type);
-    final icon = _getIcon(type);
+    final color = _getColor(type, n);
+    final icon = _getIcon(type, n);
 
     return Dismissible(
       key: Key(n['id'] as String? ?? '$index'),
@@ -600,7 +617,7 @@ class _NotificationScreenState extends State<NotificationScreen>
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            _typeLabel(type),
+                            _typeLabel(type, n),
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 9,
                               fontWeight: FontWeight.w700,

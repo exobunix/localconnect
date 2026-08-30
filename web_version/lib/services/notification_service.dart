@@ -1242,8 +1242,13 @@ class NotificationService {
       final broadcastRow = <String, dynamic>{
         'title': title,
         'body': body,
-        'type': 'admin_broadcast',
+        'type': 'general',
         'target_audience': targetType,
+        'metadata': {
+          'is_broadcast': true,
+          'subtype': 'admin_broadcast',
+          'audience': targetType,
+        },
         'is_read': false,
         'created_at': now,
       };
@@ -1286,8 +1291,13 @@ class NotificationService {
                 'user_id': uid,
                 'title': title,
                 'body': body,
-                'type': 'admin_broadcast',
+                'type': 'general',
                 'target_audience': targetType,
+                'metadata': {
+                  'is_broadcast': true,
+                  'subtype': 'admin_broadcast',
+                  'audience': targetType,
+                },
                 'is_read': false,
                 'created_at': now,
               });
