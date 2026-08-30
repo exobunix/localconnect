@@ -889,6 +889,30 @@ class SupabaseService {
 
   // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
 
+  List<Map<String, dynamic>> _deduplicateNotifications(List<dynamic> rawList) {
+    final seenIds = <String>{};
+    final seenKeys = <String>{};
+    final unique = <Map<String, dynamic>>[];
+
+    for (final item in rawList) {
+      final map = item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item as Map);
+      final id = map['id'] as String? ?? '';
+      final title = map['title'] as String? ?? '';
+      final body = map['body'] as String? ?? '';
+      final rawDate = map['created_at'] as String? ?? '';
+      final dateKey = rawDate.length >= 16 ? rawDate.substring(0, 16) : rawDate;
+      final contentKey = '${title}_${body}_$dateKey';
+
+      if (id.isNotEmpty && seenIds.contains(id)) continue;
+      if (title.isNotEmpty && seenKeys.contains(contentKey)) continue;
+
+      if (id.isNotEmpty) seenIds.add(id);
+      if (title.isNotEmpty) seenKeys.add(contentKey);
+      unique.add(map);
+    }
+    return unique;
+  }
+
   Future<List<Map<String, dynamic>>> getNotifications() async {
     try {
       final userId = currentUser?.id;
@@ -901,7 +925,7 @@ class SupabaseService {
               .or('user_id.eq.$userId,user_id.is.null,target_audience.eq.all,target_audience.eq.all_users,target_audience.eq.all_customers,target_audience.eq.all_vendors')
               .order('created_at', ascending: false)
               .limit(60);
-          final list = List<Map<String, dynamic>>.from(response);
+          final list = _deduplicateNotifications(response);
           if (list.isNotEmpty) return list;
         } catch (_) {
           final response = await client
@@ -910,7 +934,7 @@ class SupabaseService {
               .or('user_id.eq.$userId,user_id.is.null')
               .order('created_at', ascending: false)
               .limit(60);
-          final list = List<Map<String, dynamic>>.from(response);
+          final list = _deduplicateNotifications(response);
           if (list.isNotEmpty) return list;
         }
       }
@@ -920,7 +944,7 @@ class SupabaseService {
           .select()
           .order('created_at', ascending: false)
           .limit(40);
-      return List<Map<String, dynamic>>.from(fallback);
+      return _deduplicateNotifications(fallback);
     } catch (e) {
       debugPrint('[SupabaseService] getNotifications error: $e');
       return [];

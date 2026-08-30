@@ -1271,48 +1271,7 @@ class NotificationService {
         sentCount = 1;
       }
 
-      // 2. Also insert individual rows for users if broadcasting to a group
-      if (targetType != 'specific_user') {
-        try {
-          var query = SupabaseService.instance.client.from('user_profiles').select('id, role');
-          if (targetType == 'all_customers') {
-            query = query.eq('role', 'customer');
-          } else if (targetType == 'all_vendors') {
-            query = query.eq('role', 'provider');
-          }
-
-          final users = await query;
-          final userList = List<Map<String, dynamic>>.from(users);
-          final rows = <Map<String, dynamic>>[];
-          for (final u in userList) {
-            final uid = u['id'] as String?;
-            if (uid != null && uid.isNotEmpty) {
-              rows.add({
-                'user_id': uid,
-                'title': title,
-                'body': body,
-                'type': 'general',
-                'target_audience': targetType,
-                'metadata': {
-                  'is_broadcast': true,
-                  'subtype': 'admin_broadcast',
-                  'audience': targetType,
-                },
-                'is_read': false,
-                'created_at': now,
-              });
-            }
-          }
-          if (rows.isNotEmpty) {
-            await SupabaseService.instance.client.from('notifications').insert(rows);
-            sentCount += rows.length;
-          }
-        } catch (e) {
-          debugPrint('[NotificationService] Individual row insert: $e');
-        }
-      }
-
-      // 3. Dispatch realtime broadcast event to all active clients
+      // 2. Dispatch realtime broadcast event to all active clients
       try {
         final broadcastChannel = SupabaseService.instance.client.channel('public:global_admin_broadcast');
         await broadcastChannel.sendBroadcastMessage(
@@ -1331,7 +1290,7 @@ class NotificationService {
 
       showInAppToast(
         title: '📢 Push Notification Dispatched',
-        subtitle: 'Sent "$title" to $sentCount recipient(s).',
+        subtitle: 'Sent "$title" broadcast to audience.',
         icon: Icons.campaign_rounded,
         iconColor: const Color(0xFF7C3AED),
         bgColor: const Color(0xFFF5F3FF),
