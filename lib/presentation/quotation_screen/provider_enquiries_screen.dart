@@ -597,10 +597,7 @@ class _ProviderEnquiriesScreenState extends State<ProviderEnquiriesScreen>
                           context,
                           MaterialPageRoute(
                             builder: (_) => ProviderQuotationBuilderScreen(
-                              enquiryId: enquiryId,
-                              customerId: item['customer_id'] as String?,
-                              customerName: customerName,
-                              serviceTitle: serviceTitle,
+                              enquiry: item,
                             ),
                           ),
                         ).then((_) => _loadEnquiries());

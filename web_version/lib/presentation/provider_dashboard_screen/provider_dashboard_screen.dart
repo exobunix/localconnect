@@ -1748,6 +1748,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                 ],
               ),
             ),
+          ),
           const SizedBox(height: 8),
           // ── Customer Enquiries (Direct Leads & Messages) ─────────────────
           GestureDetector(
