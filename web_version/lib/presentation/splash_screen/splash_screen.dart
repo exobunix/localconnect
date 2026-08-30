@@ -92,7 +92,12 @@ class _SplashScreenState extends State<SplashScreen>
     if (kIsWeb) {
       try {
         final href = html.window.location.href;
-        if (href.contains('type=recovery') || href.contains('reset-password')) {
+        if (href.contains('type=recovery') ||
+            href.contains('reset-password') ||
+            href.contains('recovery') ||
+            href.contains('error_code=otp_expired') ||
+            href.contains('otp_expired') ||
+            href.contains('error=access_denied')) {
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,

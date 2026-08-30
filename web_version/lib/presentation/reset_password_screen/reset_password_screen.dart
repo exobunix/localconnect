@@ -7,6 +7,9 @@ import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 
+import 'package:flutter/foundation.dart';
+import 'package:universal_html/html.dart' as html;
+
 class ResetPasswordScreen extends StatefulWidget {
   final String? initialEmail;
   const ResetPasswordScreen({super.key, this.initialEmail});
@@ -24,7 +27,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _obscureNew = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  bool _isResending = false;
+  bool _isLinkExpired = false;
   String? _errorMessage;
+  String? _successMessage;
   bool _isSuccess = false;
 
   // Password strength criteria
@@ -46,12 +52,31 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       _emailController.text = user.email!;
     } else if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty) {
       _emailController.text = widget.initialEmail!;
-    } else {
-      // Check if there is an active session
-      final session = SupabaseService.instance.client.auth.currentSession;
-      if (session == null) {
-        // May be loaded without auth recovery session
-      }
+    }
+
+    if (kIsWeb) {
+      try {
+        final href = html.window.location.href;
+        final uri = Uri.tryParse(href);
+        if (_emailController.text.isEmpty) {
+          if (uri != null && uri.queryParameters.containsKey('email')) {
+            _emailController.text = uri.queryParameters['email']!;
+          } else {
+            final stored = html.window.localStorage['reset_password_email'];
+            if (stored != null && stored.isNotEmpty) {
+              _emailController.text = stored;
+            }
+          }
+        }
+
+        if (href.contains('error_code=otp_expired') ||
+            href.contains('access_denied') ||
+            href.contains('expired')) {
+          _isLinkExpired = true;
+          _errorMessage =
+              'This reset link has expired or has already been used. Enter your email below and click "Send New Link".';
+        }
+      } catch (_) {}
     }
   }
 
@@ -80,6 +105,52 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       _hasNumber &&
       _hasSpecial;
 
+  Future<void> _handleResendLink() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your email address first.');
+      return;
+    }
+
+    setState(() {
+      _isResending = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      if (kIsWeb) {
+        try {
+          html.window.localStorage['reset_password_email'] = email;
+        } catch (_) {}
+      }
+
+      final redirectUrl = kIsWeb
+          ? '${Uri.base.origin}/?email=${Uri.encodeComponent(email)}#/reset-password'
+          : null;
+
+      await SupabaseService.instance.resetPassword(
+        email,
+        redirectTo: redirectUrl,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+          _isLinkExpired = false;
+          _successMessage = 'A fresh password reset link has been sent to $email. Please check your inbox!';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+          _errorMessage = 'Failed to send reset link: $e';
+        });
+      }
+    }
+  }
+
   Future<void> _handleUpdatePassword() async {
     final newPassword = _newPasswordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
@@ -102,24 +173,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _successMessage = null;
     });
 
     try {
-      final user = SupabaseService.instance.currentUser;
-      if (user == null && _emailController.text.trim().isEmpty) {
-        setState(() {
-          _errorMessage = 'Reset link has expired or is invalid. Please request a new password reset email.';
-        });
-        return;
-      }
-
-      // Update the user password in Supabase Auth
+      // Update user password in Supabase Auth
       await SupabaseService.instance.client.auth.updateUser(
         UserAttributes(password: newPassword),
       );
 
-      // Invalidate the recovery session by signing out
-      await SupabaseService.instance.signOut();
+      // Sign out recovery session to require fresh login with new credentials
+      try {
+        await SupabaseService.instance.signOut();
+      } catch (_) {}
 
       if (mounted) {
         setState(() {
@@ -130,8 +196,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     } on AuthException catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.message.contains('expired') || e.message.contains('invalid')
-              ? 'Reset link is invalid or expired. Please request a new password reset.'
+          _isLinkExpired = e.message.contains('expired') || e.message.contains('invalid');
+          _errorMessage = _isLinkExpired
+              ? 'Reset link is invalid or expired. Please click "Send New Link" below.'
               : e.message;
           _isLoading = false;
         });
@@ -293,26 +360,26 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           ),
           SizedBox(height: 3.h),
 
-          // Error Box
-          if (_errorMessage != null) ...[
+          // Success Banner
+          if (_successMessage != null) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFEBEE),
+                color: const Color(0xFFE8F5E9),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFFCDD2)),
+                border: Border.all(color: const Color(0xFFA5D6A7)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: Color(0xFFC62828), size: 20),
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF2E7D32), size: 20),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      _errorMessage!,
+                      _successMessage!,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 10.sp,
-                        color: const Color(0xFFC62828),
-                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF2E7D32),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -322,32 +389,80 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             SizedBox(height: 2.h),
           ],
 
-          // Email Field (Read-only pre-filled)
-          _buildFieldLabel('EMAIL'),
-          SizedBox(height: 0.8.h),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F3F9),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE0E0E0)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.email_outlined, color: Color(0xFF90A4AE), size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _emailController.text.isNotEmpty ? _emailController.text : 'Account Email Detected',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF44474E),
-                    ),
+          // Error Box
+          if (_errorMessage != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFCDD2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, color: Color(0xFFC62828), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.sp,
+                            color: const Color(0xFFC62828),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const Icon(Icons.lock_outline_rounded, color: Color(0xFFB0BEC5), size: 16),
-              ],
+                  if (_isLinkExpired) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isResending ? null : _handleResendLink,
+                        icon: _isResending
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.send_rounded, size: 16),
+                        label: Text(
+                          _isResending ? 'Sending...' : 'Send New Reset Link',
+                          style: GoogleFonts.plusJakartaSans(fontSize: 10.sp, fontWeight: FontWeight.w700),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFC62828),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SizedBox(height: 2.h),
+          ],
+
+          // Email Field
+          _buildFieldLabel('EMAIL ADDRESS'),
+          SizedBox(height: 0.8.h),
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF1E293B),
+            ),
+            decoration: _inputDecoration(
+              hint: 'Enter your registered email',
+              icon: Icons.email_outlined,
             ),
           ),
           SizedBox(height: 2.h),

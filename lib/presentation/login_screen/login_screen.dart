@@ -1053,7 +1053,14 @@ class _LoginScreenState extends State<LoginScreen>
               _errorMessage = null;
             });
             try {
-              final redirectUrl = kIsWeb ? '${Uri.base.origin}/#${AppRoutes.resetPasswordScreen}' : null;
+              if (kIsWeb) {
+                try {
+                  html.window.localStorage['reset_password_email'] = email;
+                } catch (_) {}
+              }
+              final redirectUrl = kIsWeb
+                  ? '${Uri.base.origin}/?email=${Uri.encodeComponent(email)}#/reset-password'
+                  : null;
               await SupabaseService.instance.resetPassword(
                 email,
                 redirectTo: redirectUrl,
