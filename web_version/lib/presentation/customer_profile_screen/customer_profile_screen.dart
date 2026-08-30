@@ -1,4 +1,5 @@
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/app_export.dart';
@@ -27,6 +28,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   bool _savingProfile = false;
+  String? _avatarUrl;
+  bool _uploadingAvatar = false;
 
   // Location
   LocationData? _customerLocation;
@@ -126,6 +129,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
         _profile = data;
         _nameCtrl.text = data?['full_name'] as String? ?? '';
         _phoneCtrl.text = data?['phone'] as String? ?? '';
+        _avatarUrl = data?['avatar_url'] as String?;
         _cacheAge = null;
         _loadingProfile = false;
       });
@@ -584,6 +588,95 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
     }
   }
 
+  Future<void> _pickAndUploadAvatar() async {
+    if (!_isOnline) {
+      _showSnack('Cannot upload while offline');
+      return;
+    }
+    final userId = SupabaseService.instance.currentUser?.id;
+    if (userId == null) return;
+
+    // Show source picker
+    ImageSource? source;
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: Text('Take Photo', style: GoogleFonts.plusJakartaSans()),
+              onTap: () {
+                source = ImageSource.camera;
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: Text('Choose from Gallery', style: GoogleFonts.plusJakartaSans()),
+              onTap: () {
+                source = ImageSource.gallery;
+                Navigator.pop(context);
+              },
+            ),
+            if (_avatarUrl != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                title: Text('Remove Photo',
+                    style: GoogleFonts.plusJakartaSans(color: Colors.red)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await SupabaseService.instance
+                      .updateUserProfile(userId: userId, avatarUrl: '');
+                  if (mounted) setState(() => _avatarUrl = null);
+                  _showSnack('Photo removed', success: true);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final XFile? picked = await picker.pickImage(
+      source: source!,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    setState(() => _uploadingAvatar = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final mimeType = picked.name.toLowerCase().endsWith('.png')
+          ? 'image/png'
+          : 'image/jpeg';
+      final url = await SupabaseService.instance.uploadUserAvatar(
+        userId: userId,
+        imageBytes: bytes,
+        contentType: mimeType,
+      );
+      if (url != null && mounted) {
+        setState(() => _avatarUrl = url);
+        _showSnack('Profile photo updated!', success: true);
+      } else if (mounted) {
+        _showSnack('Failed to upload photo. Check Storage bucket settings.');
+      }
+    } catch (e) {
+      if (mounted) _showSnack('Upload error: $e');
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
   Future<void> _savePreferences() async {
     if (!_isOnline) {
       _showSnack('Cannot save while offline');
@@ -757,23 +850,74 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
           padding: const EdgeInsets.fromLTRB(20, 56, 20, 56),
           child: Row(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: Center(
-                  child: Text(
-                    initials,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+              // ── Avatar with camera overlay ──────────────────────────
+              GestureDetector(
+                onTap: _pickAndUploadAvatar,
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2.5),
+                      ),
+                      child: ClipOval(
+                        child: _uploadingAvatar
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : (_avatarUrl != null && _avatarUrl!.isNotEmpty
+                                ? Image.network(
+                                    _avatarUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Center(
+                                      child: Text(
+                                        initials,
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      initials,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  )),
+                      ),
                     ),
-                  ),
+                    // Camera icon overlay
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppTheme.primary, width: 1.5),
+                        ),
+                        child: Icon(
+                          Icons.camera_alt_rounded,
+                          size: 13,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 16),
@@ -799,6 +943,15 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
                         color: Colors.white70,
                       ),
                       overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tap photo to change',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10,
+                        color: Colors.white60,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                   ],
                 ),

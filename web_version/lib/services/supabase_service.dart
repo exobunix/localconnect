@@ -242,6 +242,40 @@ class SupabaseService {
     await client.from('user_profiles').update(updates).eq('id', userId);
   }
 
+  /// Upload a profile photo for a user to Supabase Storage.
+  /// Returns the public URL on success, null on failure.
+  Future<String?> uploadUserAvatar({
+    required String userId,
+    required Uint8List imageBytes,
+    String contentType = 'image/jpeg',
+  }) async {
+    try {
+      final ext = contentType == 'image/png' ? 'png' : 'jpg';
+      final storagePath = 'avatars/$userId.$ext';
+
+      // Upload (upsert so re-upload overwrites)
+      await client.storage
+          .from('user-avatars')
+          .uploadBinary(
+            storagePath,
+            imageBytes,
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
+          );
+
+      // Get public URL
+      final publicUrl =
+          client.storage.from('user-avatars').getPublicUrl(storagePath);
+
+      // Persist avatar_url on the user profile row
+      await updateUserProfile(userId: userId, avatarUrl: publicUrl);
+
+      return publicUrl;
+    } catch (e) {
+      debugPrint('[SupabaseService] uploadUserAvatar error: $e');
+      return null;
+    }
+  }
+
   // ─── SAVED ADDRESSES ──────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getSavedAddresses() async {
