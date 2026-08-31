@@ -198,6 +198,73 @@ class _AdminCategoryManagementScreenState
     }
   }
 
+  Future<void> _deleteCategory(String id) async {
+    try {
+      await SupabaseService.instance.adminDeleteCategory(id);
+      CategoryService.instance.invalidateCache();
+      await _loadCategories();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Category deleted successfully!'),
+            backgroundColor: Color(0xFF00C853),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete category: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showDeleteCategoryConfirmDialog(
+    BuildContext context,
+    Map<String, dynamic> cat,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Delete Category',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to delete the category "${cat['name']}"? This will also delete all of its subcategories. This action cannot be undone.',
+          style: GoogleFonts.plusJakartaSans(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _deleteCategory(cat['id'] as String);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   int get _activeCount =>
       _categories.where((c) => c['is_active'] == true).length;
 
@@ -578,6 +645,25 @@ class _AdminCategoryManagementScreenState
                                                 ),
                                                 onPressed: () =>
                                                     _showEditCategoryDialog(
+                                                      context,
+                                                      cat,
+                                                    ),
+                                                padding: EdgeInsets.zero,
+                                                constraints:
+                                                    const BoxConstraints(
+                                                      minWidth: 32,
+                                                      minHeight: 32,
+                                                    ),
+                                              ),
+                                              // Delete button
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.delete_outline_rounded,
+                                                  size: 18,
+                                                  color: Colors.redAccent,
+                                                ),
+                                                onPressed: () =>
+                                                    _showDeleteCategoryConfirmDialog(
                                                       context,
                                                       cat,
                                                     ),

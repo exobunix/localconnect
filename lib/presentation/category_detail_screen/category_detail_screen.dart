@@ -282,6 +282,10 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     final categoryId = args is String ? args : 'shop';
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 1024;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+
     final categoryName = _dynamicCategory?.name ?? categoryId;
     final categoryNameMarathi = _dynamicCategory?.nameMarathi ?? '';
     final categoryColor = _dynamicCategory?.color ?? AppTheme.primary;
@@ -489,78 +493,6 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                 }),
               ),
             ),
-          // Subcategory Info Header Card
-          if (selectedSub != null && selectedSub.id.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: AppTheme.cardShadow,
-                  border: Border.all(
-                    color: categoryColor.withValues(alpha: 0.15),
-                    width: 1,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (selectedSub.imageUrl.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(15),
-                        ),
-                        child: Image.network(
-                          selectedSub.imageUrl,
-                          height: 160,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        ),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            selectedSub.name,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF1D1B20),
-                            ),
-                          ),
-                          if (selectedSub.nameMarathi.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              selectedSub.nameMarathi,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 13,
-                                color: const Color(0xFF49454F),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                          if (selectedSub.description.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              selectedSub.description,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 13,
-                                color: const Color(0xFF49454F),
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           if (_isLoading)
             SliverToBoxAdapter(
               child: Padding(
@@ -622,37 +554,72 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                         ),
                       ),
                     )
-                  : SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _ProviderListCard(
-                            provider: filteredProviders[index],
-                            categoryColor: categoryColor,
-                            categoryName: categoryName,
-                            subcategoryName: selectedSub?.name ?? 'General',
-                            onTap: () => _showProviderDetail(
-                              filteredProviders[index],
-                              categoryColor,
-                              categoryName,
-                              selectedSub?.name ?? 'General',
-                            ),
-                            onEnquiry: () => _showEnquiryDialog(
-                              filteredProviders[index],
-                              categoryColor,
-                              categoryName,
-                              selectedSub?.name ?? 'General',
-                            ),
-                            onBook: () => _showBookingSheet(
-                              filteredProviders[index],
-                              categoryColor,
-                              categoryName,
-                            ),
+                  : (isDesktop || isTablet
+                      ? SliverGrid(
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: isDesktop ? (screenWidth > 1200 ? 4 : 3) : 2,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: isDesktop ? (screenWidth > 1200 ? 1.0 : 0.9) : 1.05,
                           ),
-                        ),
-                        childCount: filteredProviders.length,
-                      ),
-                    ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => _ProviderListCard(
+                              provider: filteredProviders[index],
+                              categoryColor: categoryColor,
+                              categoryName: categoryName,
+                              subcategoryName: selectedSub?.name ?? 'General',
+                              onTap: () => _showProviderDetail(
+                                filteredProviders[index],
+                                categoryColor,
+                                categoryName,
+                                selectedSub?.name ?? 'General',
+                              ),
+                              onEnquiry: () => _showEnquiryDialog(
+                                filteredProviders[index],
+                                categoryColor,
+                                categoryName,
+                                selectedSub?.name ?? 'General',
+                              ),
+                              onBook: () => _showBookingSheet(
+                                filteredProviders[index],
+                                categoryColor,
+                                categoryName,
+                              ),
+                            ),
+                            childCount: filteredProviders.length,
+                          ),
+                        )
+                      : SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _ProviderListCard(
+                                provider: filteredProviders[index],
+                                categoryColor: categoryColor,
+                                categoryName: categoryName,
+                                subcategoryName: selectedSub?.name ?? 'General',
+                                onTap: () => _showProviderDetail(
+                                  filteredProviders[index],
+                                  categoryColor,
+                                  categoryName,
+                                  selectedSub?.name ?? 'General',
+                                ),
+                                onEnquiry: () => _showEnquiryDialog(
+                                  filteredProviders[index],
+                                  categoryColor,
+                                  categoryName,
+                                  selectedSub?.name ?? 'General',
+                                ),
+                                onBook: () => _showBookingSheet(
+                                  filteredProviders[index],
+                                  categoryColor,
+                                  categoryName,
+                                ),
+                              ),
+                            ),
+                            childCount: filteredProviders.length,
+                          ),
+                        )),
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],

@@ -1823,6 +1823,9 @@ class SupabaseService {
   }
 
   Future<void> adminDeleteCategory(String id) async {
+    // Delete dependent subcategories first to prevent foreign key errors
+    await client.from('subcategories').delete().eq('category_id', id);
+    // Then delete the category itself
     await client.from('categories').delete().eq('id', id);
   }
 
@@ -1862,6 +1865,8 @@ class SupabaseService {
   Future<void> adminDeleteSubcategory(String id) async {
     await client.from('subcategories').delete().eq('id', id);
   }
+
+
 
   Future<void> adminToggleSubcategory({
     required String id,
