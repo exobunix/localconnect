@@ -31,13 +31,77 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     _conversationId = args?['conversationId'] as String? ?? '';
-    _otherUserId = args?['otherUserId'] as String? ?? '';
-    _otherUserName = args?['otherUserName'] as String? ?? 'Chat';
+    _otherUserId = args?['otherUserId'] as String? ?? args?['providerUserId'] as String? ?? '';
+    _otherUserName = args?['otherUserName'] as String? ?? args?['providerName'] as String? ?? 'Chat';
     _otherUserAvatar = args?['otherUserAvatar'] as String? ?? '';
+
+    final providerId = args?['providerId'] as String? ?? '';
 
     if (_conversationId.isNotEmpty) {
       _loadMessages();
       _subscribeToMessages();
+    } else if (_otherUserId.isNotEmpty || providerId.isNotEmpty) {
+      _initializeConversation(providerId);
+    } else {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _initializeConversation(String providerId) async {
+    setState(() => _isLoading = true);
+    try {
+      String targetUserId = _otherUserId;
+      String? targetServiceId = providerId.isNotEmpty ? providerId : null;
+
+      if (targetUserId.isEmpty && providerId.isNotEmpty) {
+        final response = await SupabaseService.instance.client
+            .from('service_providers')
+            .select('user_id')
+            .eq('id', providerId)
+            .maybeSingle();
+        if (response != null) {
+          targetUserId = response['user_id'] as String? ?? '';
+        }
+      }
+
+      if (targetUserId.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not find provider details.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+
+      final conversation = await SupabaseService.instance.getOrCreateConversation(
+        providerUserId: targetUserId,
+        providerServiceId: targetServiceId,
+      );
+
+      if (conversation != null && mounted) {
+        setState(() {
+          _conversationId = conversation['id'] as String? ?? '';
+          _otherUserId = targetUserId;
+        });
+        if (_conversationId.isNotEmpty) {
+          _loadMessages();
+          _subscribeToMessages();
+        } else {
+          setState(() => _isLoading = false);
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
