@@ -939,6 +939,8 @@ class _HomeMaintenanceCustomerScreenState
             ),
           ),
         );
+      }
+    }
   }
 
   void _showProviderDetail(Map<String, dynamic> provider) {
