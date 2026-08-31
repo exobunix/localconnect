@@ -939,14 +939,45 @@ class _HomeMaintenanceCustomerScreenState
             ),
           ),
         );
-      }
-    }
   }
 
   void _showProviderDetail(Map<String, dynamic> provider) {
+    final handleResult = (String? result) {
+      if (result == 'call') {
+        _handleCall(provider['phone'] as String? ?? '');
+      } else if (result == 'message') {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.chatDetailScreen,
+          arguments: {
+            'providerId': provider['id'],
+            'providerName': provider['name'],
+          },
+        );
+      } else if (result == 'whatsapp') {
+        _handleWhatsApp(provider['phone'] as String? ?? '');
+      } else if (result == 'enquiry') {
+        UniversalEnquiryDialog.show(
+          context,
+          providerId: provider['id'] as String? ?? 'p_1',
+          providerName: provider['name'] as String? ?? 'Provider',
+          providerImage: provider['image'] as String?,
+          providerPhone: provider['phone'] as String?,
+          providerRating: (provider['rating'] as num?)?.toDouble() ?? 4.8,
+          category: 'Home Maintenance',
+          subcategory: _activeSubcategory,
+          serviceTitle: provider['speciality'] as String? ?? 'Home Maintenance Service',
+          basePrice: '₹${provider['charge']}${provider['chargeUnit'] ?? '/visit'}',
+          themeColor: _activeColor,
+        );
+      } else if (result == 'book') {
+        _showBookingSheet(provider);
+      }
+    };
+
     final isWeb = MediaQuery.of(context).size.width > 850;
     if (isWeb) {
-      showDialog(
+      showDialog<String>(
         context: context,
         builder: (context) => Dialog(
           shape: RoundedRectangleBorder(
@@ -961,7 +992,6 @@ class _HomeMaintenanceCustomerScreenState
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Custom Header
                   Container(
                     padding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
                     child: Row(
@@ -983,17 +1013,18 @@ class _HomeMaintenanceCustomerScreenState
                     ),
                   ),
                   const Divider(height: 1),
-                  // Scrollable Body
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const SizedBox(height: 16),
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(14.0),
+                                borderRadius: BorderRadius.circular(16.0),
                                 child: Image.network(
                                   provider['image'] as String,
                                   width: 80,
@@ -1024,16 +1055,16 @@ class _HomeMaintenanceCustomerScreenState
                                             style: GoogleFonts.plusJakartaSans(
                                               fontSize: 18,
                                               fontWeight: FontWeight.w800,
+                                              color: const Color(0xFF1A1C1E),
                                             ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
-                                        if (provider['verified'] == true) ...[
-                                          const SizedBox(width: 6),
+                                        if (provider['verified'] == true)
                                           Container(
                                             padding: const EdgeInsets.symmetric(
-                                              horizontal: 6,
-                                              vertical: 2,
+                                              horizontal: 8,
+                                              vertical: 3,
                                             ),
                                             decoration: BoxDecoration(
                                               color: Colors.green[50],
@@ -1047,22 +1078,21 @@ class _HomeMaintenanceCustomerScreenState
                                                   size: 12,
                                                   color: Colors.green[700],
                                                 ),
-                                                const SizedBox(width: 3),
+                                                const SizedBox(width: 4),
                                                 Text(
                                                   'Verified',
                                                   style: GoogleFonts.plusJakartaSans(
                                                     fontSize: 10,
                                                     color: Colors.green[700],
-                                                    fontWeight: FontWeight.w600,
+                                                    fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
                                               ],
                                             ),
                                           ),
-                                        ],
                                       ],
                                     ),
-                                    const SizedBox(height: 6),
+                                    const SizedBox(height: 4),
                                     Text(
                                       provider['speciality'] as String,
                                       style: GoogleFonts.plusJakartaSans(
@@ -1075,14 +1105,14 @@ class _HomeMaintenanceCustomerScreenState
                                       children: [
                                         Icon(
                                           Icons.star_rounded,
-                                          size: 15,
+                                          size: 16,
                                           color: Colors.amber[600],
                                         ),
                                         Text(
                                           ' ${provider['rating']}',
                                           style: GoogleFonts.plusJakartaSans(
                                             fontSize: 13,
-                                            fontWeight: FontWeight.w600,
+                                            fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                         Text(
@@ -1100,7 +1130,6 @@ class _HomeMaintenanceCustomerScreenState
                             ],
                           ),
                           const SizedBox(height: 16),
-                          // Contact number row
                           if ((provider['phone'] as String? ?? '').isNotEmpty) ...[
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -1195,18 +1224,17 @@ class _HomeMaintenanceCustomerScreenState
                               ),
                             ),
                           ],
+                          const SizedBox(height: 20),
                         ],
                       ),
                     ),
                   ),
                   const Divider(height: 1),
-                  // Actions footer
                   Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Call, Message, WhatsApp row
                         Row(
                           children: [
                             Expanded(
@@ -1214,10 +1242,7 @@ class _HomeMaintenanceCustomerScreenState
                                 icon: Icons.call_rounded,
                                 label: 'Call',
                                 color: Colors.green[700]!,
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  _handleCall(provider['phone'] as String? ?? '');
-                                },
+                                onTap: () => Navigator.pop(context, 'call'),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -1226,17 +1251,7 @@ class _HomeMaintenanceCustomerScreenState
                                 icon: Icons.chat_bubble_outline_rounded,
                                 label: 'Message',
                                 color: _activeColor,
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  Navigator.pushNamed(
-                                    context,
-                                    AppRoutes.chatDetailScreen,
-                                    arguments: {
-                                      'providerId': provider['id'],
-                                      'providerName': provider['name'],
-                                    },
-                                  );
-                                },
+                                onTap: () => Navigator.pop(context, 'message'),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -1245,16 +1260,12 @@ class _HomeMaintenanceCustomerScreenState
                                 icon: Icons.help_outline,
                                 label: 'WhatsApp',
                                 color: const Color(0xFF25D366),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  _handleWhatsApp(provider['phone'] as String? ?? '');
-                                },
+                                onTap: () => Navigator.pop(context, 'whatsapp'),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        // Chat and Book Now row
                         Row(
                           children: [
                             Expanded(
@@ -1277,22 +1288,7 @@ class _HomeMaintenanceCustomerScreenState
                                     borderRadius: BorderRadius.circular(10.0),
                                   ),
                                 ),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  UniversalEnquiryDialog.show(
-                                    context,
-                                    providerId: provider['id'] as String? ?? 'p_1',
-                                    providerName: provider['name'] as String? ?? 'Provider',
-                                    providerImage: provider['image'] as String?,
-                                    providerPhone: provider['phone'] as String?,
-                                    providerRating: (provider['rating'] as num?)?.toDouble() ?? 4.8,
-                                    category: 'Home Maintenance',
-                                    subcategory: _activeSubcategory,
-                                    serviceTitle: provider['speciality'] as String? ?? 'Home Maintenance Service',
-                                    basePrice: '₹${provider['charge']}${provider['chargeUnit'] ?? '/visit'}',
-                                    themeColor: _activeColor,
-                                  );
-                                },
+                                onPressed: () => Navigator.pop(context, 'enquiry'),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1319,10 +1315,7 @@ class _HomeMaintenanceCustomerScreenState
                                   ),
                                   elevation: 0,
                                 ),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  _showBookingSheet(provider);
-                                },
+                                onPressed: () => Navigator.pop(context, 'book'),
                               ),
                             ),
                           ],
@@ -1335,11 +1328,11 @@ class _HomeMaintenanceCustomerScreenState
             ),
           ),
         ),
-      );
+      ).then(handleResult);
       return;
     }
 
-    showModalBottomSheet(
+    showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -1456,16 +1449,12 @@ class _HomeMaintenanceCustomerScreenState
                             Text(
                               ' ${provider['rating']}',
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
+                                  fontSize: 12, fontWeight: FontWeight.w600),
                             ),
                             Text(
                               ' (${provider['reviews']} reviews)',
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11,
-                                color: Colors.grey[500],
-                              ),
+                                  fontSize: 11, color: Colors.grey[500]),
                             ),
                           ],
                         ),
@@ -1475,7 +1464,6 @@ class _HomeMaintenanceCustomerScreenState
                 ],
               ),
               const SizedBox(height: 12),
-              // Contact number row
               if ((provider['phone'] as String? ?? '').isNotEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -1564,7 +1552,6 @@ class _HomeMaintenanceCustomerScreenState
                 ),
               ],
               const SizedBox(height: 20),
-              // Call, Message, WhatsApp row
               Row(
                 children: [
                   Expanded(
@@ -1572,10 +1559,7 @@ class _HomeMaintenanceCustomerScreenState
                       icon: Icons.call_rounded,
                       label: 'Call',
                       color: Colors.green[700]!,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _handleCall(provider['phone'] as String? ?? '');
-                      },
+                      onTap: () => Navigator.pop(context, 'call'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1584,17 +1568,7 @@ class _HomeMaintenanceCustomerScreenState
                       icon: Icons.chat_bubble_outline_rounded,
                       label: 'Message',
                       color: _activeColor,
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.pushNamed(
-                          context,
-                          AppRoutes.chatDetailScreen,
-                          arguments: {
-                            'providerId': provider['id'],
-                            'providerName': provider['name'],
-                          },
-                        );
-                      },
+                      onTap: () => Navigator.pop(context, 'message'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1603,16 +1577,12 @@ class _HomeMaintenanceCustomerScreenState
                       icon: Icons.help_outline,
                       label: 'WhatsApp',
                       color: const Color(0xFF25D366),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _handleWhatsApp(provider['phone'] as String? ?? '');
-                      },
+                      onTap: () => Navigator.pop(context, 'whatsapp'),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              // Chat and Book Now row
               Row(
                 children: [
                   Expanded(
@@ -1635,25 +1605,10 @@ class _HomeMaintenanceCustomerScreenState
                           borderRadius: BorderRadius.circular(10.0),
                         ),
                       ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        UniversalEnquiryDialog.show(
-                          context,
-                          providerId: provider['id'] as String? ?? 'p_1',
-                          providerName: provider['name'] as String? ?? 'Provider',
-                          providerImage: provider['image'] as String?,
-                          providerPhone: provider['phone'] as String?,
-                          providerRating: (provider['rating'] as num?)?.toDouble() ?? 4.8,
-                          category: 'Home Maintenance',
-                          subcategory: _activeSubcategory,
-                          serviceTitle: provider['speciality'] as String? ?? 'Home Maintenance Service',
-                          basePrice: '₹${provider['charge']}${provider['chargeUnit'] ?? '/visit'}',
-                          themeColor: _activeColor,
-                        );
-                      },
+                      onPressed: () => Navigator.pop(context, 'enquiry'),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
@@ -1676,10 +1631,7 @@ class _HomeMaintenanceCustomerScreenState
                           borderRadius: BorderRadius.circular(10.0),
                         ),
                       ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _showBookingSheet(provider);
-                      },
+                      onPressed: () => Navigator.pop(context, 'book'),
                     ),
                   ),
                 ],
@@ -1689,7 +1641,7 @@ class _HomeMaintenanceCustomerScreenState
           ),
         ),
       ),
-    );
+    ).then(handleResult);
   }
 
   Widget _contactActionButton({

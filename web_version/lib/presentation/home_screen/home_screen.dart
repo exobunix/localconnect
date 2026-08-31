@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   RealtimeChannel? _msgSubscription;
   bool _isOnline = true;
   String? _cacheAge;
+  String? _avatarUrl;
 
   static const _cacheKeyProfile = 'home_user_profile';
 
@@ -116,6 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
             SupabaseService.instance.selectedCity = _selectedCity;
           }
           _userRole = data?['role'] as String? ?? 'customer';
+          _avatarUrl = data?['avatar_url'] as String?;
           _cacheAge = ConnectivityService.instance.formatCacheAge(ts);
         });
       }
@@ -132,6 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
           SupabaseService.instance.selectedCity = _selectedCity;
         }
         _userRole = profile['role'] as String? ?? 'customer';
+        _avatarUrl = profile['avatar_url'] as String?;
       });
       await ConnectivityService.instance.cacheData(_cacheKeyProfile, profile);
     }
@@ -163,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _handleProfileTap() {
-    Navigator.pushNamed(context, AppRoutes.customerProfileScreen);
+    Navigator.pushNamed(context, AppRoutes.customerProfileScreen).then((_) => _loadUserProfile());
   }
 
   void _onScroll() {
@@ -217,6 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onProfileTap: _handleProfileTap,
               onSignOut: _handleSignOut,
               unreadNotificationCount: unreadNotifCount,
+              avatarUrl: _avatarUrl,
             ),
             if (!_isOnline && _cacheAge != null)
               Padding(
@@ -1019,7 +1023,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: CircleAvatar(
                     radius: 18,
                     backgroundColor: Colors.white.withValues(alpha: 0.2),
-                    child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
+                    backgroundImage: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                        ? NetworkImage(_avatarUrl!)
+                        : null,
+                    child: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                        ? null
+                        : const Icon(Icons.person_rounded, color: Colors.white, size: 20),
                   ),
                 ),
                 const SizedBox(width: 8),

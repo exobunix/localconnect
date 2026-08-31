@@ -318,7 +318,7 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
         top: 12,
         left: 20,
         right: 20,
-        bottom: bottomInset + 20,
+        bottom: bottomInset + MediaQuery.of(context).padding.bottom + 20,
       ),
       child: _isSuccess ? _buildSuccessView() : _buildFormView(),
     );

@@ -944,7 +944,7 @@ class _HomeMaintenanceCustomerScreenState
   }
 
   void _showProviderDetail(Map<String, dynamic> provider) {
-    showModalBottomSheet(
+    showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -1177,10 +1177,7 @@ class _HomeMaintenanceCustomerScreenState
                       icon: Icons.call_rounded,
                       label: 'Call',
                       color: Colors.green[700]!,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _handleCall(provider['phone'] as String? ?? '');
-                      },
+                      onTap: () => Navigator.pop(context, 'call'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1189,17 +1186,7 @@ class _HomeMaintenanceCustomerScreenState
                       icon: Icons.chat_bubble_outline_rounded,
                       label: 'Message',
                       color: _activeColor,
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.pushNamed(
-                          context,
-                          AppRoutes.chatDetailScreen,
-                          arguments: {
-                            'providerId': provider['id'],
-                            'providerName': provider['name'],
-                          },
-                        );
-                      },
+                      onTap: () => Navigator.pop(context, 'message'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1208,10 +1195,7 @@ class _HomeMaintenanceCustomerScreenState
                       icon: Icons.help_outline,
                       label: 'WhatsApp',
                       color: const Color(0xFF25D366),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _handleWhatsApp(provider['phone'] as String? ?? '');
-                      },
+                      onTap: () => Navigator.pop(context, 'whatsapp'),
                     ),
                   ),
                 ],
@@ -1240,22 +1224,7 @@ class _HomeMaintenanceCustomerScreenState
                           borderRadius: BorderRadius.circular(10.0),
                         ),
                       ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        UniversalEnquiryDialog.show(
-                          context,
-                          providerId: provider['id'] as String? ?? 'p_1',
-                          providerName: provider['name'] as String? ?? 'Provider',
-                          providerImage: provider['image'] as String?,
-                          providerPhone: provider['phone'] as String?,
-                          providerRating: (provider['rating'] as num?)?.toDouble() ?? 4.8,
-                          category: 'Home Maintenance',
-                          subcategory: _activeSubcategory,
-                          serviceTitle: provider['speciality'] as String? ?? 'Home Maintenance Service',
-                          basePrice: '₹${provider['charge']}${provider['chargeUnit'] ?? '/visit'}',
-                          themeColor: _activeColor,
-                        );
-                      },
+                      onPressed: () => Navigator.pop(context, 'enquiry'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1281,10 +1250,7 @@ class _HomeMaintenanceCustomerScreenState
                           borderRadius: BorderRadius.circular(10.0),
                         ),
                       ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _showBookingSheet(provider);
-                      },
+                      onPressed: () => Navigator.pop(context, 'book'),
                     ),
                   ),
                 ],
@@ -1294,7 +1260,38 @@ class _HomeMaintenanceCustomerScreenState
           ),
         ),
       ),
-    );
+    ).then((result) {
+      if (result == 'call') {
+        _handleCall(provider['phone'] as String? ?? '');
+      } else if (result == 'message') {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.chatDetailScreen,
+          arguments: {
+            'providerId': provider['id'],
+            'providerName': provider['name'],
+          },
+        );
+      } else if (result == 'whatsapp') {
+        _handleWhatsApp(provider['phone'] as String? ?? '');
+      } else if (result == 'enquiry') {
+        UniversalEnquiryDialog.show(
+          context,
+          providerId: provider['id'] as String? ?? 'p_1',
+          providerName: provider['name'] as String? ?? 'Provider',
+          providerImage: provider['image'] as String?,
+          providerPhone: provider['phone'] as String?,
+          providerRating: (provider['rating'] as num?)?.toDouble() ?? 4.8,
+          category: 'Home Maintenance',
+          subcategory: _activeSubcategory,
+          serviceTitle: provider['speciality'] as String? ?? 'Home Maintenance Service',
+          basePrice: '₹${provider['charge']}${provider['chargeUnit'] ?? '/visit'}',
+          themeColor: _activeColor,
+        );
+      } else if (result == 'book') {
+        _showBookingSheet(provider);
+      }
+    });
   }
 
   Widget _contactActionButton({

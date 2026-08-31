@@ -1,8 +1,10 @@
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_export.dart';
 import '../../services/category_service.dart';
 import '../../services/supabase_service.dart';
+import '../../utils/image_upload_helper.dart';
 
 class AdminCategoryManagementScreen extends StatefulWidget {
   const AdminCategoryManagementScreen({super.key});
@@ -17,6 +19,103 @@ class _AdminCategoryManagementScreenState
   bool _isLoading = true;
   List<Map<String, dynamic>> _categories = [];
   String? _expandedCategoryId;
+
+  Future<void> _pickAndUploadImage(
+    TextEditingController controller,
+    String pathPrefix,
+    String id,
+  ) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+
+      final validation = await ImageUploadHelper.validateAndCompress(picked);
+      if (!validation.isValid) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(validation.errorMessage ?? 'Invalid image file'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Show loader
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
+                SizedBox(width: 12),
+                Text('Uploading image...'),
+              ],
+            ),
+            duration: Duration(days: 1), // indefinite until dismissed
+            dismissDirection: DismissDirection.none,
+          ),
+        );
+      }
+
+      final fileName = picked.name;
+      final fileExtension = fileName.split('.').last.toLowerCase();
+      final storagePath = '$pathPrefix/${id}_${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+
+      final publicUrl = await SupabaseService.instance.uploadImageToBucket(
+        bucketName: 'user-avatars',
+        storagePath: storagePath,
+        imageBytes: validation.bytes!,
+        contentType: validation.mimeType ?? 'image/jpeg',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+      }
+
+      if (publicUrl != null) {
+        controller.text = publicUrl;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image uploaded successfully!'),
+              backgroundColor: Color(0xFF00C853),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to upload image to storage.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -839,6 +938,17 @@ class _AdminCategoryManagementScreenState
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
+                    onPressed: () {
+                      final name = nameCtrl.text.trim();
+                      final folderId = name.isNotEmpty
+                          ? name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '')
+                          : 'temp';
+                      _pickAndUploadImage(imageCtrl, 'categories', folderId);
+                    },
+                    tooltip: 'Upload Photo',
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -961,6 +1071,17 @@ class _AdminCategoryManagementScreenState
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
+                    onPressed: () {
+                      final name = nameCtrl.text.trim();
+                      final folderId = name.isNotEmpty
+                          ? name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '')
+                          : 'temp';
+                      _pickAndUploadImage(imageCtrl, 'categories', folderId);
+                    },
+                    tooltip: 'Upload Photo',
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1051,6 +1172,17 @@ class _AdminCategoryManagementScreenState
                 decoration: InputDecoration(
                   labelText: 'Photo/Image URL',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
+                    onPressed: () {
+                      final name = nameCtrl.text.trim();
+                      final folderId = name.isNotEmpty
+                          ? name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '')
+                          : 'temp';
+                      _pickAndUploadImage(imageCtrl, 'subcategories', folderId);
+                    },
+                    tooltip: 'Upload Photo',
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1167,6 +1299,17 @@ class _AdminCategoryManagementScreenState
                 decoration: InputDecoration(
                   labelText: 'Photo/Image URL',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
+                    onPressed: () {
+                      final name = nameCtrl.text.trim();
+                      final folderId = name.isNotEmpty
+                          ? name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '')
+                          : 'temp';
+                      _pickAndUploadImage(imageCtrl, 'subcategories', folderId);
+                    },
+                    tooltip: 'Upload Photo',
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

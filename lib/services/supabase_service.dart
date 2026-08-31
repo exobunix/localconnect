@@ -276,6 +276,32 @@ class SupabaseService {
     }
   }
 
+  /// Upload an image file to a specified public storage bucket.
+  /// Returns the public URL on success, null on failure.
+  Future<String?> uploadImageToBucket({
+    required String bucketName,
+    required String storagePath,
+    required Uint8List imageBytes,
+    String contentType = 'image/jpeg',
+  }) async {
+    try {
+      await client.storage
+          .from(bucketName)
+          .uploadBinary(
+            storagePath,
+            imageBytes,
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
+          );
+
+      final publicUrl =
+          client.storage.from(bucketName).getPublicUrl(storagePath);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('[SupabaseService] uploadImageToBucket error: $e');
+      return null;
+    }
+  }
+
   // ─── SAVED ADDRESSES ──────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getSavedAddresses() async {

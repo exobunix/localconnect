@@ -67,12 +67,20 @@ class _EventProviderDetailScreenState extends State<EventProviderDetailScreen>
   Color get _color => widget.subcategory['color'] as Color;
 
   void _showInquirySheet() {
-    showModalBottomSheet(
+    showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _InquirySheet(provider: widget.provider, color: _color),
-    );
+    ).then((result) {
+      if (result != null && mounted) {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.bookingCheckoutScreen,
+          arguments: result,
+        );
+      }
+    });
   }
 
   void _showReportSheet() {
@@ -2096,25 +2104,20 @@ class _InquirySheetState extends State<_InquirySheet> {
                         final startingPrice = widget.provider['starting_price']?.toString() ?? '15000';
                         final formattedPrice = startingPrice.startsWith('₹') ? startingPrice : '₹$startingPrice';
 
-                        Navigator.pop(context); // Pop sheet/modal
-                        Navigator.pushNamed(
-                          context,
-                          AppRoutes.bookingCheckoutScreen,
-                          arguments: {
-                            'providerId': widget.provider['id'] as String?,
-                            'providerName': widget.provider['name'] as String? ?? 'Event Partner',
-                            'providerImage': widget.provider['avatar_url'] as String? ?? '',
-                            'providerRating': widget.provider['rating'] as double? ?? 4.8,
-                            'service': widget.provider['speciality'] as String? ?? 'Event Management',
-                            'category': 'event_management',
-                            'scheduledDate': dateStr,
-                            'scheduledTime': 'On Demand',
-                            'amount': formattedPrice,
-                            'notes': _msgCtrl.text.trim().isNotEmpty 
-                                ? 'Contact info: $name ($phone), Method: $_contactMethod | ${_msgCtrl.text.trim()}'
-                                : 'Contact info: $name ($phone), Method: $_contactMethod',
-                          },
-                        );
+                        Navigator.pop(context, {
+                          'providerId': widget.provider['id'] as String?,
+                          'providerName': widget.provider['name'] as String? ?? 'Event Partner',
+                          'providerImage': widget.provider['avatar_url'] as String? ?? '',
+                          'providerRating': widget.provider['rating'] as double? ?? 4.8,
+                          'service': widget.provider['speciality'] as String? ?? 'Event Management',
+                          'category': 'event_management',
+                          'scheduledDate': dateStr,
+                          'scheduledTime': 'On Demand',
+                          'amount': formattedPrice,
+                          'notes': _msgCtrl.text.trim().isNotEmpty 
+                              ? 'Contact info: $name ($phone), Method: $_contactMethod | ${_msgCtrl.text.trim()}'
+                              : 'Contact info: $name ($phone), Method: $_contactMethod',
+                        });
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: widget.color,

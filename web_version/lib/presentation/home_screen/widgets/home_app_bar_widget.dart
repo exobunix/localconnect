@@ -13,6 +13,7 @@ class HomeAppBarWidget extends StatelessWidget {
   final VoidCallback onProfileTap;
   final VoidCallback? onSignOut;
   final int unreadNotificationCount;
+  final String? avatarUrl;
 
   const HomeAppBarWidget({
     super.key,
@@ -22,6 +23,7 @@ class HomeAppBarWidget extends StatelessWidget {
     required this.onProfileTap,
     this.onSignOut,
     this.unreadNotificationCount = 0,
+    this.avatarUrl,
   });
 
   @override
@@ -173,9 +175,11 @@ class HomeAppBarWidget extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.6),
                     width: 2,
                   ),
-                  image: const DecorationImage(
+                  image: DecorationImage(
                     image: NetworkImage(
-                      'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg',
+                      (avatarUrl != null && avatarUrl!.isNotEmpty)
+                          ? avatarUrl!
+                          : 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg',
                     ),
                     fit: BoxFit.cover,
                   ),
