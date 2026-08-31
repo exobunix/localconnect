@@ -8,6 +8,8 @@ class DynamicSubCategory {
   final String name;
   final String nameMarathi;
   final IconData icon;
+  final String imageUrl;
+  final String description;
   final bool isActive;
   final int sortOrder;
 
@@ -16,6 +18,8 @@ class DynamicSubCategory {
     required this.name,
     required this.nameMarathi,
     required this.icon,
+    required this.imageUrl,
+    required this.description,
     required this.isActive,
     required this.sortOrder,
   });
@@ -26,6 +30,8 @@ class DynamicSubCategory {
       name: map['name'] as String? ?? '',
       nameMarathi: map['name_marathi'] as String? ?? '',
       icon: CategoryService._iconFromName(map['icon_name'] as String? ?? ''),
+      imageUrl: map['image_url'] as String? ?? '',
+      description: map['description'] as String? ?? '',
       isActive: map['is_active'] as bool? ?? true,
       sortOrder: map['sort_order'] as int? ?? 99,
     );
@@ -37,6 +43,7 @@ class DynamicCategory {
   final String name;
   final String nameMarathi;
   final IconData icon;
+  final String imageUrl;
   final Color color;
   final bool isActive;
   final int sortOrder;
@@ -47,6 +54,7 @@ class DynamicCategory {
     required this.name,
     required this.nameMarathi,
     required this.icon,
+    required this.imageUrl,
     required this.color,
     required this.isActive,
     required this.sortOrder,
@@ -62,6 +70,7 @@ class DynamicCategory {
       name: map['name'] as String? ?? '',
       nameMarathi: map['name_marathi'] as String? ?? '',
       icon: CategoryService._iconFromName(map['icon_name'] as String? ?? ''),
+      imageUrl: map['image_url'] as String? ?? '',
       color: CategoryService._colorFromHex(
         map['color_hex'] as String? ?? '',
         map['id'] as String? ?? '',

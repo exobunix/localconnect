@@ -240,15 +240,30 @@ class _CategoryItemState extends State<_CategoryItem>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
                         color: widget.category.color.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        widget.category.icon,
-                        color: widget.category.color,
-                        size: 32,
+                      child: ClipOval(
+                        child: widget.category.imageUrl.isNotEmpty
+                            ? Image.network(
+                                widget.category.imageUrl,
+                                width: 56,
+                                height: 56,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Icon(
+                                  widget.category.icon,
+                                  color: widget.category.color,
+                                  size: 32,
+                                ),
+                              )
+                            : Icon(
+                                widget.category.icon,
+                                color: widget.category.color,
+                                size: 32,
+                              ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -288,10 +303,25 @@ class _CategoryItemState extends State<_CategoryItem>
                         width: 1.5,
                       ),
                     ),
-                    child: Icon(
-                      widget.category.icon,
-                      color: widget.category.color,
-                      size: 28,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: widget.category.imageUrl.isNotEmpty
+                          ? Image.network(
+                              widget.category.imageUrl,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(
+                                widget.category.icon,
+                                color: widget.category.color,
+                                size: 28,
+                              ),
+                            )
+                          : Icon(
+                              widget.category.icon,
+                              color: widget.category.color,
+                              size: 28,
+                            ),
                     ),
                   ),
                   const SizedBox(height: 6),

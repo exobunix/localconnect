@@ -225,10 +225,25 @@ class _CategoryItemState extends State<_CategoryItem>
                   width: 1.5,
                 ),
               ),
-              child: Icon(
-                widget.category.icon,
-                color: widget.category.color,
-                size: 28,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: widget.category.imageUrl.isNotEmpty
+                    ? Image.network(
+                        widget.category.imageUrl,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(
+                          widget.category.icon,
+                          color: widget.category.color,
+                          size: 28,
+                        ),
+                      )
+                    : Icon(
+                        widget.category.icon,
+                        color: widget.category.color,
+                        size: 28,
+                      ),
               ),
             ),
             const SizedBox(height: 6),
