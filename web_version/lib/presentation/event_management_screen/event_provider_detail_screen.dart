@@ -727,28 +727,61 @@ class _OverviewTab extends StatelessWidget {
           isDark: isDark,
           child: Column(
             children: [
-              Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  color: color.withAlpha(15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: color.withAlpha(40)),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.map_rounded, color: color, size: 32),
-                      const SizedBox(height: 6),
-                      Text(
-                        'View on Google Maps',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          color: color,
-                          fontWeight: FontWeight.w600,
+              InkWell(
+                onTap: () async {
+                  final mapUrl = provider['google_map_url'] as String? ?? '';
+                  if (mapUrl.isNotEmpty) {
+                    final uri = Uri.parse(mapUrl);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } else {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Could not open map URL: $mapUrl')),
+                        );
+                      }
+                    }
+                  } else {
+                    final name = provider['name'] as String? ?? 'Event Partner';
+                    final city = provider['city'] as String? ?? '';
+                    final query = Uri.encodeComponent('$name $city');
+                    final fallbackUrl = 'https://www.google.com/maps/search/?api=1&query=$query';
+                    final uri = Uri.parse(fallbackUrl);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } else {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Could not open Google Maps')),
+                        );
+                      }
+                    }
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: color.withAlpha(40)),
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.map_rounded, color: color, size: 32),
+                        const SizedBox(height: 6),
+                        Text(
+                          'View on Google Maps',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            color: color,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
