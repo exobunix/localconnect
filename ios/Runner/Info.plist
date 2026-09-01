@@ -39,10 +39,6 @@
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>LocalConnect uses your location to show nearby service providers and help you find services in your area.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>LocalConnect uses your location to show nearby service providers and help you find services in your area.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>LocalConnect uses your location in the background to track active deliveries and rides.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>LocalConnect needs camera access to let you upload profile photos and service images.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
