@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.localconnect"
+    namespace = "com.avdar.localconnect"
     compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.localconnect"
+        applicationId = "com.avdar.localconnect"
         minSdk = flutter.minSdkVersion  // Razorpay requires minSdk 21+
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

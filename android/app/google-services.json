@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:78703580798:android:0fd300b7bf0cefe503aa2f",
         "android_client_info": {
-          "package_name": "com.localconnect"
+          "package_name": "com.avdar.localconnect"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "1053905240243-36mumg853sgv9lacdmtj7a7776c77r20.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.localconnect",
+            "package_name": "com.avdar.localconnect",
             "certificate_hash": "545df2a5063126ca4761e29bb8b9931dfbc513f5"
           }
         },
@@ -29,7 +29,7 @@
           "client_id": "78703580798-adhrbrvo772iftp3c0o82gs25rmlgik9.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.localconnect",
+            "package_name": "com.avdar.localconnect",
             "certificate_hash": "545df2a5063126ca4761e29bb8b9931dfbc513f5"
           }
         },
