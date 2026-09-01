@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_export.dart';
 import '../../services/notification_hub_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/supabase_service.dart';
 
 class NotificationScreen extends StatefulWidget {

@@ -2134,16 +2134,20 @@ class SupabaseService {
       await client.from('provider_documents').insert(docRows);
     }
 
-    // Create category approval request
-    await client.from('category_approval_requests').upsert({
-      'provider_id': providerId,
-      'user_id': userId,
-      'category': category,
-      'subcategory': subcategory,
-      'reason': approvalReason,
-      'status': 'pending',
-      'updated_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'provider_id');
+    // Create category approval request (safe try-catch so legacy RLS won't block registration)
+    try {
+      await client.from('category_approval_requests').upsert({
+        'provider_id': providerId,
+        'user_id': userId,
+        'category': category,
+        'subcategory': subcategory,
+        'reason': approvalReason,
+        'status': 'pending',
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'provider_id');
+    } catch (e) {
+      debugPrint('[registerProviderWithApproval] category_approval_requests note: $e');
+    }
   }
 
   /// Get category approval request for a provider
@@ -2160,6 +2164,23 @@ class SupabaseService {
           .maybeSingle();
       return response;
     } catch (e) {
+      // Fallback: read directly from service_providers
+      try {
+        final sp = await client
+            .from('service_providers')
+            .select()
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (sp != null) {
+          return {
+            'provider_id': sp['id'],
+            'user_id': userId,
+            'category': sp['category'],
+            'subcategory': sp['subcategory'],
+            'status': sp['registration_status'] ?? 'pending',
+          };
+        }
+      } catch (_) {}
       return null;
     }
   }

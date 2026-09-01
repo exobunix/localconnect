@@ -598,12 +598,229 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isGoogleLoading = true);
+    try {
+      if (kIsWeb) {
+        try {
+          html.window.localStorage['google_signin_role'] = 'provider';
+        } catch (_) {}
+        await SupabaseService.instance.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: '${Uri.base.origin}/#/provider_registration_screen',
+          queryParams: {'role': 'provider'},
+        );
+        return;
+      }
+
+      const webClientId =
+          String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
+      final effectiveClientId = webClientId.isNotEmpty
+          ? webClientId
+          : '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com';
+
+      final googleSignIn = GoogleSignIn(serverClientId: effectiveClientId);
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        if (mounted) setState(() => _isGoogleLoading = false);
+        return;
+      }
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken ?? googleUser.id;
+      final accessToken = googleAuth.accessToken;
+
+      await SupabaseService.instance.signInWithGoogleIdToken(
+        idToken: idToken,
+        accessToken: accessToken,
+        email: googleUser.email,
+        name: googleUser.displayName,
+      );
+
+      final user = SupabaseService.instance.currentUser;
+      if (user != null) {
+        if (mounted) {
+          setState(() {
+            _emailController.text = user.email ?? googleUser.email;
+            if (_ownerNameController.text.trim().isEmpty) {
+              _ownerNameController.text =
+                  user.userMetadata?['full_name'] as String? ??
+                  googleUser.displayName ??
+                  '';
+            }
+            _isGoogleLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isGoogleLoading = false;
+          _errorMessage = 'Google sign-in failed: $e';
+        });
+      }
+    }
+  }
+
   Widget _buildStepBusiness() {
+    final currentU = SupabaseService.instance.currentUser;
     return _buildCard(
       icon: Icons.storefront_rounded,
-      title: 'Business Details',
+      title: 'Business & Partner Account',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (currentU != null)
+            Container(
+              padding: EdgeInsets.all(3.w),
+              margin: EdgeInsets.only(bottom: 2.h),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: Color(0xFF16A34A),
+                      size: 20,
+                    ),
+                  ),
+                  SizedBox(width: 3.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Google Account Linked',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF15803D),
+                          ),
+                        ),
+                        Text(
+                          currentU.email ?? '',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9.sp,
+                            color: const Color(0xFF166534),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              margin: EdgeInsets.only(bottom: 2.5.h),
+              padding: EdgeInsets.all(3.5.w),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.flash_on_rounded,
+                        color: Color(0xFFEAB308),
+                        size: 20,
+                      ),
+                      SizedBox(width: 2.w),
+                      Text(
+                        'Quick Partner Setup',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1E293B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 0.5.h),
+                  Text(
+                    'Sign in with Google to pre-fill your details and secure your provider account.',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 9.5.sp,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                  SizedBox(height: 1.5.h),
+                  SizedBox(
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: _isGoogleLoading ? null : _handleGoogleSignIn,
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(
+                          color: Color(0xFFCBD5E1),
+                          width: 1.2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 1,
+                      ),
+                      child: _isGoogleLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.account_circle_rounded,
+                                  color: Color(0xFF4285F4),
+                                  size: 22,
+                                ),
+                                SizedBox(width: 2.5.w),
+                                Text(
+                                  'Continue with Google',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 10.5.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                  SizedBox(height: 1.5.h),
+                  Row(
+                    children: [
+                      const Expanded(child: Divider(color: Color(0xFFCBD5E1))),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 2.w),
+                        child: Text(
+                          'OR FILL MANUALLY',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 8.5.sp,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF94A3B8),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const Expanded(child: Divider(color: Color(0xFFCBD5E1))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           _buildTextField(
             controller: _shopNameController,
             label: 'Shop / Business Name',
