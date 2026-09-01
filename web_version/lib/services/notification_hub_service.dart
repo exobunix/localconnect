@@ -20,11 +20,13 @@ class NotificationHubService extends ChangeNotifier {
   // Per-category unread counts
   int _quotationUnread = 0;
   int _bookingUnread = 0;
+  int _enquiryUnread = 0;
   int _responseUnread = 0;
   int _reviewUnread = 0;
 
   int get quotationUnread => _quotationUnread;
   int get bookingUnread => _bookingUnread;
+  int get enquiryUnread => _enquiryUnread;
   int get responseUnread => _responseUnread;
   int get reviewUnread => _reviewUnread;
 
@@ -47,6 +49,7 @@ class NotificationHubService extends ChangeNotifier {
     _unreadCount = 0;
     _quotationUnread = 0;
     _bookingUnread = 0;
+    _enquiryUnread = 0;
     _responseUnread = 0;
     _reviewUnread = 0;
     notifyListeners();
@@ -59,7 +62,8 @@ class NotificationHubService extends ChangeNotifier {
       final unreadList = notifs.where((n) => n['is_read'] == false).toList();
       _unreadCount = unreadList.length;
       _quotationUnread = unreadList.where((n) => n['type'] == 'quotation').length;
-      _bookingUnread = unreadList.where((n) => n['type'] == 'booking').length;
+      _bookingUnread = unreadList.where((n) => n['type'] == 'booking' || n['type'] == 'booking_status').length;
+      _enquiryUnread = unreadList.where((n) => n['type'] == 'enquiry').length;
       _responseUnread = unreadList.where((n) => n['type'] == 'message').length;
       _reviewUnread = unreadList.where((n) => n['type'] == 'review').length;
       notifyListeners();
@@ -96,7 +100,8 @@ class NotificationHubService extends ChangeNotifier {
   void decrementUnread({String? type}) {
     if (_unreadCount > 0) _unreadCount--;
     if (type == 'quotation' && _quotationUnread > 0) _quotationUnread--;
-    if (type == 'booking' && _bookingUnread > 0) _bookingUnread--;
+    if ((type == 'booking' || type == 'booking_status') && _bookingUnread > 0) _bookingUnread--;
+    if (type == 'enquiry' && _enquiryUnread > 0) _enquiryUnread--;
     if (type == 'message' && _responseUnread > 0) _responseUnread--;
     if (type == 'review' && _reviewUnread > 0) _reviewUnread--;
     notifyListeners();
@@ -106,6 +111,7 @@ class NotificationHubService extends ChangeNotifier {
     _unreadCount = 0;
     _quotationUnread = 0;
     _bookingUnread = 0;
+    _enquiryUnread = 0;
     _responseUnread = 0;
     _reviewUnread = 0;
     notifyListeners();
@@ -117,4 +123,3 @@ class NotificationHubService extends ChangeNotifier {
     super.dispose();
   }
 }
-

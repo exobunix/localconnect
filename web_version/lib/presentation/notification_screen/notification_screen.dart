@@ -23,9 +23,10 @@ class _NotificationScreenState extends State<NotificationScreen>
   static const _tabs = [
     _TabDef('All', null, Icons.notifications_rounded),
     _TabDef('Announcements', 'admin_broadcast', Icons.campaign_rounded),
-    _TabDef('Quotations', 'quotation', Icons.request_quote_rounded),
     _TabDef('Bookings', 'booking', Icons.event_available_rounded),
-    _TabDef('Responses', 'message', Icons.chat_bubble_rounded),
+    _TabDef('Enquiries', 'enquiry', Icons.mark_email_unread_rounded),
+    _TabDef('Quotations', 'quotation', Icons.request_quote_rounded),
+    _TabDef('Messages', 'message', Icons.chat_bubble_rounded),
     _TabDef('Reviews', 'review', Icons.star_rounded),
   ];
 
@@ -34,6 +35,8 @@ class _NotificationScreenState extends State<NotificationScreen>
   @override
   void initState() {
     super.initState();
+    // Stop continuous partner alarm when entering notifications hub
+    NotificationService.instance.stopContinuousBookingAlert();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _loadNotifications();
     _subscribeToNotifications();
@@ -154,9 +157,12 @@ class _NotificationScreenState extends State<NotificationScreen>
       case 'broadcast':
       case 'announcement':
         return Icons.campaign_rounded;
+      case 'enquiry':
+        return Icons.mark_email_unread_rounded;
       case 'quotation':
         return Icons.request_quote_rounded;
       case 'booking':
+      case 'booking_status':
         return Icons.event_available_rounded;
       case 'order':
         return Icons.receipt_long_rounded;
@@ -184,9 +190,12 @@ class _NotificationScreenState extends State<NotificationScreen>
       case 'broadcast':
       case 'announcement':
         return const Color(0xFFE11D48); // Bold Crimson / Rose for Admin Announcements
+      case 'enquiry':
+        return const Color(0xFF2563EB); // Vibrant Blue
       case 'quotation':
         return const Color(0xFF7C3AED);
       case 'booking':
+      case 'booking_status':
         return AppTheme.success;
       case 'order':
         return const Color(0xFF0EA5E9);
@@ -214,9 +223,12 @@ class _NotificationScreenState extends State<NotificationScreen>
       case 'broadcast':
       case 'announcement':
         return 'ANNOUNCEMENT';
+      case 'enquiry':
+        return 'ENQUIRY';
       case 'quotation':
         return 'QUOTATION';
       case 'booking':
+      case 'booking_status':
         return 'BOOKING';
       case 'order':
         return 'ORDER';
@@ -229,7 +241,7 @@ class _NotificationScreenState extends State<NotificationScreen>
       case 'review':
         return 'REVIEW';
       case 'message':
-        return 'RESPONSE';
+        return 'MESSAGE';
       default:
         return 'GENERAL';
     }
@@ -684,9 +696,20 @@ class _NotificationScreenState extends State<NotificationScreen>
   }
 
   void _handleNotificationTap(Map<String, dynamic> n) {
+    NotificationService.instance.stopContinuousBookingAlert();
+
     final type = n['type'] as String?;
     final metadata = n['metadata'] as Map<String, dynamic>?;
+
     switch (type) {
+      case 'enquiry':
+        final enquiryId = metadata?['enquiry_id']?.toString() ?? n['id']?.toString();
+        // Route to received quotations or chat/enquiry view
+        Navigator.pushNamed(
+          context,
+          AppRoutes.customerReceivedQuotationsScreen,
+        );
+        break;
       case 'quotation':
         Navigator.pushNamed(
           context,
@@ -694,6 +717,7 @@ class _NotificationScreenState extends State<NotificationScreen>
         );
         break;
       case 'booking':
+      case 'booking_status':
         Navigator.pushNamed(context, AppRoutes.customerBookingsScreen);
         break;
       case 'message':

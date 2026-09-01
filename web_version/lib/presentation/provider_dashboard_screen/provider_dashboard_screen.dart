@@ -316,6 +316,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   }
 
   Future<void> _acceptOrder(String orderId) async {
+    NotificationService.instance.stopContinuousBookingAlert();
     setState(() => _processingOrderIds.add(orderId));
     // Fetch order details for notification
     final orderData = await SupabaseService.instance.getOrderById(orderId);
@@ -349,7 +350,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         );
         NotificationService.instance.showBookingStatusToast(
           status: 'accepted',
-          providerName: providerName,
+          orderId: orderNumber,
+          serviceName: orderData['service'] as String?,
         );
       }
     }
@@ -363,6 +365,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   }
 
   Future<void> _rejectOrder(String orderId) async {
+    NotificationService.instance.stopContinuousBookingAlert();
     final confirm = await _showConfirmDialog(
       'Reject Order',
       'Are you sure you want to reject this order?',

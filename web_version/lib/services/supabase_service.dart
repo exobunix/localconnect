@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'notification_service.dart';
 
 class SupabaseService {
   static SupabaseService? _instance;
@@ -868,13 +869,40 @@ class SupabaseService {
           if (providerUserId != null && providerUserId.isNotEmpty) {
             await insertOrderNotification(
               userId: providerUserId,
-              title: '🔔 New Order Request',
-              body: 'You have a new order $orderNumber for $service.',
+              title: '🔔 New Booking Request',
+              body: '$customerName booked $service ($orderNumber).',
               type: 'booking',
+              metadata: {
+                'order_id': response['id'],
+                'order_number': orderNumber,
+                'customer_name': customerName,
+                'service': service,
+                'amount': numericAmount.toString(),
+                'is_continuous_alert': true,
+              },
             );
           }
         } catch (_) {}
       }
+
+      // Notify customer of order placement confirmation
+      try {
+        await insertOrderNotification(
+          userId: userId,
+          title: '📅 Booking Placed (#$orderNumber)',
+          body: 'Your booking for $service has been placed successfully.',
+          type: 'booking',
+          metadata: {
+            'order_id': response['id'],
+            'order_number': orderNumber,
+          },
+        );
+      } catch (_) {}
+
+      // Play sound chime for user
+      try {
+        NotificationService.instance.playNotificationSound();
+      } catch (_) {}
 
       return response;
     } catch (e) {
@@ -893,23 +921,64 @@ class SupabaseService {
     if (rating != null) updates['rating'] = rating;
 
     await client.from('orders').update(updates).eq('id', orderId);
+
+    // Look up order info to send real-time notification
+    try {
+      final order = await client
+          .from('orders')
+          .select('customer_id, provider_id, service, order_number')
+          .eq('id', orderId)
+          .maybeSingle();
+
+      if (order != null) {
+        final customerId = order['customer_id'] as String?;
+        final service = order['service'] as String? ?? 'Service';
+        final orderNum = order['order_number'] as String? ?? '';
+
+        if (customerId != null && customerId.isNotEmpty) {
+          final statusLabel = status == 'confirmed'
+              ? 'Confirmed'
+              : status == 'in_progress'
+                  ? 'In Progress'
+                  : status == 'completed'
+                      ? 'Completed'
+                      : status == 'cancelled'
+                          ? 'Cancelled'
+                          : status;
+
+          await insertOrderNotification(
+            userId: customerId,
+            title: 'Booking $statusLabel ($orderNum)',
+            body: 'Your service $service is now $statusLabel.',
+            type: 'booking_status',
+            metadata: {'order_id': orderId, 'status': status},
+          );
+        }
+      }
+    } catch (_) {}
   }
 
   /// Insert a notification row for a user (used to notify customers/providers of order events).
   Future<void> insertOrderNotification({
-    required String userId,
+    String? userId,
     required String title,
     required String body,
     String type = 'booking',
+    Map<String, dynamic>? metadata,
   }) async {
     try {
-      await client.from('notifications').insert({
-        'user_id': userId,
+      final row = <String, dynamic>{
         'title': title,
         'body': body,
         'type': type,
         'is_read': false,
-      });
+        'metadata': metadata ?? {},
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      if (userId != null && userId.isNotEmpty) {
+        row['user_id'] = userId;
+      }
+      await client.from('notifications').insert(row);
     } catch (_) {}
   }
 
