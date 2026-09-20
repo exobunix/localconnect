@@ -828,20 +828,35 @@ class _AdminCategoryManagementScreenState
                                                               ? AppTheme.primary
                                                               : Colors.grey,
                                                         ),
-                                                        const SizedBox(width: 4),
+                                                        const SizedBox(
+                                                          width: 4,
+                                                        ),
                                                         GestureDetector(
-                                                          onTap: () => _showEditSubcategoryDialog(context, s),
+                                                          onTap: () =>
+                                                              _showEditSubcategoryDialog(
+                                                                context,
+                                                                s,
+                                                              ),
                                                           child: MouseRegion(
-                                                            cursor: SystemMouseCursors.click,
+                                                            cursor:
+                                                                SystemMouseCursors
+                                                                    .click,
                                                             child: Text(
-                                                              s['name'] as String? ?? '',
+                                                              s['name']
+                                                                      as String? ??
+                                                                  '',
                                                               style: GoogleFonts.plusJakartaSans(
                                                                 fontSize: 11,
-                                                                fontWeight: FontWeight.w600,
-                                                                color: subActive ? null : Colors.grey,
+                                                                fontWeight:
+                                                                    FontWeight.w600,
+                                                                color: subActive
+                                                                    ? null
+                                                                    : Colors
+                                                                        .grey,
                                                                 decoration: subActive
                                                                     ? null
-                                                                    : TextDecoration.lineThrough,
+                                                                    : TextDecoration
+                                                                        .lineThrough,
                                                               ),
                                                             ),
                                                           ),

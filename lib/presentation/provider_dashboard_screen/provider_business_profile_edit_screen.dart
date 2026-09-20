@@ -3,8 +3,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_export.dart';
+import '../../services/location_service.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/image_upload_helper.dart';
+import '../../widgets/location_map_picker_dialog.dart';
 
 /// Universal Provider Business Profile Edit Screen
 /// Allows any provider to edit their full business profile
@@ -24,6 +26,12 @@ class _ProviderBusinessProfileEditScreenState
   bool _isLoading = true;
   bool _isSaving = false;
   String? _providerId;
+
+  // Location coordinates
+  double? _latitude;
+  double? _longitude;
+  String _district = '';
+  String _pincode = '';
 
   // Controllers
   final _businessNameCtrl = TextEditingController();
@@ -98,9 +106,63 @@ class _ProviderBusinessProfileEditScreenState
         }
         _profilePhotoUrl = provider['image_url'] as String?;
         _coverImageUrl = provider['cover_image_url'] as String?;
+        _latitude = (provider['business_latitude'] ?? provider['latitude']) as double?;
+        _longitude = (provider['business_longitude'] ?? provider['longitude']) as double?;
+        _district = provider['district'] as String? ?? '';
+        _pincode = provider['pincode'] as String? ?? '';
       }
     } catch (_) {}
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _openMapPicker() async {
+    final result = await LocationMapPickerDialog.show(
+      context,
+      initialLat: _latitude,
+      initialLng: _longitude,
+      initialAddress: _addressCtrl.text.trim(),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _latitude = result.latitude;
+        _longitude = result.longitude;
+        if (result.district.isNotEmpty) _district = result.district;
+        if (result.pincode.isNotEmpty) _pincode = result.pincode;
+        if (_addressCtrl.text.trim().isEmpty && result.fullAddress.isNotEmpty) {
+          _addressCtrl.text = result.fullAddress;
+        }
+      });
+    }
+  }
+
+  Future<void> _detectGpsLocation() async {
+    try {
+      final pos = await LocationService.instance.getCurrentPosition();
+      if (pos != null) {
+        final loc = await LocationService.instance.reverseGeocode(
+          pos.latitude,
+          pos.longitude,
+        );
+        if (mounted) {
+          setState(() {
+            _latitude = pos.latitude;
+            _longitude = pos.longitude;
+            if (loc != null) {
+              if (loc.district.isNotEmpty) _district = loc.district;
+              if (loc.pincode.isNotEmpty) _pincode = loc.pincode;
+              if (_addressCtrl.text.trim().isEmpty && loc.fullAddress.isNotEmpty) {
+                _addressCtrl.text = loc.fullAddress;
+              }
+            }
+          });
+          _showSnack('GPS location detected successfully!', isSuccess: true);
+        }
+      } else if (mounted) {
+        _showSnack('Could not access GPS. Please check location permissions.');
+      }
+    } catch (e) {
+      if (mounted) _showSnack('GPS error: $e');
+    }
   }
 
   Future<void> _pickAndUploadImage({required bool isCover}) async {
@@ -200,6 +262,12 @@ class _ProviderBusinessProfileEditScreenState
             'google_map_url': _mapUrlCtrl.text.trim(),
             'emergency_contact': _emergencyCtrl.text.trim(),
             'languages_spoken': langs,
+            'business_latitude': _latitude,
+            'business_longitude': _longitude,
+            'latitude': _latitude,
+            'longitude': _longitude,
+            'district': _district,
+            'pincode': _pincode,
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', _providerId!);
@@ -361,6 +429,7 @@ class _ProviderBusinessProfileEditScreenState
                         _mapUrlCtrl,
                         hint: 'Paste your Google Maps URL',
                       ),
+                      _buildMapPinWidget(),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -704,6 +773,121 @@ class _ProviderBusinessProfileEditScreenState
             validator: required
                 ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null
                 : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapPinWidget() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Shop Location on Map',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF374151),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _latitude != null
+                  ? const Color(0xFFE8F5E9)
+                  : const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _latitude != null
+                    ? const Color(0xFF4CAF50)
+                    : Colors.grey[300]!,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _latitude != null
+                          ? Icons.check_circle_rounded
+                          : Icons.location_off_rounded,
+                      color: _latitude != null
+                          ? const Color(0xFF2E7D32)
+                          : Colors.grey[500],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _latitude != null
+                            ? 'Location Pinned (${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)})'
+                            : 'Location Not Pinned',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: _latitude != null
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFF374151),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _openMapPicker,
+                        icon: const Icon(Icons.map_rounded, size: 16),
+                        label: Text(
+                          _latitude != null ? 'Change Pin' : 'Select on Map',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _detectGpsLocation,
+                        icon: const Icon(Icons.my_location_rounded, size: 16),
+                        label: Text(
+                          'Use GPS',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _primary,
+                          side: const BorderSide(color: _primary),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),

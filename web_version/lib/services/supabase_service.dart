@@ -1866,7 +1866,21 @@ class SupabaseService {
     bool isActive = true,
     String description = '',
     String imageUrl = '',
+    int sortOrder = 99,
   }) async {
+    try {
+      await client.rpc('admin_upsert_category', params: {
+        'p_id': id,
+        'p_name': name,
+        'p_name_marathi': nameMarathi,
+        'p_is_active': isActive,
+        'p_description': description,
+        'p_image_url': imageUrl,
+        'p_sort_order': sortOrder,
+      });
+      return;
+    } catch (_) {}
+
     await client.from('categories').upsert({
       'id': id,
       'name': name,
@@ -1874,6 +1888,7 @@ class SupabaseService {
       'is_active': isActive,
       'description': description,
       'image_url': imageUrl,
+      'sort_order': sortOrder,
       'updated_at': DateTime.now().toIso8601String(),
     }, onConflict: 'id');
   }
@@ -1882,6 +1897,14 @@ class SupabaseService {
     required String id,
     required bool isActive,
   }) async {
+    try {
+      await client.rpc('admin_toggle_category', params: {
+        'p_id': id,
+        'p_is_active': isActive,
+      });
+      return;
+    } catch (_) {}
+
     await client
         .from('categories')
         .update({
@@ -1892,6 +1915,11 @@ class SupabaseService {
   }
 
   Future<void> adminDeleteCategory(String id) async {
+    try {
+      await client.rpc('admin_delete_category', params: {'p_id': id});
+      return;
+    } catch (_) {}
+
     // Delete dependent subcategories first to prevent foreign key errors
     await client.from('subcategories').delete().eq('category_id', id);
     // Then delete the category itself
@@ -1905,15 +1933,34 @@ class SupabaseService {
     String nameMarathi = '',
     String imageUrl = '',
     String description = '',
+    bool isActive = true,
+    int sortOrder = 99,
   }) async {
-    await client.from('subcategories').insert({
+    try {
+      await client.rpc('admin_upsert_subcategory', params: {
+        'p_id': id,
+        'p_category_id': categoryId,
+        'p_name': name,
+        'p_name_marathi': nameMarathi,
+        'p_is_active': isActive,
+        'p_description': description,
+        'p_image_url': imageUrl,
+        'p_sort_order': sortOrder,
+      });
+      return;
+    } catch (_) {}
+
+    await client.from('subcategories').upsert({
       'id': id,
       'category_id': categoryId,
       'name': name,
       'name_marathi': nameMarathi,
       'image_url': imageUrl,
       'description': description,
-    });
+      'is_active': isActive,
+      'sort_order': sortOrder,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'id');
   }
 
   Future<void> adminUpdateSubcategory({
@@ -1922,32 +1969,56 @@ class SupabaseService {
     String nameMarathi = '',
     String imageUrl = '',
     String description = '',
+    bool? isActive,
+    int? sortOrder,
   }) async {
-    await client.from('subcategories').update({
+    final updates = <String, dynamic>{
       'name': name,
       'name_marathi': nameMarathi,
       'image_url': imageUrl,
       'description': description,
-    }).eq('id', id);
+      if (isActive != null) 'is_active': isActive,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    await client.from('subcategories').update(updates).eq('id', id);
   }
 
   Future<void> adminDeleteSubcategory(String id) async {
+    try {
+      await client.rpc('admin_delete_subcategory', params: {'p_id': id});
+      return;
+    } catch (_) {}
     await client.from('subcategories').delete().eq('id', id);
   }
-
-
 
   Future<void> adminToggleSubcategory({
     required String id,
     required bool isActive,
   }) async {
-    await client
-        .from('subcategories')
-        .update({
-          'is_active': isActive,
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', id);
+    try {
+      await client.rpc('admin_toggle_subcategory', params: {
+        'p_id': id,
+        'p_is_active': isActive,
+      });
+      return;
+    } catch (_) {}
+
+    try {
+      await client
+          .from('subcategories')
+          .update({
+            'is_active': isActive,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', id);
+    } catch (_) {
+      // Fallback if updated_at column is missing
+      await client
+          .from('subcategories')
+          .update({'is_active': isActive})
+          .eq('id', id);
+    }
   }
 
   // ─── PROVIDER ONBOARDING ──────────────────────────────────────────────────
@@ -2079,6 +2150,10 @@ class SupabaseService {
     required String whatsapp,
     required List<Map<String, String>> documents,
     required String approvalReason,
+    double? latitude,
+    double? longitude,
+    String? district,
+    String? pincode,
   }) async {
     // Ensure user_profiles row exists
     await client.from('user_profiles').upsert({
@@ -2089,24 +2164,40 @@ class SupabaseService {
       'role': 'provider',
     }, onConflict: 'id');
 
-    // Upsert service_providers row with pending_approval status
+    // Upsert service_providers row with pending_approval status & coordinates
+    final providerData = <String, dynamic>{
+      'user_id': userId,
+      'business_name': businessName,
+      'owner_name': ownerName,
+      'category': category,
+      'subcategory': subcategory,
+      'address': address,
+      'business_address': address,
+      'city': city,
+      'phone': phone,
+      'whatsapp': whatsapp,
+      'onboarding_completed': true,
+      'is_active': false,
+      'registration_status': 'pending_approval',
+      'member_since': DateTime.now().year.toString(),
+    };
+    if (latitude != null && latitude != 0) {
+      providerData['business_latitude'] = latitude;
+    }
+    if (longitude != null && longitude != 0) {
+      providerData['business_longitude'] = longitude;
+    }
+    if (district != null && district.isNotEmpty) {
+      providerData['district'] = district;
+    }
+    if (pincode != null && pincode.isNotEmpty) {
+      providerData['pincode'] = pincode;
+    }
+    providerData['location_updated_at'] = DateTime.now().toIso8601String();
+
     final response = await client
         .from('service_providers')
-        .upsert({
-          'user_id': userId,
-          'business_name': businessName,
-          'owner_name': ownerName,
-          'category': category,
-          'subcategory': subcategory,
-          'address': address,
-          'city': city,
-          'phone': phone,
-          'whatsapp': whatsapp,
-          'onboarding_completed': true,
-          'is_active': false,
-          'registration_status': 'pending_approval',
-          'member_since': DateTime.now().year.toString(),
-        }, onConflict: 'user_id')
+        .upsert(providerData, onConflict: 'user_id')
         .select('id')
         .single();
 
@@ -2425,7 +2516,7 @@ class SupabaseService {
   // ─── REVIEWS ──────────────────────────────────────────────────────────────
 
   Future<bool> submitReview({
-    required String orderId,
+    String? orderId,
     required String providerId,
     required int rating,
     required String reviewText,
@@ -2464,8 +2555,7 @@ class SupabaseService {
             .getPublicUrl(storagePath);
       }
 
-      await client.from('reviews').insert({
-        'order_id': orderId,
+      final reviewRow = <String, dynamic>{
         'customer_id': userId,
         'provider_id': providerId,
         'rating': rating,
@@ -2473,22 +2563,82 @@ class SupabaseService {
         'provider_name': providerName,
         'service': service,
         if (photoUrl != null) 'photo_url': photoUrl,
-      });
+      };
 
-      // Mark order as reviewed
-      await client.from('orders').update({'reviewed': true}).eq('id', orderId);
+      final hasValidOrderId = orderId != null &&
+          orderId.trim().isNotEmpty &&
+          orderId.contains('-');
+      if (hasValidOrderId) {
+        reviewRow['order_id'] = orderId.trim();
+      }
 
-      // Create a notification for the customer
+      await client.from('reviews').insert(reviewRow);
+
+      // Mark order as reviewed if valid order ID present
+      if (hasValidOrderId) {
+        try {
+          await client
+              .from('orders')
+              .update({'reviewed': true})
+              .eq('id', orderId.trim());
+        } catch (_) {}
+      }
+
+      // Customer notification
       await createNotification(
         userId: userId,
         title: 'Review Submitted',
         body: 'Your review for $providerName has been submitted. Thank you!',
         type: 'review',
-        relatedId: orderId,
+        relatedId: providerId,
       );
+
+      // Notify provider
+      try {
+        final pRes = await client
+            .from('service_providers')
+            .select('user_id')
+            .or('id.eq.$providerId,user_id.eq.$providerId')
+            .maybeSingle();
+        final providerUserId = pRes?['user_id'] as String?;
+        if (providerUserId != null && providerUserId.isNotEmpty) {
+          final customerProfile = await getUserProfile(userId);
+          final customerName =
+              customerProfile?['full_name'] as String? ?? 'A customer';
+          await createNotification(
+            userId: providerUserId,
+            title: 'New Review Received! ⭐',
+            body: '$customerName left a $rating-star review for you: "$reviewText"',
+            type: 'review',
+            relatedId: providerId,
+          );
+        }
+      } catch (_) {}
+
+      // Recalculate provider overall rating & review count
+      try {
+        final allRev = await client
+            .from('reviews')
+            .select('rating')
+            .or('provider_id.eq.$providerId');
+        final revList = List<Map<String, dynamic>>.from(allRev);
+        if (revList.isNotEmpty) {
+          final sum = revList.fold<double>(
+            0.0,
+            (acc, r) => acc + ((r['rating'] as num?)?.toDouble() ?? 0.0),
+          );
+          final avg = double.parse((sum / revList.length).toStringAsFixed(1));
+          await client.from('service_providers').update({
+            'rating': avg,
+            'review_count': revList.length,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).or('id.eq.$providerId,user_id.eq.$providerId');
+        }
+      } catch (_) {}
 
       return true;
     } catch (e) {
+      debugPrint('[SupabaseService.submitReview ERROR] $e');
       return false;
     }
   }
@@ -2510,12 +2660,24 @@ class SupabaseService {
     String providerId,
   ) async {
     try {
+      String resolvedProviderId = providerId;
+      try {
+        final p = await client
+            .from('service_providers')
+            .select('id')
+            .or('id.eq.$providerId,user_id.eq.$providerId')
+            .maybeSingle();
+        if (p != null && p['id'] != null) {
+          resolvedProviderId = p['id'] as String;
+        }
+      } catch (_) {}
+
       final response = await client
           .from('reviews')
           .select(
             'id, rating, review_text, service, photo_url, created_at, customer_id, user_profiles!customer_id(full_name, avatar_url)',
           )
-          .eq('provider_id', providerId)
+          .or('provider_id.eq.$resolvedProviderId,provider_id.eq.$providerId')
           .order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
@@ -2524,7 +2686,7 @@ class SupabaseService {
         final response = await client
             .from('reviews')
             .select()
-            .eq('provider_id', providerId)
+            .or('provider_id.eq.$providerId')
             .order('created_at', ascending: false);
         return List<Map<String, dynamic>>.from(response);
       } catch (_) {
@@ -2835,7 +2997,6 @@ class SupabaseService {
       if (userId == null) return null;
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final ext = fileName.contains('.') ? fileName.split('.').last : 'jpg';
       final storagePath = '$userId/$providerId/${timestamp}_$fileName';
 
       // Upload to storage bucket

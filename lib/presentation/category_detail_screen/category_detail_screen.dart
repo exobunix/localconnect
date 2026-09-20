@@ -337,6 +337,17 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.map_rounded, color: Colors.white),
+                tooltip: 'View Providers on Map',
+                onPressed: () {
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.mapDiscoveryScreen,
+                    arguments: {'category': _categoryId},
+                  );
+                },
+              ),
               if (!_isOnline)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),

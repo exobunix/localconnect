@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import '../../widgets/location_map_picker_dialog.dart';
 import '../quotation_screen/customer_enquiry_screen.dart';
 
 /// Customer-facing Provider Public Profile Screen
@@ -338,6 +339,75 @@ class _ProviderPublicProfileScreenState
   String get _profilePhoto => _provider?['image_url'] as String? ?? '';
   String get _coverPhoto => _provider?['cover_image_url'] as String? ?? '';
 
+  double? get _lat {
+    final v = _provider?['business_latitude'] ?? _provider?['latitude'];
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  double? get _lng {
+    final v = _provider?['business_longitude'] ?? _provider?['longitude'];
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  void _openLocationOnMap() {
+    if (_lat != null && _lng != null) {
+      LocationMapPickerDialog.show(
+        context,
+        initialLat: _lat,
+        initialLng: _lng,
+        initialAddress: _address,
+      );
+    }
+  }
+
+  void _getDirections() {
+    if (_lat != null && _lng != null) {
+      final url = 'https://www.google.com/maps/search/?api=1&query=$_lat,$_lng';
+      _launchUrl(url);
+    } else if ((_provider?['google_map_url'] as String?)?.isNotEmpty == true) {
+      _launchUrl(_provider!['google_map_url'] as String);
+    } else if (_address.isNotEmpty) {
+      final encoded = Uri.encodeComponent('$_address, ${_provider?['city'] ?? ''}');
+      _launchUrl('https://www.google.com/maps/search/?api=1&query=$encoded');
+    }
+  }
+
+  void _openReviewSubmission() {
+    final currentU = SupabaseService.instance.currentUser;
+    if (currentU == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please log in to write a review.',
+            style: GoogleFonts.plusJakartaSans(fontSize: 13),
+          ),
+          action: SnackBarAction(
+            label: 'Log In',
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.loginScreen),
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.pushNamed(
+      context,
+      AppRoutes.reviewSubmissionScreen,
+      arguments: {
+        'provider_id': _providerId,
+        'provider_name': _providerName,
+        'service': _category ?? '',
+        'order_id': '',
+      },
+    ).then((_) {
+      _loadReviews();
+      _loadProvider();
+    });
+  }
+
   Color get _categoryColor {
     switch (_category) {
       case 'transport':
@@ -645,29 +715,120 @@ class _ProviderPublicProfileScreenState
           ),
           const SizedBox(height: 12),
         ],
-        // Map link
-        if ((_provider?['google_map_url'] as String?)?.isNotEmpty == true) ...[
-          OutlinedButton.icon(
-            onPressed: () => _launchUrl(_provider!['google_map_url'] as String),
-            icon: const Icon(Icons.map_rounded),
-            label: Text(
-              'View on Google Maps',
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _categoryColor,
-              side: BorderSide(color: _categoryColor),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
+        // Location & Map Directions
+        _buildLocationCard(),
+        const SizedBox(height: 12),
         // ── Recent Reviews section ──────────────────────────────────────────
         _buildRecentReviewsSection(),
         const SizedBox(height: 80),
       ],
+    );
+  }
+
+  Widget _buildLocationCard() {
+    final hasCoords = _lat != null && _lng != null;
+    return _buildCard(
+      'Location & Directions',
+      Icons.location_on_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_address.isNotEmpty)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.storefront_rounded, size: 16, color: _categoryColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '$_address${_provider?['city'] != null ? ', ${_provider!['city']}' : ''}',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1A1A2E),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          if (hasCoords) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFC8E6C9)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.pin_drop_rounded, size: 14, color: Color(0xFF2E7D32)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'GPS Pinned (${_lat!.toStringAsFixed(4)}, ${_lng!.toStringAsFixed(4)})',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF2E7D32),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _getDirections,
+                  icon: const Icon(Icons.directions_rounded, size: 16),
+                  label: Text(
+                    'Directions',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _categoryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              if (hasCoords) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _openLocationOnMap,
+                    icon: const Icon(Icons.map_rounded, size: 16),
+                    label: Text(
+                      'View Map',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _categoryColor,
+                      side: BorderSide(color: _categoryColor),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -749,7 +910,29 @@ class _ProviderPublicProfileScreenState
                 ],
               ),
               const Spacer(),
-              if (displayCount > 0)
+              ElevatedButton.icon(
+                onPressed: _openReviewSubmission,
+                icon: const Icon(Icons.rate_review_rounded, size: 14),
+                label: Text(
+                  'Write Review',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _categoryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              if (displayCount > 0) ...[
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => _tabController.animateTo(3),
                   child: Text(
@@ -761,6 +944,7 @@ class _ProviderPublicProfileScreenState
                     ),
                   ),
                 ),
+              ],
             ],
           ),
           if (_reviewsLoading) ...[
@@ -1537,6 +1721,26 @@ class _ProviderPublicProfileScreenState
                 ),
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: _openReviewSubmission,
+          icon: const Icon(Icons.rate_review_rounded, size: 18),
+          label: Text(
+            'Write a Review',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _categoryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         ),
         const SizedBox(height: 12),

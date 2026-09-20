@@ -86,6 +86,22 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
     _initLocationAndLoad();
   }
 
+  bool _argsProcessed = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_argsProcessed) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map && args['category'] != null) {
+        _selectedCategory = args['category'] as String;
+      } else if (args is String) {
+        _selectedCategory = args;
+      }
+      _argsProcessed = true;
+    }
+  }
+
   @override
   void dispose() {
     _sheetAnimController.dispose();

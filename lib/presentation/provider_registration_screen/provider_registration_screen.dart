@@ -13,8 +13,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/app_categories.dart';
 import '../../routes/app_routes.dart';
 import '../../services/category_service.dart';
+import '../../services/location_service.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/location_map_picker_dialog.dart';
 
 // twilio_otp_service removed — phone OTP no longer used
 
@@ -64,6 +66,10 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   final _cityController = TextEditingController();
   final _phoneController = TextEditingController();
   final _whatsappController = TextEditingController();
+  double? _latitude;
+  double? _longitude;
+  String _district = '';
+  String _pincode = '';
 
   // Phone OTP controllers (kept for backwards compatibility)
   final List<TextEditingController> _otpControllers = List.generate(
@@ -223,10 +229,28 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
           setState(() => _errorMessage = 'Please enter the owner name.');
           return false;
         }
-        if (_emailController.text.trim().isNotEmpty &&
-            !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(_emailController.text.trim())) {
-          setState(() => _errorMessage = 'Please enter a valid email address.');
-          return false;
+        final currentU = SupabaseService.instance.currentUser;
+        if (currentU == null) {
+          final email = _emailController.text.trim();
+          final pass = _passwordController.text.trim();
+          final confirm = _confirmPasswordController.text.trim();
+
+          if (email.isEmpty) {
+            setState(() => _errorMessage = 'Please enter your email address.');
+            return false;
+          }
+          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+            setState(() => _errorMessage = 'Please enter a valid email address.');
+            return false;
+          }
+          if (pass.length < 6) {
+            setState(() => _errorMessage = 'Password must be at least 6 characters.');
+            return false;
+          }
+          if (pass != confirm) {
+            setState(() => _errorMessage = 'Passwords do not match.');
+            return false;
+          }
         }
         break;
       case 1:
@@ -330,6 +354,64 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     }
   }
 
+  Future<void> _openMapPicker() async {
+    final result = await LocationMapPickerDialog.show(
+      context,
+      initialLat: _latitude,
+      initialLng: _longitude,
+      initialAddress: _addressController.text.trim(),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _latitude = result.latitude;
+        _longitude = result.longitude;
+        if (result.district.isNotEmpty) _district = result.district;
+        if (result.pincode.isNotEmpty) _pincode = result.pincode;
+        if (_addressController.text.trim().isEmpty && result.fullAddress.isNotEmpty) {
+          _addressController.text = result.fullAddress;
+        }
+        if (_cityController.text.trim().isEmpty && result.city.isNotEmpty) {
+          _cityController.text = result.city;
+        }
+      });
+    }
+  }
+
+  Future<void> _detectGpsLocation() async {
+    setState(() => _isLoading = true);
+    try {
+      final pos = await LocationService.instance.getCurrentPosition();
+      if (pos != null) {
+        final loc = await LocationService.instance.reverseGeocode(
+          pos.latitude,
+          pos.longitude,
+        );
+        if (mounted) {
+          setState(() {
+            _latitude = pos.latitude;
+            _longitude = pos.longitude;
+            if (loc != null) {
+              if (loc.district.isNotEmpty) _district = loc.district;
+              if (loc.pincode.isNotEmpty) _pincode = loc.pincode;
+              if (_addressController.text.trim().isEmpty && loc.fullAddress.isNotEmpty) {
+                _addressController.text = loc.fullAddress;
+              }
+              if (_cityController.text.trim().isEmpty && loc.city.isNotEmpty) {
+                _cityController.text = loc.city;
+              }
+            }
+          });
+        }
+      } else if (mounted) {
+        setState(() => _errorMessage = 'Could not access GPS. Please check location permissions.');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _errorMessage = 'GPS error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _submitRegistration() async {
     setState(() {
       _isLoading = true;
@@ -343,20 +425,52 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
       String? userId = SupabaseService.instance.currentUser?.id;
 
       if (userId == null) {
-        // Fallback or signup if not already signed up/logged in
-        final authResponse = await SupabaseService.instance.signUpWithEmail(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-          fullName: _ownerNameController.text.trim(),
-          role: 'provider',
-          phone: _phoneController.text.trim(),
-        );
-        userId = authResponse.user?.id;
+        final email = _emailController.text.trim();
+        final password = _passwordController.text.trim();
+
+        if (email.isEmpty || password.isEmpty) {
+          setState(() {
+            _currentStep = 0;
+            _errorMessage = 'Please enter your email and password to create your account.';
+          });
+          return;
+        }
+
+        try {
+          final authResponse = await SupabaseService.instance.signUpWithEmail(
+            email: email,
+            password: password,
+            fullName: _ownerNameController.text.trim(),
+            role: 'provider',
+            phone: _phoneController.text.trim(),
+          );
+          userId = authResponse.user?.id;
+        } on AuthException catch (e) {
+          if (e.message.toLowerCase().contains('already registered') ||
+              e.message.toLowerCase().contains('already in use')) {
+            try {
+              final signInResp = await SupabaseService.instance.signInWithEmail(
+                email: email,
+                password: password,
+              );
+              userId = signInResp.user?.id;
+            } catch (_) {
+              setState(() {
+                _currentStep = 0;
+                _errorMessage =
+                    'This email is already registered. If it is yours, please log in with your password.';
+              });
+              return;
+            }
+          } else {
+            rethrow;
+          }
+        }
       }
 
-      if (userId == null) throw Exception('Account creation failed.');
+      if (userId == null) throw Exception('Account creation failed. Please check your details.');
 
-      // Step 2: Create provider profile + category approval request
+      // Step 2: Create provider profile + category approval request + coordinates
       await SupabaseService.instance.registerProviderWithApproval(
         userId: userId,
         businessName: _shopNameController.text.trim(),
@@ -369,6 +483,10 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
         whatsapp: _whatsappController.text.trim(),
         documents: _documents,
         approvalReason: _approvalReasonController.text.trim(),
+        latitude: _latitude,
+        longitude: _longitude,
+        district: _district,
+        pincode: _pincode,
       );
 
       if (mounted) {
@@ -389,22 +507,6 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  void _addDocument() {
-    if (_docNameController.text.trim().isEmpty) {
-      setState(() => _errorMessage = 'Please enter a document name/number.');
-      return;
-    }
-    setState(() {
-      _documents.add({
-        'type': _selectedDocType,
-        'name': _docNameController.text.trim(),
-        'url': '',
-      });
-      _docNameController.clear();
-      _errorMessage = null;
-    });
   }
 
   @override
@@ -837,14 +939,79 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
           SizedBox(height: 2.h),
           _buildTextField(
             controller: _emailController,
-            label: 'Email Address',
+            label: 'Email Address *',
             hint: 'business@example.com',
             icon: Icons.email_rounded,
             keyboardType: TextInputType.emailAddress,
           ),
+          if (currentU == null) ...[
+            SizedBox(height: 2.h),
+            _buildTextField(
+              controller: _passwordController,
+              label: 'Create Password *',
+              hint: 'Min 6 characters',
+              icon: Icons.lock_outline_rounded,
+              obscureText: _obscurePassword,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: AppTheme.primary,
+                  size: 18,
+                ),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+            SizedBox(height: 2.h),
+            _buildTextField(
+              controller: _confirmPasswordController,
+              label: 'Confirm Password *',
+              hint: 'Re-enter your password',
+              icon: Icons.lock_rounded,
+              obscureText: _obscureConfirm,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureConfirm
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: AppTheme.primary,
+                  size: 18,
+                ),
+                onPressed: () =>
+                    setState(() => _obscureConfirm = !_obscureConfirm),
+              ),
+            ),
+          ],
           SizedBox(height: 2.h),
           _buildInfoTip(
             'Your business name and contact details will be visible to customers searching for services in your area.',
+          ),
+          SizedBox(height: 2.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Already have an account? ',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10.sp,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.pushNamed(context, AppRoutes.loginScreen),
+                child: Text(
+                  'Log In',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primary,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1051,43 +1218,171 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   }
 
   Widget _buildStep3Location() {
-    return _buildCard(
-      icon: Icons.location_on_rounded,
-      title: 'Location & Contact',
-      child: Column(
-        children: [
-          _buildTextField(
-            controller: _addressController,
-            label: 'Business Address',
-            hint: 'Street, Area, Landmark',
-            icon: Icons.home_rounded,
-            maxLines: 3,
+    return Column(
+      children: [
+        _buildCard(
+          icon: Icons.location_on_rounded,
+          title: 'Location & Contact',
+          child: Column(
+            children: [
+              _buildTextField(
+                controller: _addressController,
+                label: 'Business Address',
+                hint: 'Street, Area, Landmark',
+                icon: Icons.home_rounded,
+                maxLines: 3,
+              ),
+              SizedBox(height: 2.h),
+              _buildTextField(
+                controller: _cityController,
+                label: 'City',
+                hint: 'e.g. Pune',
+                icon: Icons.location_city_rounded,
+              ),
+              SizedBox(height: 2.h),
+              _buildTextField(
+                controller: _phoneController,
+                label: 'Phone Number',
+                hint: 'e.g. 9876543210',
+                icon: Icons.phone_rounded,
+                keyboardType: TextInputType.phone,
+              ),
+              SizedBox(height: 2.h),
+              _buildTextField(
+                controller: _whatsappController,
+                label: 'WhatsApp Number (Optional)',
+                hint: 'Same as phone or different',
+                icon: Icons.chat_rounded,
+                keyboardType: TextInputType.phone,
+              ),
+            ],
           ),
-          SizedBox(height: 2.h),
-          _buildTextField(
-            controller: _cityController,
-            label: 'City',
-            hint: 'e.g. Pune',
-            icon: Icons.location_city_rounded,
+        ),
+        SizedBox(height: 2.h),
+        _buildCard(
+          icon: Icons.map_rounded,
+          title: 'Shop Location on Map',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Pinning your shop location on the map allows nearby customers to discover you and request instant service.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 9.5.sp,
+                  color: const Color(0xFF666666),
+                ),
+              ),
+              SizedBox(height: 1.5.h),
+              Container(
+                padding: EdgeInsets.all(3.w),
+                decoration: BoxDecoration(
+                  color: _latitude != null
+                      ? const Color(0xFFE8F5E9)
+                      : const Color(0xFFF5F7FF),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _latitude != null
+                        ? const Color(0xFF4CAF50)
+                        : const Color(0xFFD0D7DE),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _latitude != null
+                          ? Icons.check_circle_rounded
+                          : Icons.location_off_rounded,
+                      color: _latitude != null
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFF888888),
+                      size: 24,
+                    ),
+                    SizedBox(width: 3.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _latitude != null
+                                ? 'Location Pinned'
+                                : 'Location Not Pinned (Optional)',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10.5.sp,
+                              fontWeight: FontWeight.w700,
+                              color: _latitude != null
+                                  ? const Color(0xFF2E7D32)
+                                  : const Color(0xFF333333),
+                            ),
+                          ),
+                          if (_latitude != null) ...[
+                            SizedBox(height: 0.3.h),
+                            Text(
+                              'Lat: ${_latitude!.toStringAsFixed(5)}, Lng: ${_longitude!.toStringAsFixed(5)}'
+                              '${_district.isNotEmpty ? ' • $_district' : ''}',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 8.5.sp,
+                                color: const Color(0xFF555555),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 1.5.h),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _openMapPicker,
+                      icon: const Icon(Icons.map_rounded, size: 18),
+                      label: Text(
+                        _latitude != null ? 'Change Pin' : 'Select on Map',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9.5.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 1.3.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 2.w),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _detectGpsLocation,
+                      icon: const Icon(Icons.my_location_rounded, size: 18),
+                      label: Text(
+                        'Use GPS',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9.5.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        side: const BorderSide(color: AppTheme.primary),
+                        padding: EdgeInsets.symmetric(vertical: 1.3.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          SizedBox(height: 2.h),
-          _buildTextField(
-            controller: _phoneController,
-            label: 'Phone Number',
-            hint: 'e.g. 9876543210',
-            icon: Icons.phone_rounded,
-            keyboardType: TextInputType.phone,
-          ),
-          SizedBox(height: 2.h),
-          _buildTextField(
-            controller: _whatsappController,
-            label: 'WhatsApp Number (Optional)',
-            hint: 'Same as phone or different',
-            icon: Icons.chat_rounded,
-            keyboardType: TextInputType.phone,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1393,6 +1688,13 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
                 Icons.location_city_rounded,
                 'City',
                 _cityController.text.isNotEmpty ? _cityController.text : '—',
+              ),
+              _buildSummaryRow(
+                Icons.pin_drop_rounded,
+                'Map Pin',
+                _latitude != null
+                    ? '${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}${_district.isNotEmpty ? ' ($_district)' : ''}'
+                    : 'Not pinned',
               ),
               _buildSummaryRow(
                 Icons.phone_rounded,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/custom_image_widget.dart';
+import '../../../services/supabase_service.dart';
 import './provider_photos_management_widget.dart';
 import './provider_offers_management_widget.dart';
 
@@ -73,7 +74,7 @@ class ProviderTabsWidget extends StatelessWidget {
                       ),
                     )
                   : const _PhotosTab(),
-              const _ReviewsTab(),
+              _ReviewsTab(providerId: providerId),
             ],
           ),
         ),
@@ -1378,51 +1379,71 @@ class _PhotosTab extends StatelessWidget {
 
 // ── Reviews Tab ───────────────────────────────────────────
 class _ReviewsTab extends StatelessWidget {
-  const _ReviewsTab();
-
-  static final List<Map<String, dynamic>> _reviews = [
-    {
-      'name': 'Priya Kulkarni',
-      'rating': 5,
-      'date': '08 Apr 2024',
-      'text':
-          'Suresh bhai came within 20 minutes! Fixed the wiring issue perfectly. Very professional and honest pricing.',
-      'service': 'Wiring Repair',
-      'avatar': 'PK',
-    },
-    {
-      'name': 'Rahul Deshmukh',
-      'rating': 4,
-      'date': '05 Apr 2024',
-      'text':
-          'Good work. Fan installation done quickly. Slight delay but overall satisfied.',
-      'service': 'Fan Installation',
-      'avatar': 'RD',
-    },
-    {
-      'name': 'Anjali Patil',
-      'rating': 5,
-      'date': '01 Apr 2024',
-      'text': 'खूपचांगले काम! MCB बदलली आणि सर्व ठीक झाले. Highly recommend!',
-      'service': 'MCB Repair',
-      'avatar': 'AP',
-    },
-    {
-      'name': 'Vikram Shinde',
-      'rating': 4,
-      'date': '28 Mar 2024',
-      'text':
-          'AC wiring done properly. Price was fair. Will call again for future work.',
-      'service': 'AC Wiring',
-      'avatar': 'VS',
-    },
-  ];
+  final String? providerId;
+  const _ReviewsTab({this.providerId});
 
   @override
   Widget build(BuildContext context) {
+    if (providerId == null || providerId!.isEmpty) {
+      return _buildReviewsList(_mockReviews);
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseService.instance.getProviderReviews(providerId!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+        }
+        final liveReviews = snapshot.data ?? [];
+        if (liveReviews.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No Reviews Yet',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1A1C1E),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Be the first to hire and review this provider!',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: const Color(0xFF74777F),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return _buildReviewsList(liveReviews);
+      },
+    );
+  }
+
+  Widget _buildReviewsList(List<Map<String, dynamic>> reviews) {
+    final total = reviews.length;
+    double avg = 5.0;
+    if (total > 0) {
+      final sum = reviews.fold<double>(
+        0,
+        (prev, r) => prev + ((r['rating'] as num?)?.toDouble() ?? 5.0),
+      );
+      avg = sum / total;
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const BouncingScrollPhysics(),
       children: [
         // Rating summary
         Container(
@@ -1436,9 +1457,9 @@ class _ReviewsTab extends StatelessWidget {
               Column(
                 children: [
                   Text(
-                    '4.7',
+                    avg.toStringAsFixed(1),
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 40,
+                      fontSize: 36,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
                     ),
@@ -1447,7 +1468,9 @@ class _ReviewsTab extends StatelessWidget {
                     children: List.generate(
                       5,
                       (i) => Icon(
-                        i < 4 ? Icons.star_rounded : Icons.star_half_rounded,
+                        i < avg.round()
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
                         color: const Color(0xFFFFA000),
                         size: 14,
                       ),
@@ -1455,7 +1478,7 @@ class _ReviewsTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '132 Reviews',
+                    '$total ${total == 1 ? 'Review' : 'Reviews'}',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 11,
                       color: Colors.white.withValues(alpha: 0.85),
@@ -1467,15 +1490,13 @@ class _ReviewsTab extends StatelessWidget {
               Expanded(
                 child: Column(
                   children: [5, 4, 3, 2, 1].map((star) {
-                    final pct = star == 5
-                        ? 0.72
-                        : star == 4
-                        ? 0.18
-                        : star == 3
-                        ? 0.06
-                        : star == 2
-                        ? 0.02
-                        : 0.02;
+                    final count = reviews
+                        .where(
+                          (r) =>
+                              ((r['rating'] as num?)?.toInt() ?? 5) == star,
+                        )
+                        .length;
+                    final pct = total > 0 ? count / total : 0.0;
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Row(
@@ -1503,7 +1524,8 @@ class _ReviewsTab extends StatelessWidget {
                                 backgroundColor: Colors.white.withValues(
                                   alpha: 0.25,
                                 ),
-                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                valueColor:
+                                    const AlwaysStoppedAnimation<Color>(
                                   Color(0xFFFFA000),
                                 ),
                                 minHeight: 6,
@@ -1512,7 +1534,7 @@ class _ReviewsTab extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '${(pct * 100).round()}%',
+                            '$count',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 10,
                               color: Colors.white.withValues(alpha: 0.85),
@@ -1528,10 +1550,22 @@ class _ReviewsTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        ..._reviews.map((r) => _ReviewCard(review: r)),
+        ...reviews.map((r) => _ReviewCard(review: r)),
       ],
     );
   }
+
+  static final List<Map<String, dynamic>> _mockReviews = [
+    {
+      'name': 'Priya Kulkarni',
+      'rating': 5,
+      'date': '08 Apr 2024',
+      'text':
+          'Came within 20 minutes! Fixed the issue perfectly. Very professional and honest pricing.',
+      'service': 'Wiring Repair',
+      'avatar': 'PK',
+    },
+  ];
 }
 
 class _ReviewCard extends StatelessWidget {
@@ -1541,6 +1575,23 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final customerProfile = review['user_profiles'];
+    final name = (review['name'] as String?) ??
+        (customerProfile is Map
+            ? (customerProfile['full_name'] as String?)
+            : null) ??
+        'Customer';
+    final avatar = (review['avatar'] as String?) ??
+        (name.isNotEmpty ? name[0].toUpperCase() : 'C');
+    final rating = (review['rating'] as num?)?.toInt() ?? 5;
+    final text =
+        (review['review_text'] as String?) ?? (review['text'] as String?) ?? '';
+    final service = (review['service'] as String?) ?? '';
+    final date = (review['date'] as String?) ??
+        (review['created_at'] != null
+            ? (review['created_at'] as String).substring(0, 10)
+            : '');
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -1564,7 +1615,7 @@ class _ReviewCard extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    review['avatar'] as String,
+                    avatar,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -1579,20 +1630,21 @@ class _ReviewCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      review['name'] as String,
+                      name,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFF1A1C1E),
                       ),
                     ),
-                    Text(
-                      review['date'] as String,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        color: const Color(0xFF74777F),
+                    if (date.isNotEmpty)
+                      Text(
+                        date,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          color: const Color(0xFF74777F),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -1601,46 +1653,52 @@ class _ReviewCard extends StatelessWidget {
                 children: [
                   Row(
                     children: List.generate(
-                      review['rating'] as int,
-                      (_) => const Icon(
-                        Icons.star_rounded,
-                        color: Color(0xFFFFA000),
+                      5,
+                      (s) => Icon(
+                        s < rating
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        color: const Color(0xFFFFA000),
                         size: 13,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      review['service'] as String,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primary,
+                  if (service.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        service,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            review['text'] as String,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              color: const Color(0xFF44474E),
-              height: 1.5,
+          if (text.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              text,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                color: const Color(0xFF44474E),
+                height: 1.5,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

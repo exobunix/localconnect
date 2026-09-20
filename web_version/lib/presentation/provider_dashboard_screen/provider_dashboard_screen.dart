@@ -74,6 +74,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   // Account deletion
   bool _isDeletingAccount = false;
 
+  // Reviews state
+  List<Map<String, dynamic>> _providerReviews = [];
+  bool _isLoadingReviews = false;
+
   @override
   void initState() {
     super.initState();
@@ -108,6 +112,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       _subscribeToOrders(provider['id'] as String);
       // Load subscription status for dashboard card
       _loadSubscriptionStatus(provider['id'] as String);
+      // Load customer reviews for dashboard visibility
+      _loadProviderReviews(provider['id'] as String);
     } catch (e) {
       setState(() {
         _error = 'Failed to load dashboard. Please try again.';
@@ -191,6 +197,233 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _loadProviderReviews(String providerId) async {
+    setState(() => _isLoadingReviews = true);
+    try {
+      final reviews = await SupabaseService.instance.getProviderReviews(providerId);
+      if (mounted) {
+        setState(() {
+          _providerReviews = reviews;
+          _isLoadingReviews = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingReviews = false);
+    }
+  }
+
+  void _showReviewsBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        maxChildSize: 0.95,
+        minChildSize: 0.4,
+        builder: (_, ctrl) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppTheme.outline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.star_rounded, color: Color(0xFFFFA000), size: 24),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Customer Ratings & Reviews',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1A1C1E),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF8E1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFFE082)),
+                      ),
+                      child: Text(
+                        '${((_providerProfile?['rating'] as num?)?.toDouble() ?? 5.0).toStringAsFixed(1)} ★ (${_providerReviews.length})',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFE65100),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: _isLoadingReviews
+                    ? const Center(child: CircularProgressIndicator())
+                    : _providerReviews.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey[400]),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'No Customer Reviews Yet',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF1A1C1E),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'When customers rate and review your completed jobs, their feedback will appear here.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            controller: ctrl,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _providerReviews.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            itemBuilder: (ctx, i) {
+                              final r = _providerReviews[i];
+                              final rating = (r['rating'] as num?)?.toInt() ?? 5;
+                              final reviewText = (r['review_text'] as String?) ?? '';
+                              final customerProfile = r['user_profiles'];
+                              final customerName = customerProfile is Map
+                                  ? (customerProfile['full_name'] as String?) ?? 'Customer'
+                                  : 'Customer';
+                              final avatarUrl = customerProfile is Map
+                                  ? customerProfile['avatar_url'] as String?
+                                  : null;
+                              final photoUrl = r['photo_url'] as String?;
+                              final createdAt = r['created_at'] as String?;
+                              return Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF9FAFB),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFEEEEEE)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 16,
+                                          backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                                          backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                                              ? NetworkImage(avatarUrl)
+                                              : null,
+                                          child: avatarUrl == null || avatarUrl.isEmpty
+                                              ? Text(
+                                                  customerName.isNotEmpty ? customerName[0].toUpperCase() : 'C',
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: AppTheme.primary,
+                                                  ),
+                                                )
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                customerName,
+                                                style: GoogleFonts.plusJakartaSans(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: const Color(0xFF1A1C1E),
+                                                ),
+                                              ),
+                                              if (createdAt != null)
+                                                Text(
+                                                  _formatDateTime(DateTime.tryParse(createdAt) ?? DateTime.now()),
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    fontSize: 10,
+                                                    color: Colors.grey[500],
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        Row(
+                                          children: List.generate(
+                                            5,
+                                            (s) => Icon(
+                                              s < rating ? Icons.star_rounded : Icons.star_border_rounded,
+                                              color: const Color(0xFFFFA000),
+                                              size: 16,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (reviewText.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        reviewText,
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 12,
+                                          color: const Color(0xFF374151),
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ],
+                                    if (photoUrl != null && photoUrl.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          photoUrl,
+                                          height: 120,
+                                          width: double.infinity,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _subscribeToOrders(String providerId) {
@@ -1614,6 +1847,81 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                             color: Colors.white70,
                           ),
                           overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white70,
+                    size: 14,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // ─── Customer Ratings & Reviews Bar ────────────────────────────
+          GestureDetector(
+            onTap: () => _showReviewsBottomSheet(context),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE65100), Color(0xFFF57C00)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.star_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Customer Reviews & Rating',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${((_providerProfile?['rating'] as num?)?.toDouble() ?? 5.0).toStringAsFixed(1)} ★',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          _providerReviews.isNotEmpty
+                              ? '${_providerReviews.length} verified ${_providerReviews.length == 1 ? 'review' : 'reviews'} • Tap to view all customer feedback'
+                              : '${(_providerProfile?['review_count'] as num?)?.toInt() ?? 0} reviews • Tap to view feedback',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            color: Colors.white70,
+                          ),
                         ),
                       ],
                     ),
