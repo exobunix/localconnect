@@ -16,7 +16,22 @@ class ShareAppButton extends StatelessWidget {
 
   Future<void> _share(BuildContext context) async {
     final message = ReferralService.instance.shareMessage;
-    await Share.share(message, subject: 'LocalConnect - Local Services App');
+    try {
+      await Share.share(message, subject: 'LocalConnect - Local Services App');
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: message));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'App invite link copied to clipboard!',
+              style: GoogleFonts.plusJakartaSans(),
+            ),
+            backgroundColor: AppTheme.primary,
+          ),
+        );
+      }
+    }
     await ReferralService.instance.logShare(
       shareType: 'app',
       platform: 'native',

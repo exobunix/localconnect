@@ -101,6 +101,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           return;
         }
         setAdminSessionActive(true);
+        await SupabaseService.instance.loadAdminProfile();
         setState(() {
           _isAdmin = true;
           _isCheckingRole = false;
@@ -471,6 +472,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          _buildSettingsTile(
+            icon: Icons.admin_panel_settings_rounded,
+            title: 'Admin Accounts & Area Access',
+            subtitle: SupabaseService.instance.isSuperAdmin
+                ? 'Create & manage multiple admin accounts and city assignments'
+                : 'Assigned City: ${SupabaseService.instance.currentAdminArea}',
+            color: const Color(0xFF1E88E5),
+            onTap: () => Navigator.pushNamed(
+              context,
+              AppRoutes.adminAccountsManagementScreen,
+            ),
+          ),
           _buildSettingsTile(
             icon: Icons.category_rounded,
             title: 'Category Management',

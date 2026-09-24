@@ -8,7 +8,7 @@ class ReferralService {
 
   static const String _appName = 'LocalConnect';
   static const String _playStoreUrl =
-      'https://play.google.com/store/apps/details?id=com.localconnect';
+      'https://play.google.com/store/apps/details?id=com.avdar.localconnect';
 
   String get playStoreUrl => _playStoreUrl;
 
@@ -46,9 +46,9 @@ class ReferralService {
 
   // ── Referral Code Management ──────────────────────────────────────────────
 
-  Future<String?> getOrCreateReferralCode() async {
+  Future<String> getOrCreateReferralCode() async {
     final userId = SupabaseService.instance.currentUser?.id;
-    if (userId == null) return null;
+    if (userId == null) return 'LCAPP';
 
     try {
       // Try to get existing code
@@ -58,8 +58,8 @@ class ReferralService {
           .eq('user_id', userId)
           .maybeSingle();
 
-      if (existing != null) {
-        return existing['referral_code'] as String?;
+      if (existing != null && (existing['referral_code'] as String?)?.isNotEmpty == true) {
+        return existing['referral_code'] as String;
       }
 
       // Generate new code via RPC
@@ -67,10 +67,14 @@ class ReferralService {
         'generate_referral_code',
         params: {'p_user_id': userId},
       );
-      return result as String?;
-    } catch (e) {
-      return null;
-    }
+      if (result != null && result.toString().isNotEmpty) {
+        return result.toString();
+      }
+    } catch (_) {}
+
+    final cleanId = userId.replaceAll('-', '').toUpperCase();
+    final suffix = cleanId.length >= 6 ? cleanId.substring(0, 6) : cleanId;
+    return 'LC$suffix';
   }
 
   Future<Map<String, dynamic>?> getReferralStats() async {

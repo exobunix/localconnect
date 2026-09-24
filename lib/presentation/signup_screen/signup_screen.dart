@@ -176,7 +176,7 @@ class _SignupScreenState extends State<SignupScreen>
           fullName: name,
           phone: phone,
           role: _selectedRole == 0 ? 'customer' : 'provider',
-          city: 'Pune',
+          city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
         );
 
         if (mounted) {
@@ -219,7 +219,7 @@ class _SignupScreenState extends State<SignupScreen>
           fullName: name,
           phone: phone,
           role: _selectedRole == 0 ? 'customer' : 'provider',
-          city: 'Pune',
+          city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
         );
       }
 

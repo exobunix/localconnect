@@ -11,6 +11,14 @@ class SupabaseService {
   String selectedCity = '';
   String? lastOrderError;
 
+  // Admin Role & Area Access Control
+  String currentAdminRole = 'super_admin'; // 'super_admin' or 'area_admin'
+  String currentAdminArea = 'ALL'; // City name or 'ALL'
+  bool get isSuperAdmin =>
+      currentAdminRole == 'super_admin' ||
+      currentAdminArea == 'ALL' ||
+      currentAdminArea.isEmpty;
+
   SupabaseService._();
 
   static const String _envUrl = String.fromEnvironment('SUPABASE_URL');
@@ -1758,11 +1766,17 @@ class SupabaseService {
     required String title,
     String subtitle = '',
     String imageUrl = '',
+    String actionUrl = '',
+    String gradientStart = '#1565C0',
+    String gradientEnd = '#1E88E5',
   }) async {
     await client.from('banner_ads').insert({
       'title': title,
       'subtitle': subtitle,
       'image_url': imageUrl,
+      'action_url': actionUrl,
+      'gradient_start': gradientStart,
+      'gradient_end': gradientEnd,
       'is_active': true,
     });
   }
@@ -1772,6 +1786,9 @@ class SupabaseService {
     required String title,
     String subtitle = '',
     String imageUrl = '',
+    String actionUrl = '',
+    String gradientStart = '#1565C0',
+    String gradientEnd = '#1E88E5',
   }) async {
     await client
         .from('banner_ads')
@@ -1779,6 +1796,9 @@ class SupabaseService {
           'title': title,
           'subtitle': subtitle,
           'image_url': imageUrl,
+          'action_url': actionUrl,
+          'gradient_start': gradientStart,
+          'gradient_end': gradientEnd,
           'updated_at': DateTime.now().toIso8601String(),
         })
         .eq('id', id);
@@ -4186,5 +4206,187 @@ class SupabaseService {
           .eq('is_read', false);
     } catch (_) {}
   }
-}
+  // ─── ADMIN ACCOUNTS & AREA ACCESS MANAGEMENT ──────────────────────────────
 
+  Future<Map<String, dynamic>?> loadAdminProfile() async {
+    try {
+      final user = currentUser;
+      if (user == null) return null;
+      final email = user.email ?? '';
+      if (email.isEmpty) return null;
+
+      final res = await client
+          .from('admin_users')
+          .select()
+          .eq('email', email)
+          .maybeSingle();
+      if (res != null) {
+        currentAdminRole = res['role'] as String? ?? 'area_admin';
+        currentAdminArea = res['assigned_area'] as String? ?? 'Pune';
+        return res;
+      }
+      if (email == 'admin@localconnect.com') {
+        currentAdminRole = 'super_admin';
+        currentAdminArea = 'ALL';
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> getAllAdmins() async {
+    try {
+      final res = await client
+          .from('admin_users')
+          .select()
+          .order('role', ascending: false);
+      if (res.isNotEmpty) {
+        return List<Map<String, dynamic>>.from(res);
+      }
+    } catch (_) {}
+    return [
+      {
+        'id': 'super-admin-01',
+        'email': 'admin@localconnect.com',
+        'full_name': 'Super Administrator',
+        'phone': '+919209205923',
+        'role': 'super_admin',
+        'assigned_area': 'ALL',
+        'is_active': true,
+      }
+    ];
+  }
+
+  Future<bool> adminUpsertAdminAccount({
+    String? id,
+    required String email,
+    required String fullName,
+    String phone = '',
+    required String role,
+    required String assignedArea,
+    bool isActive = true,
+  }) async {
+    try {
+      final data = <String, dynamic>{
+        'email': email.trim().toLowerCase(),
+        'full_name': fullName.trim(),
+        'phone': phone.trim(),
+        'role': role,
+        'assigned_area': assignedArea.trim(),
+        'is_active': isActive,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (id != null && id.isNotEmpty) {
+        await client.from('admin_users').update(data).eq('id', id);
+      } else {
+        await client.from('admin_users').insert(data);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] adminUpsertAdminAccount error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminDeleteAdminAccount(String id) async {
+    try {
+      await client.from('admin_users').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ─── SERVICE PROVIDER ADVERTISING MANAGEMENT ─────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getProviderAdRequests({String? city}) async {
+    try {
+      var builder = client.from('provider_ad_requests').select();
+      if (city != null && city.isNotEmpty && city != 'ALL') {
+        builder = builder.ilike('city', '%$city%');
+      }
+      final res = await builder.order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> submitProviderAdRequest({
+    required String providerId,
+    required String providerName,
+    required String businessName,
+    required String category,
+    required String city,
+    required String title,
+    String subtitle = '',
+    String imageUrl = '',
+    String targetUrl = '',
+    int durationDays = 15,
+  }) async {
+    try {
+      await client.from('provider_ad_requests').insert({
+        'provider_id': providerId,
+        'provider_name': providerName,
+        'business_name': businessName,
+        'category': category,
+        'city': city,
+        'title': title,
+        'subtitle': subtitle,
+        'image_url': imageUrl,
+        'target_url': targetUrl,
+        'duration_days': durationDays,
+        'status': 'pending',
+      });
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] submitProviderAdRequest error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminApproveAdRequest({
+    required String requestId,
+    String gradientStart = '#1565C0',
+    String gradientEnd = '#1E88E5',
+  }) async {
+    try {
+      final req = await client
+          .from('provider_ad_requests')
+          .select()
+          .eq('id', requestId)
+          .maybeSingle();
+      if (req == null) return false;
+
+      await client.from('provider_ad_requests').update({
+        'status': 'approved',
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', requestId);
+
+      await adminCreateBanner(
+        title: req['title'] ?? '',
+        subtitle: req['subtitle'] ?? req['business_name'] ?? '',
+        imageUrl: req['image_url'] ?? '',
+        actionUrl: req['target_url'] ?? '/provider/${req['provider_id']}',
+        gradientStart: gradientStart,
+        gradientEnd: gradientEnd,
+      );
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> adminRejectAdRequest(String requestId, {String note = ''}) async {
+    try {
+      await client.from('provider_ad_requests').update({
+        'status': 'rejected',
+        'admin_note': note,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', requestId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+}

@@ -472,219 +472,201 @@ class _AdminCategoryManagementScreenState
                                               14,
                                             ),
                                           ),
-                                          child: Row(
-                                            children: [
-                                              // Visibility indicator dot
-                                              Container(
-                                                width: 10,
-                                                height: 10,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  color: isActive
-                                                      ? Colors.green
-                                                      : Colors.grey.shade400,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Container(
-                                                padding: const EdgeInsets.all(
-                                                  8,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: AppTheme.primary
-                                                      .withValues(alpha: 0.1),
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                ),
-                                                child: const Icon(
-                                                  Icons.category_rounded,
-                                                  color: AppTheme.primary,
-                                                  size: 20,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      cat['name'] as String? ??
-                                                          '',
-                                                      style:
-                                                          GoogleFonts.plusJakartaSans(
-                                                            fontSize: 14,
-                                                            fontWeight:
-                                                                FontWeight.w700,
-                                                          ),
-                                                    ),
-                                                    Wrap(
-                                                      crossAxisAlignment:
-                                                          WrapCrossAlignment.center,
-                                                      spacing: 6,
-                                                      runSpacing: 2,
-                                                      children: [
-                                                        Text(
-                                                          '${subcategories.length} subcategories',
-                                                          style:
-                                                              GoogleFonts.plusJakartaSans(
-                                                                fontSize: 11,
-                                                                color:
-                                                                    const Color(
-                                                                  0xFF74777F,
-                                                                ),
-                                                              ),
-                                                        ),
-                                                        Container(
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                            horizontal: 6,
-                                                            vertical: 2,
-                                                          ),
-                                                          decoration: BoxDecoration(
-                                                            color: isActive
-                                                                ? Colors.green
-                                                                    .withValues(
-                                                                      alpha:
-                                                                          0.12,
-                                                                    )
-                                                                : Colors
-                                                                    .grey
-                                                                    .shade100,
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                              20,
-                                                            ),
-                                                          ),
-                                                          child: Text(
-                                                            isActive
-                                                                ? 'Visible'
-                                                                : 'Hidden',
-                                                            style: GoogleFonts.plusJakartaSans(
-                                                              fontSize: 9,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w700,
-                                                              color: isActive
-                                                                  ? Colors
-                                                                      .green
-                                                                      .shade700
-                                                                  : Colors
-                                                                      .grey
-                                                                      .shade600,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              // Sort order badge
-                                              GestureDetector(
-                                                onTap: () =>
-                                                    _showSortOrderDialog(
-                                                      context,
-                                                      cat,
-                                                      sortOrder,
-                                                    ),
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(
-                                                    6,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color:
-                                                        AppTheme.surfaceVariant,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      const Icon(
-                                                        Icons.swap_vert_rounded,
-                                                        size: 14,
-                                                        color: AppTheme.outline,
-                                                      ),
-                                                      Text(
-                                                        '#$sortOrder',
-                                                        style:
-                                                            GoogleFonts.plusJakartaSans(
-                                                              fontSize: 10,
-                                                              color: AppTheme
-                                                                  .outline,
-                                                            ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              // Visibility toggle
-                                              Switch(
-                                                value: isActive,
-                                                onChanged: (_) =>
-                                                    _toggleCategory(
-                                                      cat['id'] as String,
-                                                      isActive,
-                                                    ),
-                                                activeColor: AppTheme.primary,
-                                                materialTapTargetSize:
-                                                    MaterialTapTargetSize
-                                                        .shrinkWrap,
-                                              ),
-                                              // Edit button
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.edit_rounded,
-                                                  size: 18,
-                                                  color: AppTheme.primary,
-                                                ),
-                                                onPressed: () =>
-                                                    _showEditCategoryDialog(
-                                                      context,
-                                                      cat,
-                                                    ),
-                                                padding: EdgeInsets.zero,
-                                                constraints:
-                                                    const BoxConstraints(
-                                                      minWidth: 32,
-                                                      minHeight: 32,
-                                                    ),
-                                              ),
-                                              // Delete button
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.delete_outline_rounded,
-                                                  size: 18,
-                                                  color: Colors.redAccent,
-                                                ),
-                                                onPressed: () =>
-                                                    _showDeleteCategoryConfirmDialog(
-                                                      context,
-                                                      cat,
-                                                    ),
-                                                padding: EdgeInsets.zero,
-                                                constraints:
-                                                    const BoxConstraints(
-                                                      minWidth: 32,
-                                                      minHeight: 32,
-                                                    ),
-                                              ),
-                                              Icon(
-                                                isExpanded
-                                                    ? Icons.expand_less_rounded
-                                                    : Icons.expand_more_rounded,
-                                                color: AppTheme.outline,
-                                                size: 20,
-                                              ),
-                                            ],
+                                           child: Column(
+                                             crossAxisAlignment: CrossAxisAlignment.start,
+                                             children: [
+                                               // ── Top Row: Dot + Icon + Title + Chevron ──
+                                               Row(
+                                                 children: [
+                                                   // Visibility indicator dot
+                                                   Container(
+                                                     width: 8,
+                                                     height: 8,
+                                                     decoration: BoxDecoration(
+                                                       shape: BoxShape.circle,
+                                                       color: isActive
+                                                           ? const Color(0xFF00C853)
+                                                           : Colors.grey.shade400,
+                                                     ),
+                                                   ),
+                                                   const SizedBox(width: 8),
+                                                   Container(
+                                                     padding: const EdgeInsets.all(7),
+                                                     decoration: BoxDecoration(
+                                                       color: AppTheme.primary
+                                                           .withValues(alpha: 0.1),
+                                                       borderRadius:
+                                                           BorderRadius.circular(8),
+                                                     ),
+                                                     child: const Icon(
+                                                       Icons.category_rounded,
+                                                       color: AppTheme.primary,
+                                                       size: 18,
+                                                     ),
+                                                   ),
+                                                   const SizedBox(width: 10),
+                                                   Expanded(
+                                                     child: Text(
+                                                       cat['name'] as String? ?? '',
+                                                       style: GoogleFonts.plusJakartaSans(
+                                                         fontSize: 15,
+                                                         fontWeight: FontWeight.w700,
+                                                         color: const Color(0xFF1E293B),
+                                                       ),
+                                                       maxLines: 2,
+                                                       overflow: TextOverflow.ellipsis,
+                                                     ),
+                                                   ),
+                                                   const SizedBox(width: 6),
+                                                   Icon(
+                                                     isExpanded
+                                                         ? Icons.keyboard_arrow_up_rounded
+                                                         : Icons.keyboard_arrow_down_rounded,
+                                                     color: AppTheme.outline,
+                                                     size: 24,
+                                                   ),
+                                                 ],
+                                               ),
+                                               const SizedBox(height: 10),
+                                               // ── Bottom Action Row: Badges & Controls ──
+                                               Row(
+                                                 children: [
+                                                   // Subcategories count badge
+                                                   Container(
+                                                     padding: const EdgeInsets.symmetric(
+                                                       horizontal: 8,
+                                                       vertical: 4,
+                                                     ),
+                                                     decoration: BoxDecoration(
+                                                       color: AppTheme.surfaceVariant,
+                                                       borderRadius: BorderRadius.circular(6),
+                                                     ),
+                                                     child: Text(
+                                                       '${subcategories.length} subcategories',
+                                                       style: GoogleFonts.plusJakartaSans(
+                                                         fontSize: 11,
+                                                         fontWeight: FontWeight.w600,
+                                                         color: const Color(0xFF475569),
+                                                       ),
+                                                     ),
+                                                   ),
+                                                   const SizedBox(width: 6),
+                                                   // Visible / Hidden badge
+                                                   Container(
+                                                     padding: const EdgeInsets.symmetric(
+                                                       horizontal: 8,
+                                                       vertical: 4,
+                                                     ),
+                                                     decoration: BoxDecoration(
+                                                       color: isActive
+                                                           ? const Color(0xFFE8F5E9)
+                                                           : Colors.grey.shade100,
+                                                       borderRadius: BorderRadius.circular(6),
+                                                     ),
+                                                     child: Text(
+                                                       isActive ? 'Visible' : 'Hidden',
+                                                       style: GoogleFonts.plusJakartaSans(
+                                                         fontSize: 10,
+                                                         fontWeight: FontWeight.w700,
+                                                         color: isActive
+                                                             ? const Color(0xFF2E7D32)
+                                                             : Colors.grey.shade600,
+                                                       ),
+                                                     ),
+                                                   ),
+                                                   const Spacer(),
+                                                   // Sort order badge
+                                                   GestureDetector(
+                                                     onTap: () => _showSortOrderDialog(
+                                                       context,
+                                                       cat,
+                                                       sortOrder,
+                                                     ),
+                                                     child: Container(
+                                                       padding: const EdgeInsets.symmetric(
+                                                         horizontal: 6,
+                                                         vertical: 4,
+                                                       ),
+                                                       decoration: BoxDecoration(
+                                                         color: AppTheme.surfaceVariant,
+                                                         borderRadius: BorderRadius.circular(6),
+                                                       ),
+                                                       child: Row(
+                                                         mainAxisSize: MainAxisSize.min,
+                                                         children: [
+                                                           const Icon(
+                                                             Icons.swap_vert_rounded,
+                                                             size: 14,
+                                                             color: AppTheme.outline,
+                                                           ),
+                                                           Text(
+                                                             '#$sortOrder',
+                                                             style: GoogleFonts.plusJakartaSans(
+                                                               fontSize: 10,
+                                                               fontWeight: FontWeight.bold,
+                                                               color: AppTheme.outline,
+                                                             ),
+                                                           ),
+                                                         ],
+                                                       ),
+                                                     ),
+                                                   ),
+                                                   const SizedBox(width: 4),
+                                                   // Visibility toggle
+                                                   Transform.scale(
+                                                     scale: 0.8,
+                                                     child: Switch(
+                                                       value: isActive,
+                                                       onChanged: (_) => _toggleCategory(
+                                                         cat['id'] as String,
+                                                         isActive,
+                                                       ),
+                                                       activeColor: AppTheme.primary,
+                                                       materialTapTargetSize:
+                                                           MaterialTapTargetSize.shrinkWrap,
+                                                     ),
+                                                   ),
+                                                   // Edit button
+                                                   IconButton(
+                                                     icon: const Icon(
+                                                       Icons.edit_rounded,
+                                                       size: 18,
+                                                       color: AppTheme.primary,
+                                                     ),
+                                                     onPressed: () => _showEditCategoryDialog(
+                                                       context,
+                                                       cat,
+                                                     ),
+                                                     padding: EdgeInsets.zero,
+                                                     constraints: const BoxConstraints(
+                                                       minWidth: 32,
+                                                       minHeight: 32,
+                                                     ),
+                                                   ),
+                                                   // Delete button
+                                                   IconButton(
+                                                     icon: const Icon(
+                                                       Icons.delete_outline_rounded,
+                                                       size: 18,
+                                                       color: Colors.redAccent,
+                                                     ),
+                                                     onPressed: () =>
+                                                         _showDeleteCategoryConfirmDialog(
+                                                       context,
+                                                       cat,
+                                                     ),
+                                                     padding: EdgeInsets.zero,
+                                                     constraints: const BoxConstraints(
+                                                       minWidth: 32,
+                                                       minHeight: 32,
+                                                     ),
+                                                   ),
+                                                 ],
+                                               ),
+                                             ],
+                                           ),
                                           ),
                                         ),
-                                      ),
                                       // ── Subcategories ─────────────────
                                       if (isExpanded) ...[
                                         const Divider(height: 1),

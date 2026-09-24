@@ -164,7 +164,9 @@ class AdminAppBarWidget extends StatelessWidget {
                   maxLines: 1,
                 ),
                 Text(
-                  'LocalConnect Dashboard • 11 Apr 2026',
+                  SupabaseService.instance.isSuperAdmin
+                      ? 'Super Admin • All Access'
+                      : 'Area Admin: ${SupabaseService.instance.currentAdminArea}',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 10,
                     color: Colors.white.withValues(alpha: 0.75),

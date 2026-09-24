@@ -58,3 +58,4 @@ client_secret_*.json
 localconnect-release.apk
 *.apk
 scratch/
+android/.kotlin/

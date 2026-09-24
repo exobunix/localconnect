@@ -5,6 +5,7 @@ import '../core/testing_mode.dart';
 import '../presentation/active_booking_tracking_screen/active_booking_tracking_screen.dart';
 import '../presentation/admin_login_screen/admin_login_screen.dart';
 import '../presentation/admin_panel_screen/admin_advanced_reports_screen.dart';
+import '../presentation/admin_panel_screen/admin_accounts_management_screen.dart';
 import '../presentation/admin_panel_screen/admin_banner_ads_screen.dart';
 import '../presentation/admin_panel_screen/admin_category_management_screen.dart';
 import '../presentation/admin_panel_screen/admin_category_monetization_screen.dart';
@@ -180,6 +181,8 @@ class AppRoutes {
   static const String orderManagementScreen = '/order-management-screen';
   static const String upiPaymentScreen = '/upi-payment-screen';
   static const String notificationScreen = '/notification-screen';
+  static const String adminAccountsManagementScreen =
+      '/admin-accounts-management-screen';
   static const String adminCategoryManagementScreen =
       '/admin-category-management-screen';
   static const String adminUserManagementScreen =
@@ -678,6 +681,10 @@ class AppRoutes {
       // ── Admin-only routes ─────────────────────────────────────────────────,
       adminPanelScreen: (context) =>
           const RoleGuard(requiredRole: 'admin', child: AdminPanelScreen()),
+      adminAccountsManagementScreen: (context) => const RoleGuard(
+        requiredRole: 'admin',
+        child: AdminAccountsManagementScreen(),
+      ),
       adminCategoryManagementScreen: (context) => const RoleGuard(
         requiredRole: 'admin',
         child: AdminCategoryManagementScreen(),

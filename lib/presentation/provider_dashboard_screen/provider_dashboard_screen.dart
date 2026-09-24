@@ -1797,6 +1797,84 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             ],
           ),
           const SizedBox(height: 10),
+          // ─── Provider Advertising & Promotion Banner ────────────────────
+          GestureDetector(
+            onTap: () => _showPromoteAndAdvertiseDialog(),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6A1B9A), Color(0xFF8E24AA), Color(0xFFAB47BC)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6A1B9A).withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.campaign_rounded, color: Colors.white, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Promote Business & Run Banner Ads',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.amber,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'FEATURED',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'Showcase your services on customer home screen banner carousel',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            color: Colors.white70,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white70,
+                    size: 14,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           // ─── Service Area Management Button ────────────────────────────
           GestureDetector(
             onTap: () {
@@ -3970,6 +4048,231 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     required String subtitle,
   }) {
     return EmptyStateWidget(icon: icon, title: title, subtitle: subtitle);
+  }
+
+  void _showPromoteAndAdvertiseDialog() {
+    final businessName = _providerProfile?['business_name'] as String? ??
+        _providerProfile?['full_name'] as String? ??
+        'Local Service Provider';
+    final category = _providerProfile?['category'] as String? ?? 'Home Maintenance';
+    final city = _providerProfile?['city'] as String? ??
+        _providerProfile?['business_city'] as String? ??
+        'Pune';
+    final providerId = _providerProfile?['id'] as String? ?? '';
+
+    final titleCtrl = TextEditingController(text: '$businessName - Expert $category');
+    final subtitleCtrl = TextEditingController(text: 'Book verified $category services in $city. Instant confirmation!');
+    final imageCtrl = TextEditingController(text: _providerProfile?['image_url'] as String? ?? '');
+    int selectedDays = 15;
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6A1B9A).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.campaign_rounded, color: Color(0xFF6A1B9A), size: 24),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Request Banner Advertisement',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF1A1C1E),
+                            ),
+                          ),
+                          Text(
+                            'Reach thousands of customers in $city',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Banner Headline *',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: titleCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. 20% OFF Plumbing Services This Week',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Offer / Subtitle *',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: subtitleCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Fast response, guaranteed work, top-rated in $city',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Banner Image URL (optional)',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: imageCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'https://...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Campaign Duration',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [7, 15, 30].map((days) {
+                    final isSel = selectedDays == days;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => setModalState(() => selectedDays = days),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSel ? const Color(0xFF6A1B9A) : const Color(0xFFF3E5F5),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '$days Days',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: isSel ? Colors.white : const Color(0xFF6A1B9A),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final title = titleCtrl.text.trim();
+                            if (title.isEmpty) return;
+                            setModalState(() => isSubmitting = true);
+
+                            final success = await SupabaseService.instance.submitProviderAdRequest(
+                              providerId: providerId,
+                              providerName: _providerProfile?['full_name'] as String? ?? 'Provider',
+                              businessName: businessName,
+                              category: category,
+                              city: city,
+                              title: title,
+                              subtitle: subtitleCtrl.text.trim(),
+                              imageUrl: imageCtrl.text.trim(),
+                              durationDays: selectedDays,
+                            );
+
+                            if (mounted) {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    success
+                                        ? 'Advertising request submitted! Admin will review and activate it shortly.'
+                                        : 'Failed to submit request. Please try again.',
+                                    style: GoogleFonts.plusJakartaSans(),
+                                  ),
+                                  backgroundColor: success ? const Color(0xFF2E7D32) : Colors.red,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6A1B9A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : Text(
+                            'Submit Advertisement Request',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   String _formatDateTime(DateTime dt) {

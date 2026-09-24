@@ -52,10 +52,18 @@ class _AdminProviderManagementScreenState
     setState(() => _isLoading = true);
     try {
       final data = await SupabaseService.instance.getAdminAllProviders();
+      final isSuper = SupabaseService.instance.isSuperAdmin;
+      final assignedArea = SupabaseService.instance.currentAdminArea.trim().toLowerCase();
+      final areaFiltered = isSuper
+          ? data
+          : data.where((p) {
+              final city = (p['city'] ?? p['business_city'] ?? '').toString().toLowerCase();
+              return city.contains(assignedArea) || assignedArea.contains(city);
+            }).toList();
       if (mounted) {
         setState(() {
-          _providers = data;
-          _filteredProviders = data;
+          _providers = areaFiltered;
+          _filteredProviders = areaFiltered;
           _isLoading = false;
         });
       }

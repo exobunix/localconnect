@@ -366,7 +366,7 @@ class _ProviderPublicProfileScreenState
 
   void _getDirections() {
     if (_lat != null && _lng != null) {
-      final url = 'https://www.google.com/maps/search/?api=1&query=$_lat,$_lng';
+      final url = 'https://www.google.com/maps/dir/?api=1&destination=$_lat,$_lng';
       _launchUrl(url);
     } else if ((_provider?['google_map_url'] as String?)?.isNotEmpty == true) {
       _launchUrl(_provider!['google_map_url'] as String);
@@ -783,9 +783,9 @@ class _ProviderPublicProfileScreenState
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _getDirections,
-                  icon: const Icon(Icons.directions_rounded, size: 16),
+                  icon: const Icon(Icons.navigation_rounded, size: 16),
                   label: Text(
-                    'Directions',
+                    'Open in Google Maps',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,

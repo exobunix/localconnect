@@ -87,6 +87,12 @@ class _HomeScreenState extends State<HomeScreen> {
         final userId = SupabaseService.instance.currentUser?.id;
         if (userId != null) {
           await LocationService.instance.saveCustomerLocation(loc);
+          try {
+            await SupabaseService.instance.updateUserProfile(
+              userId: userId,
+              city: loc.displayCity,
+            );
+          } catch (_) {}
         }
       }
     } catch (e) {
@@ -112,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _userName = data?['full_name'] as String? ?? '';
           final city = data?['city'] as String? ?? '';
-          if (city.isNotEmpty) {
+          if (city.isNotEmpty && _selectedCity.isEmpty) {
             _selectedCity = city;
             SupabaseService.instance.selectedCity = _selectedCity;
           }
@@ -129,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _userName = profile['full_name'] as String? ?? '';
         final city = profile['city'] as String? ?? '';
-        if (city.isNotEmpty) {
+        if (city.isNotEmpty && _selectedCity.isEmpty) {
           _selectedCity = city;
           SupabaseService.instance.selectedCity = _selectedCity;
         }

@@ -23,6 +23,7 @@ const _providerOnlyRoutes = {
 
 const _adminOnlyRoutes = {
   AppRoutes.adminPanelScreen,
+  AppRoutes.adminAccountsManagementScreen,
   AppRoutes.adminCategoryManagementScreen,
   AppRoutes.adminUserManagementScreen,
   AppRoutes.adminBannerAdsScreen,

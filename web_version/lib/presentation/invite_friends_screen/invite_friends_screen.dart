@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
@@ -45,8 +46,8 @@ class _InviteFriendsScreenState extends State<InviteFriendsScreen> {
   }
 
   Future<void> _copyCode() async {
-    if (_referralCode == null) return;
-    await Clipboard.setData(ClipboardData(text: _referralCode!));
+    final code = _referralCode ?? 'LCAPP';
+    await Clipboard.setData(ClipboardData(text: code));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -69,8 +70,8 @@ class _InviteFriendsScreenState extends State<InviteFriendsScreen> {
   }
 
   Future<void> _copyLink() async {
-    if (_referralCode == null) return;
-    final link = ReferralService.instance.getReferralLink(_referralCode!);
+    final code = _referralCode ?? 'LCAPP';
+    final link = ReferralService.instance.getReferralLink(code);
     await Clipboard.setData(ClipboardData(text: link));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -94,20 +95,62 @@ class _InviteFriendsScreenState extends State<InviteFriendsScreen> {
   }
 
   Future<void> _shareReferral() async {
-    if (_referralCode == null) return;
-    final message = ReferralService.instance.getReferralShareMessage(
-      _referralCode!,
-    );
-    await Share.share(message, subject: 'Join LocalConnect with my referral!');
+    final code = _referralCode ?? 'LCAPP';
+    final message = ReferralService.instance.getReferralShareMessage(code);
+    try {
+      await Share.share(message, subject: 'Join LocalConnect with my referral!');
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: message));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Referral invite copied to clipboard!', style: GoogleFonts.plusJakartaSans()),
+            backgroundColor: AppTheme.primary,
+          ),
+        );
+      }
+    }
     await ReferralService.instance.logShare(
       shareType: 'referral',
       platform: 'native',
     );
   }
 
+  Future<void> _shareWhatsApp() async {
+    final code = _referralCode ?? 'LCAPP';
+    final message = ReferralService.instance.getReferralShareMessage(code);
+    final encoded = Uri.encodeComponent(message);
+    final uri = Uri.parse('https://wa.me/?text=$encoded');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await _shareReferral();
+      }
+    } catch (_) {
+      await _shareReferral();
+    }
+    await ReferralService.instance.logShare(
+      shareType: 'referral',
+      platform: 'whatsapp',
+    );
+  }
+
   Future<void> _shareApp() async {
     final message = ReferralService.instance.shareMessage;
-    await Share.share(message, subject: 'LocalConnect - Local Services App');
+    try {
+      await Share.share(message, subject: 'LocalConnect - Local Services App');
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: message));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('App link copied to clipboard!', style: GoogleFonts.plusJakartaSans()),
+            backgroundColor: AppTheme.primary,
+          ),
+        );
+      }
+    }
     await ReferralService.instance.logShare(
       shareType: 'app',
       platform: 'native',
@@ -232,9 +275,8 @@ class _InviteFriendsScreenState extends State<InviteFriendsScreen> {
   }
 
   Widget _buildReferralCodeCard() {
-    final referralLink = _referralCode != null
-        ? ReferralService.instance.getReferralLink(_referralCode!)
-        : '';
+    final code = _referralCode ?? 'LCAPP';
+    final referralLink = ReferralService.instance.getReferralLink(code);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -339,29 +381,55 @@ class _InviteFriendsScreenState extends State<InviteFriendsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Share button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _shareReferral,
-              icon: const Icon(Icons.share_rounded, size: 18),
-              label: Text(
-                'Share Referral Link',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+          // Share buttons
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _shareWhatsApp,
+                  icon: const Icon(Icons.chat_bubble_rounded, size: 18),
+                  label: Text(
+                    'WhatsApp',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _shareReferral,
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: Text(
+                    'Share More',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
                 ),
-                elevation: 0,
               ),
-            ),
+            ],
           ),
         ],
       ),

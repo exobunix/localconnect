@@ -491,23 +491,43 @@ class _HomeMaintenanceCustomerScreenState
 
         final sub = (row['subcategory'] as String? ?? '').toLowerCase().trim();
         String subKey = 'plumber';
-        if (sub.contains('plumb')) subKey = 'plumber';
-        else if (sub.contains('elect')) subKey = 'electrician';
-        else if (sub.contains('paint')) subKey = 'painter';
-        else if (sub.contains('mason')) subKey = 'mason';
-        else if (sub.contains('carpent')) subKey = 'carpenter';
-        else if (sub.contains('wage') || sub.contains('labour') || sub.contains('labor') || sub.contains('helper')) subKey = 'daily_wage';
-        else if (sub.contains('maid') || sub.contains('housekeep')) subKey = 'maid';
-        else if (sub.contains('clean')) subKey = 'cleaning';
-        else if (sub.contains('waterproof')) subKey = 'waterproofing';
-        else if (sub.contains('pest')) subKey = 'pest_control';
-        else if (sub.contains('ac') || sub.contains('air')) subKey = 'ac_repair';
-        else if (sub.contains('appliance')) subKey = 'appliance_repair';
-        else if (sub.contains('ro') || sub.contains('purifier') || sub.contains('filter')) subKey = 'ro_purifier';
-        else if (sub.contains('cctv') || sub.contains('security')) subKey = 'cctv_security';
-        else if (sub.contains('lock')) subKey = 'locksmith';
-        else if (sub.contains('garden')) subKey = 'gardening';
-        else subKey = sub.isNotEmpty ? sub : 'plumber';
+        bool matchedDynamic = false;
+        for (final s in _subcategories) {
+          final sId = (s['id'] as String).toLowerCase();
+          final sLabel = (s['label'] as String).toLowerCase();
+          if (sub == sId || sub == sLabel ||
+              (sLabel.length > 3 && sub.contains(sLabel)) ||
+              (sub.length > 3 && sLabel.contains(sub))) {
+            subKey = s['id'] as String;
+            matchedDynamic = true;
+            break;
+          }
+        }
+        if (!matchedDynamic) {
+          if (sub.contains('ac') || sub.contains('fridge') || sub.contains('cool')) {
+            final acSub = _subcategories.where(
+              (s) => (s['label'] as String).toLowerCase().contains('ac') || (s['id'] as String).contains('ac')
+            );
+            subKey = acSub.isNotEmpty ? acSub.first['id'] as String : 'home_maintenance_ac_fridge_repairing';
+          }
+          else if (sub.contains('plumb')) subKey = 'plumber';
+          else if (sub.contains('elect')) subKey = 'electrician';
+          else if (sub.contains('paint')) subKey = 'painter';
+          else if (sub.contains('mason')) subKey = 'mason';
+          else if (sub.contains('carpent')) subKey = 'carpenter';
+          else if (sub.contains('wage') || sub.contains('labour') || sub.contains('labor') || sub.contains('helper')) subKey = 'daily_wage';
+          else if (sub.contains('maid') || sub.contains('housekeep')) subKey = 'maid';
+          else if (sub.contains('clean')) subKey = 'cleaning';
+          else if (sub.contains('waterproof') || sub.contains('water proof')) subKey = 'waterproofing';
+          else if (sub.contains('weld')) subKey = 'home_maintenance_welding_and_engg_work';
+          else if (sub.contains('pest')) subKey = 'pest_control';
+          else if (sub.contains('appliance')) subKey = 'appliance_repair';
+          else if (sub.contains('ro') || sub.contains('purifier') || sub.contains('filter')) subKey = 'ro_purifier';
+          else if (sub.contains('cctv') || sub.contains('security')) subKey = 'cctv_security';
+          else if (sub.contains('lock')) subKey = 'locksmith';
+          else if (sub.contains('garden')) subKey = 'gardening';
+          else subKey = sub.isNotEmpty ? sub : 'plumber';
+        }
 
         final charges = (row['charges'] as List?) ?? [];
         final firstCharge = charges.isNotEmpty ? charges.first : null;
@@ -608,11 +628,106 @@ class _HomeMaintenanceCustomerScreenState
   }
 
   Future<void> _loadSubcategories() async {
-    // Always use fallback subcategories to align with mock data keys and prevent TabController crashes
-    if (!mounted) return;
-    setState(() {
-      _subcategoriesLoaded = true;
-    });
+    try {
+      final activeCategories = await CategoryService.instance.getActiveCategories();
+      final homeMaint = activeCategories.firstWhere(
+        (c) => c.id == 'home_maintenance' || c.name.toLowerCase().contains('maintenance'),
+        orElse: () => const DynamicCategory(
+          id: 'home_maintenance',
+          name: 'Home Maintenance',
+          nameMarathi: 'घर देखभाल',
+          icon: Icons.home_repair_service_rounded,
+          imageUrl: '',
+          color: Color(0xFF0277BD),
+          isActive: true,
+          sortOrder: 1,
+          subcategories: [],
+        ),
+      );
+
+      final List<Map<String, dynamic>> dynamicSubs = [];
+      final Set<String> seenIds = {};
+
+      // Add database subcategories first
+      for (final s in homeMaint.subcategories) {
+        if (!s.isActive) continue;
+        final subId = s.id;
+        final subName = s.name.trim();
+        if (subName.isEmpty || seenIds.contains(subId)) continue;
+        seenIds.add(subId);
+
+        IconData icon = s.icon;
+        final lName = subName.toLowerCase();
+        if (icon == Icons.label_rounded || icon == Icons.category_rounded) {
+          if (lName.contains('ac') || lName.contains('fridge') || lName.contains('refriger') || lName.contains('cool')) {
+            icon = Icons.ac_unit_rounded;
+          } else if (lName.contains('weld')) {
+            icon = Icons.handyman_rounded;
+          } else if (lName.contains('maid') || lName.contains('housekeep')) {
+            icon = Icons.cleaning_services_rounded;
+          } else if (lName.contains('waterproof') || lName.contains('water proof')) {
+            icon = Icons.water_damage_rounded;
+          } else if (lName.contains('plumb')) {
+            icon = Icons.plumbing_rounded;
+          } else if (lName.contains('elect')) {
+            icon = Icons.bolt_rounded;
+          } else if (lName.contains('paint')) {
+            icon = Icons.format_paint_rounded;
+          } else if (lName.contains('mason')) {
+            icon = Icons.construction_rounded;
+          } else if (lName.contains('carpent')) {
+            icon = Icons.carpenter_rounded;
+          } else if (lName.contains('wage') || lName.contains('helper') || lName.contains('labour')) {
+            icon = Icons.engineering_rounded;
+          } else if (lName.contains('clean')) {
+            icon = Icons.cleaning_services_rounded;
+          } else {
+            icon = Icons.home_repair_service_rounded;
+          }
+        }
+
+        dynamicSubs.add({
+          'id': subId,
+          'label': subName,
+          'icon': icon,
+          'color': _colorForSubcategory(subId, subName),
+        });
+      }
+
+      // Merge any fallback subcategories that were not yet in DB so mock data still displays
+      for (final fb in _fallbackSubcategories) {
+        final fbId = fb['id'] as String;
+        final fbLabel = (fb['label'] as String).toLowerCase();
+        final alreadyPresent = dynamicSubs.any(
+          (d) => d['id'] == fbId || (d['label'] as String).toLowerCase() == fbLabel ||
+                 (d['label'] as String).toLowerCase().contains(fbId)
+        );
+        if (!alreadyPresent) {
+          dynamicSubs.add(Map<String, dynamic>.from(fb));
+        }
+      }
+
+      if (dynamicSubs.isNotEmpty && mounted) {
+        setState(() {
+          _dynamicSubcategories = dynamicSubs;
+          _subcategoriesLoaded = true;
+          if (!_dynamicSubcategories.any((s) => s['id'] == _activeSubcategory)) {
+            _activeSubcategory = _dynamicSubcategories.first['id'] as String;
+          }
+        });
+      } else if (mounted) {
+        setState(() {
+          _subcategoriesLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('[HomeMaintenance] Error loading dynamic subcategories: $e');
+      if (mounted) {
+        setState(() {
+          _subcategoriesLoaded = true;
+        });
+      }
+    }
   }
 
   /// Assign a consistent color per subcategory id/name
@@ -2006,6 +2121,7 @@ class _HomeMaintenanceCustomerScreenState
       activeSub = subs.first;
     }
     return DefaultTabController(
+      key: ValueKey('home_maint_tabs_${subs.length}'),
       length: subs.length,
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F6FA),
