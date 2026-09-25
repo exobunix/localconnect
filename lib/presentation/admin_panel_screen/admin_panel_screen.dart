@@ -77,6 +77,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   Future<void> _checkAdminRole() async {
+    // If admin session is already active (via Master PIN or explicit admin login)
+    if (isAdminSessionActive) {
+      await SupabaseService.instance.loadAdminProfile();
+      if (mounted) {
+        setState(() {
+          _isAdmin = true;
+          _isCheckingRole = false;
+        });
+      }
+      return;
+    }
+
     try {
       final isValid = await SupabaseService.instance.ensureValidSession();
       if (!isValid) {
@@ -96,7 +108,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       final profile = await SupabaseService.instance.getUserProfile(userId);
       final role = profile?['role'] as String? ?? '';
       if (mounted) {
-        if (role != 'admin') {
+        if (role != 'admin' && role != 'super_admin') {
           Navigator.pushReplacementNamed(context, AppRoutes.adminLoginScreen);
           return;
         }
@@ -874,6 +886,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             subtitle: 'Log out of admin panel',
             color: AppTheme.error,
             onTap: () async {
+              setAdminSessionActive(false);
               await SupabaseService.instance.signOut();
               if (mounted) {
                 Navigator.pushReplacementNamed(context, AppRoutes.loginScreen);

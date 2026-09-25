@@ -81,7 +81,9 @@ String _getCachedRole() {
 /// writable by service_role (admin API), not by the authenticated user.
 Future<String> _fetchRoleFromDb() async {
   if (_isAdminSessionActive || _cachedRole == 'admin') {
-    await SupabaseService.instance.ensureValidSession();
+    try {
+      await SupabaseService.instance.ensureValidSession();
+    } catch (_) {}
     return 'admin';
   }
   try {

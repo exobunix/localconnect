@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/supabase_service.dart';
+import '../../services/admin_auth_service.dart';
 import '../../theme/app_theme.dart';
 
 class AdminAccountsManagementScreen extends StatefulWidget {
@@ -248,6 +249,7 @@ class _AdminAccountsManagementScreenState
                 final success = await SupabaseService.instance.adminUpsertAdminAccount(
                   id: admin?['id'] as String?,
                   email: email,
+                  password: passwordCtrl.text.trim(),
                   fullName: name,
                   phone: phoneCtrl.text.trim(),
                   role: selectedRole,
@@ -340,13 +342,26 @@ class _AdminAccountsManagementScreenState
                 }
                 Navigator.pop(ctx);
                 try {
-                  // Direct reset or update via Supabase
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Password reset for ${admin['email']} successfully!'),
-                      backgroundColor: const Color(0xFF00C853),
-                    ),
+                  final ok = await AdminAuthService.instance.resetAdminPassword(
+                    admin['email'] ?? '',
+                    newPass,
                   );
+                  if (ok) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Password reset for ${admin['email']} successfully!'),
+                        backgroundColor: const Color(0xFF00C853),
+                      ),
+                    );
+                    _loadAdmins();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Failed to reset password. Please try again.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),

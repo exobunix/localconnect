@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/role_guard.dart';
 import '../../routes/app_routes.dart';
-import '../../services/supabase_service.dart';
-import '../../theme/app_theme.dart';
+import '../../services/admin_auth_service.dart';
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -29,17 +27,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
-
-  // Master passcodes supported out-of-the-box
-  static const Set<String> _validMasterPasscodes = {
-    '920920',
-    'admin2026',
-    '9209205923',
-    'admin123',
-    '123456',
-    'localconnect2026',
-    'localconnect@admin',
-  };
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
@@ -93,40 +80,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       _successMessage = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 250));
 
-    final normalized = pin.toLowerCase();
-    if (_validMasterPasscodes.contains(normalized) ||
-        normalized == 'admin' ||
-        normalized == 'localconnect') {
-      bool success = false;
-      String errStr = '';
-      try {
-        await SupabaseService.instance.signInWithEmail(
-          email: 'admin@localconnect.com',
-          password: 'Admin@1234',
-        );
-        success = true;
-      } catch (e) {
-        try {
-          await SupabaseService.instance.signInWithEmail(
-            email: 'admin@localconnect.com',
-            password: 'admin123',
-          );
-          success = true;
-        } catch (e2) {
-          errStr = e2.toString();
-          debugPrint('Admin bypass signin failed: $e2');
-        }
-      }
-      if (success) {
-        _onSuccessNavigate();
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Admin authentication failed: $errStr';
-        });
-      }
+    final isMaster = AdminAuthService.instance.isMasterPasscode(pin);
+    if (isMaster) {
+      await AdminAuthService.instance.verifyMasterPasscode(pin);
+      _onSuccessNavigate();
       return;
     }
 
@@ -155,47 +114,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       _successMessage = null;
     });
 
-    try {
-      final authResponse = await SupabaseService.instance.signInWithEmail(
-        email: email,
-        password: password,
-      );
-
-      if (authResponse.user != null) {
-        // Authenticated successfully
-        _onSuccessNavigate();
-        return;
-      }
-
+    final res = await AdminAuthService.instance.loginWithEmailPassword(email, password);
+    if (res.success) {
+      _onSuccessNavigate();
+    } else {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Login failed. Please check your credentials.';
-      });
-    } catch (e) {
-      // Fallback check: if credentials match common admin email or passcode
-      if (password == 'admin2026' || password == '920920' || password == '123456') {
-        try {
-          await SupabaseService.instance.signInWithEmail(
-            email: 'admin@localconnect.com',
-            password: 'Admin@1234',
-          );
-        } catch (e2) {
-          try {
-            await SupabaseService.instance.signInWithEmail(
-              email: 'admin@localconnect.com',
-              password: 'admin123',
-            );
-          } catch (e3) {
-            debugPrint('Admin bypass signin failed: $e3');
-          }
-        }
-        _onSuccessNavigate();
-        return;
-      }
-
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Authentication failed: ${e.toString().replaceAll('Exception:', '').trim()}';
+        _errorMessage = res.message ?? 'Login failed. Please check your credentials.';
       });
     }
   }

@@ -1,8 +1,8 @@
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import '../../services/admin_auth_service.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -86,79 +86,32 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     try {
       final user = SupabaseService.instance.currentUser;
-      final email = user?.email ?? 'admin@localconnect.com';
+      final email = (user?.email?.isNotEmpty ?? false)
+          ? user!.email!
+          : SupabaseService.instance.currentAdminEmail;
 
-      // Master passcodes supported out-of-the-box for admin recovery & resets
-      const masterPasscodes = {
-        '920920',
-        'admin2026',
-        '9209205923',
-        'admin123',
-        '123456',
-        'admin@1234',
-        'localconnect2026',
-        'localconnect@admin',
-      };
-
-      final normalizedCurrent = currentPwd.toLowerCase();
-      bool isVerified = masterPasscodes.contains(normalizedCurrent) ||
-          masterPasscodes.contains(currentPwd);
-
-      if (!isVerified) {
-        // Re-authenticate to verify current password
-        try {
-          await SupabaseService.instance.signInWithEmail(
-            email: email,
-            password: currentPwd,
-          );
-          isVerified = true;
-        } on AuthException catch (e) {
-          // Check if current user is admin, allow master PINs or profile verification
-          final isAdmin = SupabaseService.instance.isSuperAdmin ||
-              email.toLowerCase() == 'admin@localconnect.com';
-          if (isAdmin &&
-              (normalizedCurrent == '920920' ||
-                  normalizedCurrent == 'admin2026' ||
-                  normalizedCurrent == 'admin123')) {
-            isVerified = true;
-          } else {
-            setState(() {
-              _errorMessage = e.message.contains('Invalid login credentials')
-                  ? 'Current password is incorrect. (Tip: You can use your Master Admin PIN 920920 or admin2026)'
-                  : 'Verification failed: ${e.message}';
-              _isLoading = false;
-            });
-            return;
-          }
-        }
-      }
-
-      // Step 2: Update password in Supabase Auth
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(password: newPwd),
+      final success = await AdminAuthService.instance.changeAdminPassword(
+        email: email,
+        currentPassword: currentPwd,
+        newPassword: newPwd,
       );
 
-      // If user is in admin_users table, update updated_at timestamp
-      try {
-        await Supabase.instance.client
-            .from('admin_users')
-            .update({'updated_at': DateTime.now().toIso8601String()})
-            .eq('email', email.toLowerCase());
-      } catch (_) {}
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _success = true;
-          _errorMessage = null;
-        });
-      }
-    } on AuthException catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.message;
-        });
+      if (success) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _success = true;
+            _errorMessage = null;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage =
+                'Current password is incorrect. (Tip: You can also use your Master Admin PIN 920920 or admin2026)';
+          });
+        }
       }
     } catch (e) {
       if (mounted) {

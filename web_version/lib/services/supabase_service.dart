@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'notification_service.dart';
+import 'admin_auth_service.dart';
 
 class SupabaseService {
   static SupabaseService? _instance;
@@ -12,6 +13,7 @@ class SupabaseService {
   String? lastOrderError;
 
   // Admin Role & Area Access Control
+  String currentAdminEmail = 'admin@localconnect.com';
   String currentAdminRole = 'super_admin'; // 'super_admin' or 'area_admin'
   String currentAdminArea = 'ALL'; // City name or 'ALL'
   bool get isSuperAdmin =>
@@ -4211,54 +4213,71 @@ class SupabaseService {
   Future<Map<String, dynamic>?> loadAdminProfile() async {
     try {
       final user = currentUser;
-      if (user == null) return null;
-      final email = user.email ?? '';
-      if (email.isEmpty) return null;
-
-      final res = await client
-          .from('admin_users')
-          .select()
-          .eq('email', email)
-          .maybeSingle();
-      if (res != null) {
-        currentAdminRole = res['role'] as String? ?? 'area_admin';
-        currentAdminArea = res['assigned_area'] as String? ?? 'Pune';
-        return res;
+      final email = (user?.email?.isNotEmpty ?? false) ? user!.email! : currentAdminEmail;
+      if (email.isEmpty) {
+        currentAdminRole = 'super_admin';
+        currentAdminArea = 'ALL';
+        return null;
       }
-      if (email == 'admin@localconnect.com') {
+      currentAdminEmail = email;
+
+      if (email.toLowerCase() == 'admin@localconnect.com') {
         currentAdminRole = 'super_admin';
         currentAdminArea = 'ALL';
       }
+
+      // Check stored admins in AdminAuthService
+      try {
+        final admins = await AdminAuthService.instance.getAllAdmins();
+        final match = admins.firstWhere(
+          (a) => (a['email'] as String? ?? '').toLowerCase() == email.toLowerCase(),
+          orElse: () => <String, dynamic>{},
+        );
+        if (match.isNotEmpty) {
+          currentAdminRole = match['role'] as String? ?? currentAdminRole;
+          currentAdminArea = match['assigned_area'] as String? ?? currentAdminArea;
+          return match;
+        }
+      } catch (_) {}
+
+      try {
+        final res = await client
+            .from('admin_users')
+            .select()
+            .eq('email', email)
+            .maybeSingle();
+        if (res != null) {
+          currentAdminRole = res['role'] as String? ?? 'area_admin';
+          currentAdminArea = res['assigned_area'] as String? ?? 'Pune';
+          return res;
+        }
+      } catch (_) {}
     } catch (_) {}
     return null;
   }
 
   Future<List<Map<String, dynamic>>> getAllAdmins() async {
     try {
-      final res = await client
-          .from('admin_users')
-          .select()
-          .order('role', ascending: false);
-      if (res.isNotEmpty) {
-        return List<Map<String, dynamic>>.from(res);
-      }
-    } catch (_) {}
-    return [
-      {
-        'id': 'super-admin-01',
-        'email': 'admin@localconnect.com',
-        'full_name': 'Super Administrator',
-        'phone': '+919209205923',
-        'role': 'super_admin',
-        'assigned_area': 'ALL',
-        'is_active': true,
-      }
-    ];
+      return await AdminAuthService.instance.getAllAdmins();
+    } catch (_) {
+      return [
+        {
+          'id': 'super-admin-01',
+          'email': 'admin@localconnect.com',
+          'full_name': 'Super Administrator',
+          'phone': '+919209205923',
+          'role': 'super_admin',
+          'assigned_area': 'ALL',
+          'is_active': true,
+        }
+      ];
+    }
   }
 
   Future<bool> adminUpsertAdminAccount({
     String? id,
     required String email,
+    String password = '',
     required String fullName,
     String phone = '',
     required String role,
@@ -4266,31 +4285,25 @@ class SupabaseService {
     bool isActive = true,
   }) async {
     try {
-      final data = <String, dynamic>{
-        'email': email.trim().toLowerCase(),
-        'full_name': fullName.trim(),
-        'phone': phone.trim(),
-        'role': role,
-        'assigned_area': assignedArea.trim(),
-        'is_active': isActive,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-      if (id != null && id.isNotEmpty) {
-        await client.from('admin_users').update(data).eq('id', id);
-      } else {
-        await client.from('admin_users').insert(data);
-      }
-      return true;
+      return await AdminAuthService.instance.saveAdminAccount(
+        id: id,
+        email: email,
+        password: password,
+        fullName: fullName,
+        phone: phone,
+        role: role,
+        assignedArea: assignedArea,
+        isActive: isActive,
+      );
     } catch (e) {
       debugPrint('[SupabaseService] adminUpsertAdminAccount error: $e');
       return false;
     }
   }
 
-  Future<bool> adminDeleteAdminAccount(String id) async {
+  Future<bool> adminDeleteAdminAccount(String idOrEmail) async {
     try {
-      await client.from('admin_users').delete().eq('id', id);
-      return true;
+      return await AdminAuthService.instance.deleteAdminAccount(idOrEmail);
     } catch (e) {
       return false;
     }
