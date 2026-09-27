@@ -1,4 +1,5 @@
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_export.dart';
 
@@ -680,6 +681,9 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
                 // Provider card
                 _buildProviderCard(listing, color),
 
+                // Media & Video Tour Showcase (Instagram & YouTube)
+                _buildMediaShowcase(listing, color),
+
                 // Subcategory-specific details
                 _buildSubcategoryDetails(listing, color),
 
@@ -818,6 +822,149 @@ class _RentListingDetailScreenState extends State<RentListingDetailScreen> {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, size: 16, color: color),
+      ),
+    );
+  }
+
+  Future<void> _openExternalUrl(String rawUrl) async {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return;
+    final uri = Uri.parse(
+      trimmed.startsWith('http://') || trimmed.startsWith('https://')
+          ? trimmed
+          : 'https://$trimmed',
+    );
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      try {
+        await launchUrl(uri);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not open link: $trimmed')),
+          );
+        }
+      }
+    }
+  }
+
+  Widget _buildMediaShowcase(Map<String, dynamic> listing, Color color) {
+    final rawInsta = (listing['instagram_url'] ?? listing['instagram'] ?? '').toString().trim();
+    final rawYt = (listing['youtube_url'] ?? listing['youtube'] ?? listing['video_url'] ?? '').toString().trim();
+    final List<dynamic> extraVideos = (listing['video_links'] is List) ? listing['video_links'] as List : [];
+
+    final hasInsta = rawInsta.isNotEmpty;
+    final hasYt = rawYt.isNotEmpty || extraVideos.isNotEmpty;
+    final firstVideo = hasYt ? (rawYt.isNotEmpty ? rawYt : extraVideos.first.toString()) : '';
+
+    if (!hasInsta && !hasYt) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.video_collection_rounded, size: 18, color: color),
+              const SizedBox(width: 8),
+              Text(
+                'Video Tour & Media Showcase',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              if (hasInsta)
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _openExternalUrl(rawInsta),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF833AB4), Color(0xFFFD1D1D), Color(0xFFFCB045)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 16),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Instagram Reel / Tour',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              if (hasInsta && hasYt) const SizedBox(width: 10),
+              if (hasYt)
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _openExternalUrl(firstVideo),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF0000),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 16),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'YouTube Walkthrough',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

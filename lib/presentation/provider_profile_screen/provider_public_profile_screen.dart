@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/location_map_picker_dialog.dart';
+import '../../widgets/universal_enquiry_dialog.dart';
 import '../quotation_screen/customer_enquiry_screen.dart';
 
 /// Customer-facing Provider Public Profile Screen
@@ -1998,11 +1999,19 @@ class _ProviderPublicProfileScreenState
               Icons.request_quote_rounded,
               'Enquiry',
               const Color(0xFF7B1FA2),
-              () => Navigator.push(
+              () => UniversalEnquiryDialog.show(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => CustomerEnquiryScreen(provider: _provider),
-                ),
+                providerId: _provider?['id']?.toString() ?? '',
+                providerName: _provider?['business_name']?.toString() ??
+                    _provider?['owner_name']?.toString() ??
+                    'Service Partner',
+                providerImage: _provider?['image_url'] as String?,
+                providerPhone: _provider?['phone'] as String?,
+                providerRating: (_provider?['rating'] as num?)?.toDouble() ?? 4.8,
+                category: _provider?['category'] as String? ?? 'Service',
+                subcategory: _provider?['subcategory'] as String? ?? '',
+                serviceTitle: _provider?['business_name'] as String? ?? 'Service Requirement',
+                themeColor: const Color(0xFF7B1FA2),
               ),
             ),
             const SizedBox(width: 8),

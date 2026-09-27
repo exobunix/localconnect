@@ -47,6 +47,8 @@ class _ProviderBusinessProfileEditScreenState
   final _mapUrlCtrl = TextEditingController();
   final _emergencyCtrl = TextEditingController();
   final _languagesCtrl = TextEditingController();
+  final _instagramCtrl = TextEditingController();
+  final _youtubeCtrl = TextEditingController();
 
   String? _profilePhotoUrl;
   String? _coverImageUrl;
@@ -76,6 +78,8 @@ class _ProviderBusinessProfileEditScreenState
     _mapUrlCtrl.dispose();
     _emergencyCtrl.dispose();
     _languagesCtrl.dispose();
+    _instagramCtrl.dispose();
+    _youtubeCtrl.dispose();
     super.dispose();
   }
 
@@ -100,6 +104,8 @@ class _ProviderBusinessProfileEditScreenState
         _addressCtrl.text = provider['address'] as String? ?? '';
         _mapUrlCtrl.text = provider['google_map_url'] as String? ?? '';
         _emergencyCtrl.text = provider['emergency_contact'] as String? ?? '';
+        _instagramCtrl.text = provider['instagram_url'] as String? ?? '';
+        _youtubeCtrl.text = provider['youtube_url'] as String? ?? '';
         final langs = provider['languages_spoken'];
         if (langs is List) {
           _languagesCtrl.text = langs.join(', ');
@@ -262,6 +268,8 @@ class _ProviderBusinessProfileEditScreenState
             'google_map_url': _mapUrlCtrl.text.trim(),
             'emergency_contact': _emergencyCtrl.text.trim(),
             'languages_spoken': langs,
+            'instagram_url': _instagramCtrl.text.trim(),
+            'youtube_url': _youtubeCtrl.text.trim(),
             'business_latitude': _latitude,
             'business_longitude': _longitude,
             'latitude': _latitude,
@@ -441,6 +449,25 @@ class _ProviderBusinessProfileEditScreenState
                         'Languages Spoken',
                         _languagesCtrl,
                         hint: 'e.g. Hindi, English, Marathi',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSection(
+                    'Social & Media Links (Instagram & YouTube)',
+                    Icons.video_collection_rounded,
+                    [
+                      _buildField(
+                        'Instagram Profile / Post / Reel Link',
+                        _instagramCtrl,
+                        keyboardType: TextInputType.url,
+                        hint: 'https://instagram.com/your_profile',
+                      ),
+                      _buildField(
+                        'YouTube Video / Channel Link',
+                        _youtubeCtrl,
+                        keyboardType: TextInputType.url,
+                        hint: 'https://youtube.com/watch?v=... or channel link',
                       ),
                     ],
                   ),

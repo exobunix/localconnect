@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../presentation/quotation_screen/customer_enquiry_screen.dart';
 
 /// Universal Enquiry Bottom Sheet & Dialog for all categories & subcategories
 class UniversalEnquiryDialog extends StatefulWidget {
@@ -240,6 +242,16 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
         }
       }
 
+      // Persist locally so customer can always find their enquiries on this device
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final localList = prefs.getStringList('local_customer_enquiries') ?? [];
+        if (!localList.contains(generatedEnquiryId)) {
+          localList.insert(0, generatedEnquiryId);
+          await prefs.setStringList('local_customer_enquiries', localList.take(50).toList());
+        }
+      } catch (_) {}
+
       // Safe dispatch of notifications (isolated from UI success)
       try {
         await NotificationService.instance.notifyEnquirySubmitted(
@@ -445,23 +457,52 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
           ),
           const SizedBox(height: 24),
 
-          // Done Button
+          // View My Enquiries Button
           SizedBox(
             width: double.infinity,
             height: 48,
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context, true);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CustomerEnquiryScreen()),
+                );
+              },
+              icon: const Icon(Icons.list_alt_rounded, color: Colors.white, size: 20),
+              label: Text(
+                'View My Enquiries',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: widget.themeColor,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Done Button
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: OutlinedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.grey.shade300),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               child: Text(
                 'Done',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF64748B),
                 ),
               ),
             ),

@@ -674,6 +674,123 @@ class _OverviewTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        // Social & Video Portfolio
+        Builder(
+          builder: (context) {
+            final rawInsta = (provider['instagram_url'] ?? provider['instagram'] ?? '').toString().trim();
+            final rawYt = (provider['youtube_url'] ?? provider['youtube'] ?? '').toString().trim();
+            if (rawInsta.isEmpty && rawYt.isEmpty) return const SizedBox.shrink();
+
+            Future<void> openUrl(String raw) async {
+              final trimmed = raw.trim();
+              if (trimmed.isEmpty) return;
+              final uri = Uri.parse(
+                trimmed.startsWith('http://') || trimmed.startsWith('https://')
+                    ? trimmed
+                    : 'https://$trimmed',
+              );
+              try {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (_) {
+                try {
+                  await launchUrl(uri);
+                } catch (_) {}
+              }
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _SectionCard(
+                title: 'Event Showcase & Social Portfolio',
+                isDark: isDark,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'View real event decors, videos, and reels from this organizer:',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        if (rawInsta.isNotEmpty)
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => openUrl(rawInsta),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF833AB4), Color(0xFFFD1D1D), Color(0xFFFCB045)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 16),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'Instagram Reels',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (rawInsta.isNotEmpty && rawYt.isNotEmpty) const SizedBox(width: 10),
+                        if (rawYt.isNotEmpty)
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => openUrl(rawYt),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF0000),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 16),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'YouTube Videos',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
         // Subcategory-specific details
         _SectionCard(
           title: 'Service Details',

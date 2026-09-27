@@ -30,6 +30,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
   bool _savingProfile = false;
   String? _avatarUrl;
   bool _uploadingAvatar = false;
+  bool _hasProviderAccount = false;
 
   // Location
   LocationData? _customerLocation;
@@ -135,6 +136,10 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
       });
       if (data != null) {
         await ConnectivityService.instance.cacheData(_cacheKeyProfile, data);
+      }
+      final hasBoth = await SupabaseService.instance.hasBothAccounts();
+      if (mounted) {
+        setState(() => _hasProviderAccount = hasBoth);
       }
     }
   }
@@ -1188,6 +1193,23 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
                     context,
                     AppRoutes.orderManagementScreen,
                   ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _sectionCard(
+            title: 'Partner / Provider Account',
+            icon: Icons.storefront_rounded,
+            child: Column(
+              children: [
+                _actionRow(
+                  icon: Icons.swap_horiz_rounded,
+                  label: _hasProviderAccount
+                      ? 'Switch to Partner Dashboard'
+                      : 'Register as Service Partner (Same Login)',
+                  color: AppTheme.primary,
+                  onTap: _handlePartnerSwitchOrRegister,
                 ),
               ],
             ),
@@ -3325,6 +3347,26 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
 
   void _showChangePasswordSheet() {
     Navigator.pushNamed(context, AppRoutes.changePasswordScreen);
+  }
+
+  Future<void> _handlePartnerSwitchOrRegister() async {
+    if (_hasProviderAccount) {
+      await SupabaseService.instance.switchActiveRole('provider');
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.providerDashboardScreen,
+          (route) => false,
+        );
+      }
+    } else {
+      if (mounted) {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.providerRegistrationScreen,
+        );
+      }
+    }
   }
 
   InputDecoration _sheetInputDecoration(String hint) {

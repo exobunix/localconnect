@@ -61,6 +61,15 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
   List<DynamicCategory> _activeCategories = [];
   bool _categoriesLoaded = false;
 
+  // Media & Social Links (for Rent, Event Management, etc.)
+  final _instagramController = TextEditingController();
+  final _youtubeController = TextEditingController();
+
+  bool get _isRentOrEventCategory {
+    final cat = (_selectedCategory ?? '').trim().toLowerCase();
+    return cat.contains('rent') || cat.contains('event');
+  }
+
   // Step 2 - Location & Contact
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
@@ -176,6 +185,8 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     _shopNameController.dispose();
     _ownerNameController.dispose();
     _approvalReasonController.dispose();
+    _instagramController.dispose();
+    _youtubeController.dispose();
     _addressController.dispose();
     _cityController.dispose();
     _phoneController.dispose();
@@ -487,6 +498,8 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
         longitude: _longitude,
         district: _district,
         pincode: _pincode,
+        instagramUrl: _instagramController.text.trim(),
+        youtubeUrl: _youtubeController.text.trim(),
       );
 
       if (mounted) {
@@ -1213,6 +1226,41 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
             ],
           ),
         ),
+        if (_isRentOrEventCategory) ...[
+          SizedBox(height: 2.h),
+          _buildCard(
+            icon: Icons.video_collection_rounded,
+            title: 'Social & Media Showcase (Rent & Event Management)',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Attach your Instagram and YouTube links so customers can explore your rental properties or event setups & portfolios directly.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10.5.sp,
+                    color: const Color(0xFF555B6D),
+                  ),
+                ),
+                SizedBox(height: 1.5.h),
+                _buildTextField(
+                  controller: _instagramController,
+                  label: 'Instagram Profile / Reel Link (Optional)',
+                  hint: 'https://instagram.com/your_profile',
+                  icon: Icons.camera_alt_outlined,
+                  keyboardType: TextInputType.url,
+                ),
+                SizedBox(height: 1.5.h),
+                _buildTextField(
+                  controller: _youtubeController,
+                  label: 'YouTube Video / Channel Link (Optional)',
+                  hint: 'https://youtube.com/watch?v=... or channel link',
+                  icon: Icons.play_circle_outline_rounded,
+                  keyboardType: TextInputType.url,
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1708,6 +1756,18 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
                     ? _emailController.text.trim()
                     : (SupabaseService.instance.currentUser?.email ?? '—'),
               ),
+              if (_instagramController.text.trim().isNotEmpty)
+                _buildSummaryRow(
+                  Icons.camera_alt_outlined,
+                  'Instagram',
+                  _instagramController.text.trim(),
+                ),
+              if (_youtubeController.text.trim().isNotEmpty)
+                _buildSummaryRow(
+                  Icons.play_circle_outline_rounded,
+                  'YouTube',
+                  _youtubeController.text.trim(),
+                ),
             ],
           ),
         ),

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'notification_service.dart';
 import 'admin_auth_service.dart';
@@ -192,28 +193,77 @@ class SupabaseService {
     }
   }
 
-  Future<bool> isEmailRegistered(String email) async {
+  Future<bool> isEmailRegistered(String email, {String? targetRole}) async {
     try {
       final response = await client.rpc('check_email_registered', params: {
         'email_addr': email.trim(),
+        'target_role': targetRole,
       });
       return response == true;
-    } catch (e) {
-      debugPrint('[SupabaseService] isEmailRegistered error: $e');
-      return false;
+    } catch (_) {
+      try {
+        var query = client
+            .from('user_profiles')
+            .select('id, role, roles')
+            .ilike('email', email.trim().toLowerCase());
+        final rows = await query;
+        if (rows.isEmpty) return false;
+        if (targetRole != null && targetRole.isNotEmpty) {
+          return rows.any((r) {
+            final rRole = r['role'] as String?;
+            final rRoles = r['roles'];
+            if (rRole == targetRole) return true;
+            if (rRoles is List && rRoles.contains(targetRole)) return true;
+            return false;
+          });
+        }
+        return true;
+      } catch (e) {
+        debugPrint('[SupabaseService] isEmailRegistered error: $e');
+        return false;
+      }
     }
   }
 
-  Future<bool> isPhoneRegistered(String phone, {String? excludeUserId}) async {
+  Future<bool> isPhoneRegistered(String phone,
+      {String? excludeUserId, String? targetRole}) async {
     try {
       final response = await client.rpc('check_phone_registered', params: {
         'phone_num': phone.trim(),
         'exclude_user_id': excludeUserId,
+        'target_role': targetRole,
       });
       return response == true;
-    } catch (e) {
-      debugPrint('[SupabaseService] isPhoneRegistered error: $e');
-      return false;
+    } catch (_) {
+      try {
+        final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+        if (cleanPhone.length >= 10) {
+          final last10 = cleanPhone.substring(cleanPhone.length - 10);
+          var query = client
+              .from('user_profiles')
+              .select('id, role, roles')
+              .ilike('phone', '%$last10%');
+          if (excludeUserId != null) {
+            query = query.neq('id', excludeUserId);
+          }
+          final rows = await query;
+          if (rows.isEmpty) return false;
+          if (targetRole != null && targetRole.isNotEmpty) {
+            return rows.any((r) {
+              final rRole = r['role'] as String?;
+              final rRoles = r['roles'];
+              if (rRole == targetRole) return true;
+              if (rRoles is List && rRoles.contains(targetRole)) return true;
+              return false;
+            });
+          }
+          return true;
+        }
+        return false;
+      } catch (e) {
+        debugPrint('[SupabaseService] isPhoneRegistered error: $e');
+        return false;
+      }
     }
   }
 
@@ -225,16 +275,73 @@ class SupabaseService {
     String role = 'customer',
     String city = 'Pune',
   }) async {
+    List<String> combinedRoles = [role];
+    try {
+      final existing = await getUserProfile(userId);
+      if (existing != null) {
+        final exRoles = existing['roles'];
+        if (exRoles is List) {
+          combinedRoles = List<String>.from(exRoles.map((e) => e.toString()));
+          if (!combinedRoles.contains(role)) combinedRoles.add(role);
+        } else {
+          final exRole = existing['role'] as String? ?? 'customer';
+          combinedRoles = {exRole, role}.toList();
+        }
+      }
+    } catch (_) {}
+
     await client.from('user_profiles').upsert({
       'id': userId,
       'email': email.trim().toLowerCase(),
       'full_name': fullName.trim(),
       'phone': phone.trim(),
       'role': role,
+      'roles': combinedRoles,
+      'active_role': role,
       'city': city,
       'is_active': true,
       'updated_at': DateTime.now().toIso8601String(),
     }, onConflict: 'id');
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('active_role', role);
+      await prefs.setStringList('user_roles', combinedRoles);
+    } catch (_) {}
+  }
+
+  /// Switch the active role between 'customer' and 'provider' for dual-account users
+  Future<void> switchActiveRole(String newRole) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('active_role', newRole);
+      final uid = currentUser?.id;
+      if (uid != null) {
+        await client.from('user_profiles').update({
+          'active_role': newRole,
+          'role': newRole,
+        }).eq('id', uid);
+      }
+    } catch (e) {
+      debugPrint('[SupabaseService] switchActiveRole note: $e');
+    }
+  }
+
+  /// Check if the current user has both customer and provider accounts
+  Future<bool> hasBothAccounts() async {
+    try {
+      final uid = currentUser?.id;
+      if (uid == null) return false;
+      final profile = await getUserProfile(uid);
+      final roles = profile?['roles'];
+      if (roles is List && roles.contains('customer') && roles.contains('provider')) {
+        return true;
+      }
+      final prov = await getMyProviderProfile();
+      return prov != null;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> updateUserProfile({
@@ -2176,15 +2283,41 @@ class SupabaseService {
     double? longitude,
     String? district,
     String? pincode,
+    String? instagramUrl,
+    String? youtubeUrl,
   }) async {
-    // Ensure user_profiles row exists
-    await client.from('user_profiles').upsert({
-      'id': userId,
-      'email': currentUser?.email ?? '',
-      'full_name': ownerName,
-      'phone': phone,
-      'role': 'provider',
-    }, onConflict: 'id');
+    // Ensure user_profiles row exists with dual role support
+    try {
+      final currentProfile = await client
+          .from('user_profiles')
+          .select('roles')
+          .eq('id', userId)
+          .maybeSingle();
+      List<String> currentRoles = [];
+      if (currentProfile?['roles'] is List) {
+        currentRoles = List<String>.from(currentProfile!['roles']);
+      }
+      if (!currentRoles.contains('provider')) currentRoles.add('provider');
+      if (!currentRoles.contains('customer')) currentRoles.add('customer');
+
+      await client.from('user_profiles').upsert({
+        'id': userId,
+        'email': currentUser?.email ?? '',
+        'full_name': ownerName,
+        'phone': phone,
+        'role': 'provider',
+        'active_role': 'provider',
+        'roles': currentRoles,
+      }, onConflict: 'id');
+    } catch (_) {
+      await client.from('user_profiles').upsert({
+        'id': userId,
+        'email': currentUser?.email ?? '',
+        'full_name': ownerName,
+        'phone': phone,
+        'role': 'provider',
+      }, onConflict: 'id');
+    }
 
     // Upsert service_providers row with pending_approval status & coordinates
     final providerData = <String, dynamic>{
@@ -2203,6 +2336,12 @@ class SupabaseService {
       'registration_status': 'pending_approval',
       'member_since': DateTime.now().year.toString(),
     };
+    if (instagramUrl != null && instagramUrl.trim().isNotEmpty) {
+      providerData['instagram_url'] = instagramUrl.trim();
+    }
+    if (youtubeUrl != null && youtubeUrl.trim().isNotEmpty) {
+      providerData['youtube_url'] = youtubeUrl.trim();
+    }
     if (latitude != null && latitude != 0) {
       providerData['business_latitude'] = latitude;
     }
@@ -2226,10 +2365,17 @@ class SupabaseService {
     final providerId = response['id'] as String;
 
     // Update user profile
-    await client
-        .from('user_profiles')
-        .update({'phone': phone, 'role': 'provider'})
-        .eq('id', userId);
+    try {
+      await client
+          .from('user_profiles')
+          .update({'phone': phone, 'role': 'provider', 'active_role': 'provider'})
+          .eq('id', userId);
+    } catch (_) {
+      await client
+          .from('user_profiles')
+          .update({'phone': phone, 'role': 'provider'})
+          .eq('id', userId);
+    }
 
     // Insert documents if any
     if (documents.isNotEmpty) {
@@ -3688,10 +3834,18 @@ class SupabaseService {
   Future<List<Map<String, dynamic>>> getCustomerEnquiries() async {
     try {
       final userId = currentUser?.id;
-      final userPhone = currentUser?.phone ??
-          currentUser?.userMetadata?['phone'] as String?;
+      final Map<String, Map<String, dynamic>> resultsMap = {};
 
-      // 1. Query by customer_id
+      // 1. Fetch user profile for phone and email
+      String? profilePhone;
+      if (userId != null) {
+        try {
+          final profile = await getUserProfile(userId);
+          profilePhone = profile?['phone'] as String?;
+        } catch (_) {}
+      }
+
+      // 2. Query by customer_id
       if (userId != null) {
         try {
           final res = await client
@@ -3699,14 +3853,19 @@ class SupabaseService {
               .select('*')
               .eq('customer_id', userId)
               .order('created_at', ascending: false);
-          final list = List<Map<String, dynamic>>.from(res);
-          if (list.isNotEmpty) return list;
+          for (final item in List<Map<String, dynamic>>.from(res)) {
+            final id = item['id']?.toString();
+            if (id != null) resultsMap[id] = item;
+          }
         } catch (_) {}
       }
 
-      // 2. Query by phone match
-      if (userPhone != null && userPhone.isNotEmpty) {
-        final cleanPhone = userPhone.replaceAll(RegExp(r'\D'), '');
+      // 3. Query by phone match (from profile or metadata)
+      final phoneToMatch = profilePhone ??
+          currentUser?.phone ??
+          currentUser?.userMetadata?['phone'] as String?;
+      if (phoneToMatch != null && phoneToMatch.isNotEmpty) {
+        final cleanPhone = phoneToMatch.replaceAll(RegExp(r'\D'), '');
         if (cleanPhone.length >= 10) {
           final last10 = cleanPhone.substring(cleanPhone.length - 10);
           try {
@@ -3715,19 +3874,39 @@ class SupabaseService {
                 .select('*')
                 .ilike('customer_phone', '%$last10%')
                 .order('created_at', ascending: false);
-            final list = List<Map<String, dynamic>>.from(res);
-            if (list.isNotEmpty) return list;
+            for (final item in List<Map<String, dynamic>>.from(res)) {
+              final id = item['id']?.toString();
+              if (id != null) resultsMap[id] = item;
+            }
           } catch (_) {}
         }
       }
 
-      // 3. Fallback: recent enquiries
-      final fallback = await client
-          .from('enquiries')
-          .select('*')
-          .order('created_at', ascending: false)
-          .limit(25);
-      return List<Map<String, dynamic>>.from(fallback);
+      // 4. Query by local enquiry IDs stored on this device
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final localIds = prefs.getStringList('local_customer_enquiries') ?? [];
+        if (localIds.isNotEmpty) {
+          final res = await client
+              .from('enquiries')
+              .select('*')
+              .inFilter('id', localIds)
+              .order('created_at', ascending: false);
+          for (final item in List<Map<String, dynamic>>.from(res)) {
+            final id = item['id']?.toString();
+            if (id != null) resultsMap[id] = item;
+          }
+        }
+      } catch (_) {}
+
+      final allList = resultsMap.values.toList();
+      allList.sort((a, b) {
+        final tA = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(1970);
+        final tB = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(1970);
+        return tB.compareTo(tA);
+      });
+
+      return allList;
     } catch (e) {
       debugPrint('[SupabaseService] getCustomerEnquiries error: $e');
       return [];

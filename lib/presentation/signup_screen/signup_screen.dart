@@ -127,10 +127,33 @@ class _SignupScreenState extends State<SignupScreen>
       setState(() => _errorMessage = 'Name must be between 2 and 100 characters.');
       return;
     }
-    if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
-      setState(() => _errorMessage = 'Please enter a valid email address.');
+
+    // Strict Email Format Validation
+    final emailRegex = RegExp(
+      r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$",
+    );
+    final emailParts = email.split('@');
+    final hasValidDomain = emailParts.length == 2 &&
+        emailParts[1].contains('.') &&
+        emailParts[1].split('.').last.length >= 2;
+
+    if (email.isEmpty || !emailRegex.hasMatch(email) || !hasValidDomain) {
+      setState(() => _errorMessage =
+          'Please enter a valid, complete email address (e.g. name@gmail.com) or sign up with Google.');
       return;
     }
+
+    // Reject dummy/fake email domains
+    final domain = emailParts[1].toLowerCase();
+    if (domain == 'test.com' ||
+        domain == 'dummy.com' ||
+        domain == 'fake.com' ||
+        domain == 'example.com') {
+      setState(() => _errorMessage =
+          'Please use your real email address or continue with Google Sign-In.');
+      return;
+    }
+
     if (phone.isEmpty || phone.length != 10) {
       setState(() => _errorMessage = 'Please enter a valid 10-digit mobile number.');
       return;
@@ -152,17 +175,22 @@ class _SignupScreenState extends State<SignupScreen>
       _errorMessage = null;
     });
 
+    final targetRole = _selectedRole == 0 ? 'customer' : 'provider';
+
     try {
       final currentUser = SupabaseService.instance.currentUser;
 
-      // 2. Duplicate mobile check
+      // 2. Duplicate mobile check strictly for the same role
+      // This allows one customer account and one provider account on the same phone & email
       final isPhoneTaken = await SupabaseService.instance.isPhoneRegistered(
         phone,
         excludeUserId: currentUser?.id,
+        targetRole: targetRole,
       );
       if (isPhoneTaken) {
         setState(() {
-          _errorMessage = 'This mobile number is already registered. Please log in or use another number.';
+          _errorMessage =
+              'A $targetRole account with this mobile number already exists. Please log in or use another number.';
           _isLoading = false;
         });
         return;
@@ -175,7 +203,7 @@ class _SignupScreenState extends State<SignupScreen>
           email: currentUser.email ?? email,
           fullName: name,
           phone: phone,
-          role: _selectedRole == 0 ? 'customer' : 'provider',
+          role: targetRole,
           city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
         );
 
@@ -203,33 +231,66 @@ class _SignupScreenState extends State<SignupScreen>
       }
 
       // 3. Normal signup with email & password
-      final authResponse = await SupabaseService.instance.signUpWithEmail(
-        email: email,
-        password: password,
-        fullName: name,
-        phone: phone,
-        role: _selectedRole == 0 ? 'customer' : 'provider',
-      );
-
-      final newUserId = authResponse.user?.id;
-      if (newUserId != null) {
-        await SupabaseService.instance.upsertUserProfile(
-          userId: newUserId,
+      try {
+        final authResponse = await SupabaseService.instance.signUpWithEmail(
           email: email,
+          password: password,
           fullName: name,
           phone: phone,
-          role: _selectedRole == 0 ? 'customer' : 'provider',
-          city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
+          role: targetRole,
         );
-      }
 
-      if (authResponse.session == null) {
-        try {
-          await SupabaseService.instance.signInWithEmail(
+        final newUserId = authResponse.user?.id;
+        if (newUserId != null) {
+          await SupabaseService.instance.upsertUserProfile(
+            userId: newUserId,
             email: email,
-            password: password,
+            fullName: name,
+            phone: phone,
+            role: targetRole,
+            city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
           );
-        } catch (_) {}
+        }
+
+        if (authResponse.session == null) {
+          try {
+            await SupabaseService.instance.signInWithEmail(
+              email: email,
+              password: password,
+            );
+          } catch (_) {}
+        }
+      } on AuthException catch (signUpErr) {
+        // If email already exists in auth, allow linking the second role (customer or provider)
+        if (signUpErr.message.contains('User already registered') ||
+            signUpErr.message.contains('already exists')) {
+          try {
+            final signInRes = await SupabaseService.instance.signInWithEmail(
+              email: email,
+              password: password,
+            );
+            final existingUid = signInRes.user?.id;
+            if (existingUid != null) {
+              await SupabaseService.instance.upsertUserProfile(
+                userId: existingUid,
+                email: email,
+                fullName: name,
+                phone: phone,
+                role: targetRole,
+                city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
+              );
+            }
+          } catch (_) {
+            setState(() {
+              _errorMessage =
+                  'An account with this email already exists. Please enter your existing password to activate your $targetRole account, or continue with Google.';
+              _isLoading = false;
+            });
+            return;
+          }
+        } else {
+          rethrow;
+        }
       }
 
       if (mounted) {
@@ -254,22 +315,15 @@ class _SignupScreenState extends State<SignupScreen>
       }
     } on AuthException catch (e) {
       if (mounted) {
-        if (e.message.contains('User already registered') || e.message.contains('already exists')) {
-          setState(() {
-            _errorMessage = 'An account with this email already exists. Please log in or continue with Google.';
-            _isLoading = false;
-          });
-        } else {
-          setState(() {
-            _errorMessage = e.message;
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _errorMessage = e.message;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Registration failed. Please check your details and try again.';
+          _errorMessage = 'Registration failed. Please check your details or sign up with Google.';
           _isLoading = false;
         });
       }
@@ -327,23 +381,37 @@ class _SignupScreenState extends State<SignupScreen>
 
       final user = SupabaseService.instance.currentUser;
       if (user != null) {
-        final profile = await SupabaseService.instance.getUserProfile(user.id);
+        final targetRole = _selectedRole == 0 ? 'customer' : 'provider';
+
+        await SupabaseService.instance.upsertUserProfile(
+          userId: user.id,
+          email: user.email ?? googleUser.email,
+          fullName: user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '',
+          role: targetRole,
+          city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
+        );
+
         if (!mounted) return;
-        if (profile != null) {
+
+        if (targetRole == 'provider') {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.providerRegistrationScreen,
+            (route) => false,
+            arguments: {
+              'email': user.email ?? googleUser.email,
+              'ownerName': user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '',
+              'isGoogleAuth': true,
+            },
+          );
+        } else {
           Navigator.pushNamedAndRemoveUntil(
             context,
             AppRoutes.homeScreen,
             (route) => false,
           );
-          return;
         }
-
-        setState(() {
-          _isGoogleLoading = false;
-          _emailController.text = user.email ?? googleUser.email;
-          _nameController.text = user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '';
-          _isGoogleEmailLocked = true;
-        });
+        return;
       }
     } catch (e) {
       if (mounted) {
@@ -387,19 +455,19 @@ class _SignupScreenState extends State<SignupScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildHeader(),
-          SizedBox(height: 2.5.h),
+          SizedBox(height: 2.h),
           _buildRoleSelector(),
-          SizedBox(height: 2.5.h),
+          SizedBox(height: 2.h),
           if (_errorMessage != null) ...[
             _buildErrorBox(_errorMessage!),
-            SizedBox(height: 2.h),
+            SizedBox(height: 1.5.h),
           ],
+          _buildGoogleButton(),
+          SizedBox(height: 2.h),
+          _buildOrDivider(),
+          SizedBox(height: 2.h),
           _buildSignupForm(),
           SizedBox(height: 2.5.h),
-          _buildOrDivider(),
-          SizedBox(height: 2.5.h),
-          _buildGoogleButton(),
-          SizedBox(height: 3.h),
           _buildLoginLink(),
         ],
       ),
@@ -879,11 +947,11 @@ class _SignupScreenState extends State<SignupScreen>
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 3.w),
           child: Text(
-            'or',
+            'or register with real email',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 10.sp,
+              fontSize: 9.sp,
               color: const Color(0xFF90A4AE),
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -897,16 +965,16 @@ class _SignupScreenState extends State<SignupScreen>
       onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
       child: Container(
         width: double.infinity,
-        height: 6.5.h,
+        padding: EdgeInsets.symmetric(vertical: 1.2.h, horizontal: 3.w),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(14.0),
-          border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
+          border: Border.all(color: const Color(0xFF4285F4), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: const Color(0xFF4285F4).withValues(alpha: 0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -922,17 +990,30 @@ class _SignupScreenState extends State<SignupScreen>
                   children: [
                     const Icon(
                       Icons.g_mobiledata_rounded,
-                      size: 28,
+                      size: 32,
                       color: Color(0xFF4285F4),
                     ),
-                    SizedBox(width: 2.w),
-                    Text(
-                      'Continue with Google',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11.5.sp,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1A1C1E),
-                      ),
+                    SizedBox(width: 1.w),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Sign Up with Google (Recommended)',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                        Text(
+                          'Instant & verified account with Google',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 8.5.sp,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

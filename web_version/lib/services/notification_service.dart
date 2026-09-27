@@ -36,6 +36,35 @@ class NotificationService {
   bool get isContinuousAlertPlaying => _continuousSoundTimer != null;
 
   /// Plays a single pleasant notification chime sound
+  /// Web: Synthesized  /// Unlocks Web Audio Context on user interaction to comply with autoplay policy
+  void unlockWebAudioContext() {
+    if (!kIsWeb) return;
+    try {
+      final script = html.ScriptElement()
+        ..text = '''
+          (function() {
+            var unlock = function() {
+              try {
+                var AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!window._lcAudioCtx && AudioContext) {
+                  window._lcAudioCtx = new AudioContext();
+                }
+                if (window._lcAudioCtx && window._lcAudioCtx.state === 'suspended') {
+                  window._lcAudioCtx.resume();
+                }
+              } catch(e) {}
+            };
+            document.addEventListener('click', unlock, { once: false, passive: true });
+            document.addEventListener('touchstart', unlock, { once: false, passive: true });
+            document.addEventListener('keydown', unlock, { once: false, passive: true });
+          })();
+        ''';
+      html.document.body?.append(script);
+      script.remove();
+    } catch (_) {}
+  }
+
+  /// Plays a single pleasant notification chime sound
   /// Web: Synthesized dual-tone sine chime via Web Audio API
   /// Mobile: System alert sound with haptics
   void playNotificationSound() {
@@ -48,14 +77,15 @@ class NotificationService {
                 try {
                   var AudioContext = window.AudioContext || window.webkitAudioContext;
                   if (!AudioContext) return;
-                  var ctx = new AudioContext();
+                  var ctx = window._lcAudioCtx || new AudioContext();
+                  if (ctx.state === 'suspended') ctx.resume();
                   
                   // Primary chime tone (880 Hz - A5)
                   var osc1 = ctx.createOscillator();
                   var gain1 = ctx.createGain();
                   osc1.type = 'sine';
                   osc1.frequency.setValueAtTime(880, ctx.currentTime);
-                  gain1.gain.setValueAtTime(0.25, ctx.currentTime);
+                  gain1.gain.setValueAtTime(0.40, ctx.currentTime);
                   gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
                   osc1.connect(gain1);
                   gain1.connect(ctx.destination);
@@ -67,7 +97,7 @@ class NotificationService {
                   var gain2 = ctx.createGain();
                   osc2.type = 'sine';
                   osc2.frequency.setValueAtTime(1318.5, ctx.currentTime + 0.10);
-                  gain2.gain.setValueAtTime(0.30, ctx.currentTime + 0.10);
+                  gain2.gain.setValueAtTime(0.45, ctx.currentTime + 0.10);
                   gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
                   osc2.connect(gain2);
                   gain2.connect(ctx.destination);
@@ -97,42 +127,43 @@ class NotificationService {
                 try {
                   var AudioContext = window.AudioContext || window.webkitAudioContext;
                   if (!AudioContext) return;
-                  var ctx = new AudioContext();
+                  var ctx = window._lcAudioCtx || new AudioContext();
+                  if (ctx.state === 'suspended') ctx.resume();
 
                   // Note 1: 587.33 Hz (D5)
                   var o1 = ctx.createOscillator();
                   var g1 = ctx.createGain();
                   o1.type = 'triangle';
                   o1.frequency.setValueAtTime(587.33, ctx.currentTime);
-                  g1.gain.setValueAtTime(0.35, ctx.currentTime);
-                  g1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.20);
+                  g1.gain.setValueAtTime(0.60, ctx.currentTime);
+                  g1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
                   o1.connect(g1);
                   g1.connect(ctx.destination);
                   o1.start(ctx.currentTime);
-                  o1.stop(ctx.currentTime + 0.20);
+                  o1.stop(ctx.currentTime + 0.22);
 
                   // Note 2: 880 Hz (A5)
                   var o2 = ctx.createOscillator();
                   var g2 = ctx.createGain();
                   o2.type = 'triangle';
-                  o2.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
-                  g2.gain.setValueAtTime(0.40, ctx.currentTime + 0.15);
-                  g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
+                  o2.frequency.setValueAtTime(880, ctx.currentTime + 0.14);
+                  g2.gain.setValueAtTime(0.65, ctx.currentTime + 0.14);
+                  g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.40);
                   o2.connect(g2);
                   g2.connect(ctx.destination);
-                  o2.start(ctx.currentTime + 0.15);
-                  o2.stop(ctx.currentTime + 0.38);
+                  o2.start(ctx.currentTime + 0.14);
+                  o2.stop(ctx.currentTime + 0.40);
 
                   // Note 3: 1174.66 Hz (D6)
                   var o3 = ctx.createOscillator();
                   var g3 = ctx.createGain();
                   o3.type = 'sine';
-                  o3.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.30);
-                  g3.gain.setValueAtTime(0.45, ctx.currentTime + 0.30);
+                  o3.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.28);
+                  g3.gain.setValueAtTime(0.70, ctx.currentTime + 0.28);
                   g3.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65);
                   o3.connect(g3);
                   g3.connect(ctx.destination);
-                  o3.start(ctx.currentTime + 0.30);
+                  o3.start(ctx.currentTime + 0.28);
                   o3.stop(ctx.currentTime + 0.65);
                 } catch(e) {}
               })();
@@ -413,26 +444,60 @@ class NotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
 
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+    unlockWebAudioContext();
 
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
-    try {
-      await _plugin.initialize(
-        settings: initSettings,
-        onDidReceiveNotificationResponse: _onNotificationTapped,
+    if (!kIsWeb) {
+      const androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
       );
+
+      const initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
+
+      try {
+        await _plugin.initialize(
+          settings: initSettings,
+          onDidReceiveNotificationResponse: _onNotificationTapped,
+        );
+
+        final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+        if (androidPlugin != null) {
+          await androidPlugin.createNotificationChannel(
+            const AndroidNotificationChannel(
+              'inquiry_notifications',
+              'Customer Enquiries & Ringing Alerts',
+              description: 'Continuous ring and notifications for customer enquiries and orders',
+              importance: Importance.max,
+              playSound: true,
+              enableVibration: true,
+            ),
+          );
+          await androidPlugin.createNotificationChannel(
+            const AndroidNotificationChannel(
+              'general_notifications',
+              'General App Notifications',
+              description: 'Standard notifications and status updates',
+              importance: Importance.high,
+              playSound: true,
+              enableVibration: true,
+            ),
+          );
+        }
+        _initialized = true;
+      } catch (e) {
+        debugPrint('[NotificationService] Local notifications init note: $e');
+        _initialized = true;
+      }
+    } else {
       _initialized = true;
-    } catch (_) {}
+    }
   }
 
   void _onNotificationTapped(NotificationResponse response) {
@@ -455,6 +520,7 @@ class NotificationService {
     playNotificationSound();
 
     if (!_initialized) await initialize();
+    if (kIsWeb) return;
 
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -486,7 +552,9 @@ class NotificationService {
         notificationDetails: details,
         payload: payload,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[NotificationService] showLocalNotification note: $e');
+    }
   }
 
   // ─── REALTIME NOTIFICATION DISPATCH METHODS ───────────────────────────────
@@ -709,21 +777,46 @@ class NotificationService {
     try {
       final now = DateTime.now().toIso8601String();
 
-      // Lookup provider user_id if providerId is service_provider uuid
-      String targetProviderUserId = providerId;
-      try {
-        final provRow = await SupabaseService.instance.client
-            .from('service_providers')
-            .select('user_id')
-            .or('id.eq.$providerId,user_id.eq.$providerId')
-            .maybeSingle();
-        if (provRow != null && provRow['user_id'] != null) {
-          targetProviderUserId = provRow['user_id'] as String;
+      // Lookup provider user_id
+      String? targetProviderUserId;
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(providerId.trim());
+
+      if (isUuid) {
+        try {
+          final provRow = await SupabaseService.instance.client
+              .from('service_providers')
+              .select('user_id')
+              .or('id.eq.$providerId,user_id.eq.$providerId')
+              .maybeSingle();
+          if (provRow != null && provRow['user_id'] != null) {
+            targetProviderUserId = provRow['user_id'] as String;
+          } else {
+            targetProviderUserId = providerId;
+          }
+        } catch (_) {
+          targetProviderUserId = providerId;
         }
-      } catch (_) {}
+      }
+
+      // If still not resolved by UUID, search by business_name or owner_name
+      if (targetProviderUserId == null && providerName.trim().isNotEmpty) {
+        try {
+          final provRow = await SupabaseService.instance.client
+              .from('service_providers')
+              .select('user_id')
+              .ilike('business_name', '%${providerName.trim()}%')
+              .limit(1)
+              .maybeSingle();
+          if (provRow != null && provRow['user_id'] != null) {
+            targetProviderUserId = provRow['user_id'] as String;
+          }
+        } catch (_) {}
+      }
 
       // 1. Notify Provider (Continuous alert trigger)
-      if (targetProviderUserId.isNotEmpty) {
+      if (targetProviderUserId != null && targetProviderUserId.isNotEmpty) {
         await SupabaseService.instance.client.from('notifications').insert({
           'user_id': targetProviderUserId,
           'title': '📩 New Customer Enquiry (#$enquiryId)',
@@ -735,13 +828,39 @@ class NotificationService {
             'customer_id': customerId,
             'customer_name': customerName,
             'customer_phone': customerPhone,
+            'provider_id': providerId,
+            'provider_name': providerName,
             'subcategory': subcategory,
+            'service': subcategory,
             'message': message,
             'is_continuous_alert': true,
           },
           'is_read': false,
           'created_at': now,
         });
+
+        // Instant broadcast trigger so provider's active device rings immediately
+        try {
+          final broadcastChannel = SupabaseService.instance.client
+              .channel('public:global_notifications_and_broadcasts');
+          await broadcastChannel.sendBroadcastMessage(
+            event: 'provider_continuous_alert',
+            payload: {
+              'target_user_id': targetProviderUserId,
+              'target_provider_id': providerId,
+              'title': '📩 New Customer Enquiry (#$enquiryId)',
+              'body': '$customerName sent an enquiry for $subcategory.',
+              'enquiry_id': enquiryId,
+              'customer_name': customerName,
+              'customer_phone': customerPhone,
+              'subcategory': subcategory,
+              'service': subcategory,
+              'message': message,
+              'is_enquiry': true,
+              'timestamp': now,
+            },
+          );
+        } catch (_) {}
       }
 
       // 2. Notify Customer (Single chime)
@@ -783,6 +902,34 @@ class NotificationService {
     try {
       _broadcastChannel = SupabaseService.instance.client
           .channel('public:global_notifications_and_broadcasts')
+          .onBroadcast(
+            event: 'provider_continuous_alert',
+            callback: (payload) {
+              final targetUserId = payload['target_user_id'] as String?;
+              final targetProviderId = payload['target_provider_id'] as String?;
+              final currentUserId = SupabaseService.instance.currentUser?.id;
+
+              bool applies = false;
+              if (currentUserId != null) {
+                if (targetUserId != null && targetUserId == currentUserId) {
+                  applies = true;
+                } else if (targetProviderId != null && targetProviderId == currentUserId) {
+                  applies = true;
+                }
+              }
+
+              if (applies) {
+                startContinuousBookingAlert(
+                  title: payload['title'] as String? ?? '📩 New Customer Enquiry',
+                  body: payload['body'] as String? ?? 'A customer sent an enquiry.',
+                  enquiryId: payload['enquiry_id']?.toString(),
+                  customerName: payload['customer_name'] as String?,
+                  serviceName: payload['service'] as String? ?? payload['subcategory'] as String?,
+                  isEnquiry: true,
+                );
+              }
+            },
+          )
           .onBroadcast(
             event: 'admin_push_notification',
             callback: (payload) {

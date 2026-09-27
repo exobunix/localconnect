@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isOnline = true;
   String? _cacheAge;
   String? _avatarUrl;
+  bool _hasProviderAccount = false;
 
   static const _cacheKeyProfile = 'home_user_profile';
 
@@ -142,6 +143,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _avatarUrl = profile['avatar_url'] as String?;
       });
       await ConnectivityService.instance.cacheData(_cacheKeyProfile, profile);
+      final hasBoth = await SupabaseService.instance.hasBothAccounts();
+      if (mounted) {
+        setState(() {
+          _hasProviderAccount = hasBoth || _userRole == 'provider';
+        });
+      }
     }
   }
 
@@ -236,6 +243,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 physics: const BouncingScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(child: HomeSearchWidget(onSearch: (_) {})),
+                  if (_hasProviderAccount)
+                    SliverToBoxAdapter(child: _buildProviderDashboardBanner()),
                   const SliverToBoxAdapter(child: HomeBannerSliderWidget()),
                   SliverToBoxAdapter(
                     child: HomeCategoryGridWidget(
@@ -310,8 +319,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildProviderDashboardBanner() {
     return GestureDetector(
-      onTap: () =>
-          Navigator.pushNamed(context, AppRoutes.providerDashboardScreen),
+      onTap: () async {
+        await SupabaseService.instance.switchActiveRole('provider');
+        if (mounted) {
+          Navigator.pushNamed(context, AppRoutes.providerDashboardScreen);
+        }
+      },
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         padding: const EdgeInsets.all(16),
