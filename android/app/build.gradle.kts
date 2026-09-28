@@ -39,6 +39,15 @@ android {
                 keyPassword = "localconnect123"
             }
         }
+        getByName("debug") {
+            val debugKeystore = file("debug.keystore")
+            if (debugKeystore.exists()) {
+                storeFile = debugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
     }
 
     buildTypes {
@@ -55,10 +64,7 @@ android {
         debug {
             isMinifyEnabled = false
             isShrinkResources = false
-            val keystoreFile = file("localconnect.keystore")
-            if (keystoreFile.exists()) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }

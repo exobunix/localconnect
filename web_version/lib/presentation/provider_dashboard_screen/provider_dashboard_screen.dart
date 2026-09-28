@@ -1199,17 +1199,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     }
   }
 
-  Future<void> _switchToCustomerMode() async {
-    try {
-      await SupabaseService.instance.switchActiveRole('customer');
-    } catch (_) {}
-    if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.homeScreen,
-        (route) => false,
-      );
-    }
+  void _openMyProfile() {
+    Navigator.pushNamed(
+      context,
+      AppRoutes.providerBusinessProfileEditScreen,
+    ).then((_) => _loadDashboard());
   }
 
   @override
@@ -1224,7 +1218,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               : _error != null
               ? _buildErrorState()
               : _buildCurrentTab(),
-          // Persistent quick actions — Customer Mode & Logout in top-right corner
+          // Persistent quick actions — My Profile & Logout in top-right corner
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             right: 8,
@@ -1235,11 +1229,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: _switchToCustomerMode,
+                      onTap: _openMyProfile,
                       borderRadius: BorderRadius.circular(24),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
+                          horizontal: 12,
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
@@ -1257,13 +1251,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: const [
                             Icon(
-                              Icons.swap_horiz_rounded,
+                              Icons.person_rounded,
                               color: Colors.white,
                               size: 16,
                             ),
                             SizedBox(width: 4),
                             Text(
-                              'Customer Mode',
+                              'My Profile',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
@@ -1415,15 +1409,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       return;
     }
     if (index == 4) {
-      // Show provider profile / settings
-      final providerId = _providerProfile?['id'] as String?;
-      if (providerId != null) {
-        Navigator.pushNamed(
-          context,
-          AppRoutes.providerProfileScreen,
-          arguments: {'providerId': providerId},
-        );
-      }
+      _openMyProfile();
       return;
     }
     // Reset unread badge when opening Orders tab
@@ -1715,6 +1701,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               tooltip: 'Availability Settings',
             ),
             IconButton(
+              icon: const Icon(Icons.person_rounded),
+              onPressed: _openMyProfile,
+              tooltip: 'My Profile',
+            ),
+            IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _loadDashboard,
               tooltip: 'Refresh',
@@ -1918,6 +1909,66 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                         ),
                         Text(
                           'Showcase your services on customer home screen banner carousel',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            color: Colors.white70,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white70,
+                    size: 14,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // ─── My Profile & Business Details ────────────────────────────
+          GestureDetector(
+            onTap: _openMyProfile,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0277BD), Color(0xFF0288D1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0288D1).withValues(alpha: 0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_circle_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'My Profile & Business Details',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          _providerProfile != null
+                              ? '${_providerProfile!['business_name'] ?? 'Provider Profile'} • Tap to edit info & photos'
+                              : 'View and edit your business profile, photos & contact info',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 10,
                             color: Colors.white70,

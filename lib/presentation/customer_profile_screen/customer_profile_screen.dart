@@ -1197,23 +1197,23 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen>
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          _sectionCard(
-            title: 'Partner / Provider Account',
-            icon: Icons.storefront_rounded,
-            child: Column(
-              children: [
-                _actionRow(
-                  icon: Icons.swap_horiz_rounded,
-                  label: _hasProviderAccount
-                      ? 'Switch to Partner Dashboard'
-                      : 'Register as Service Partner (Same Login)',
-                  color: AppTheme.primary,
-                  onTap: _handlePartnerSwitchOrRegister,
-                ),
-              ],
+          if (!_hasProviderAccount) ...[
+            const SizedBox(height: 16),
+            _sectionCard(
+              title: 'Partner / Provider Account',
+              icon: Icons.storefront_rounded,
+              child: Column(
+                children: [
+                  _actionRow(
+                    icon: Icons.store_rounded,
+                    label: 'Register as Service Partner',
+                    color: AppTheme.primary,
+                    onTap: _handlePartnerSwitchOrRegister,
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 16),
           _sectionCard(
             title: 'Account',

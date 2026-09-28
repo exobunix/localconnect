@@ -243,8 +243,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 physics: const BouncingScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(child: HomeSearchWidget(onSearch: (_) {})),
-                  if (_hasProviderAccount)
-                    SliverToBoxAdapter(child: _buildProviderDashboardBanner()),
                   const SliverToBoxAdapter(child: HomeBannerSliderWidget()),
                   SliverToBoxAdapter(
                     child: HomeCategoryGridWidget(

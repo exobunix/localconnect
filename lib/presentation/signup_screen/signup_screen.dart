@@ -283,7 +283,7 @@ class _SignupScreenState extends State<SignupScreen>
           } catch (_) {
             setState(() {
               _errorMessage =
-                  'An account with this email already exists. Please enter your existing password to activate your $targetRole account, or continue with Google.';
+                  'An account with this email already exists. You can log in directly as a $targetRole from the Login screen, or continue with Google.';
               _isLoading = false;
             });
             return;
@@ -340,7 +340,8 @@ class _SignupScreenState extends State<SignupScreen>
     try {
       if (kIsWeb) {
         try {
-          html.window.localStorage['google_signin_role'] = 'customer';
+          final targetRole = _selectedRole == 0 ? 'customer' : 'provider';
+          html.window.localStorage['google_signin_role'] = targetRole;
           html.window.localStorage['google_signin_flow'] = 'signup';
         } catch (_) {}
 

@@ -114,27 +114,24 @@ class _LoginScreenState extends State<LoginScreen>
       if (googleSignInRole == 'customer') {
         final profile = await SupabaseService.instance.getUserProfile(user.id);
         if (profile == null) {
-          final email = user.email;
+          final email = user.email ?? '';
           final name = user.userMetadata?['full_name'] as String? ?? '';
-          if (mounted) {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              AppRoutes.signupScreen,
-              (route) => false,
-              arguments: {'email': email, 'fullName': name, 'isGoogleAuth': true},
-            );
-          }
-          return;
-        } else {
-          if (mounted) {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              AppRoutes.homeScreen,
-              (route) => false,
-            );
-          }
-          return;
+          await SupabaseService.instance.upsertUserProfile(
+            userId: user.id,
+            email: email,
+            fullName: name,
+            role: 'customer',
+          );
         }
+        await SupabaseService.instance.switchActiveRole('customer');
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.homeScreen,
+            (route) => false,
+          );
+        }
+        return;
       } else if (googleSignInRole == 'provider') {
         final status = await SupabaseService.instance.getProviderRegistrationStatus(user.id);
         if (status == null) {
@@ -229,48 +226,73 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    if (role == 'provider' && userId != null) {
-      final onboardingDone = await SupabaseService.instance
-          .isProviderOnboardingComplete(userId);
+    if (_selectedRole == 0) {
+      // User selected Customer on the login screen
+      await SupabaseService.instance.switchActiveRole('customer');
+      if (userId != null) {
+        final profile = await SupabaseService.instance.getUserProfile(userId);
+        if (profile == null) {
+          await SupabaseService.instance.upsertUserProfile(
+            userId: userId,
+            email: user?.email ?? '',
+            fullName: user?.userMetadata?['full_name'] as String? ?? '',
+            role: 'customer',
+          );
+        }
+      }
       if (!mounted) return;
-      if (!onboardingDone) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.providerOnboardingScreen,
-          (route) => false,
-        );
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.homeScreen,
+        (route) => false,
+      );
+      return;
+    } else {
+      // User selected Provider on the login screen (_selectedRole == 1)
+      await SupabaseService.instance.switchActiveRole('provider');
+      if (userId != null) {
+        final onboardingDone = await SupabaseService.instance
+            .isProviderOnboardingComplete(userId);
+        if (!mounted) return;
+        if (!onboardingDone) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.providerOnboardingScreen,
+            (route) => false,
+          );
+          return;
+        }
+        final regStatus = await SupabaseService.instance
+            .getProviderRegistrationStatus(userId);
+        if (!mounted) return;
+        if (regStatus == 'approved') {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.providerDashboardScreen,
+            (route) => false,
+          );
+        } else if (regStatus == 'pending_approval' || regStatus == 'rejected') {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.providerPendingApprovalScreen,
+            (route) => false,
+          );
+        } else {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.providerRegistrationScreen,
+            (route) => false,
+          );
+        }
         return;
       }
-      final regStatus = await SupabaseService.instance
-          .getProviderRegistrationStatus(userId);
-      if (!mounted) return;
-      if (regStatus == 'approved') {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.providerDashboardScreen,
-          (route) => false,
-        );
-      } else if (regStatus == 'pending_approval' || regStatus == 'rejected') {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.providerPendingApprovalScreen,
-          (route) => false,
-        );
-      } else {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.homeScreen,
-          (route) => false,
-        );
-      }
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.providerDashboardScreen,
+        (route) => false,
+      );
       return;
     }
-
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      AppRoutes.homeScreen,
-      (route) => false,
-    );
   }
 
   // ── Email/Password Auth ───────────────────────────────────────────────────
@@ -369,22 +391,14 @@ class _LoginScreenState extends State<LoginScreen>
       if (user != null) {
         final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
         if (roleStr == 'customer') {
-          final profile = await SupabaseService.instance.getUserProfile(user.id);
-          if (profile == null) {
-            final email = user.email ?? googleUser.email;
-            final name = user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '';
-            if (mounted) {
-              setState(() {
-                _isGoogleLoading = false;
-              });
-              Navigator.pushNamed(
-                context,
-                AppRoutes.signupScreen,
-                arguments: {'email': email, 'fullName': name},
-              );
-            }
-            return;
-          }
+          final email = user.email ?? googleUser.email;
+          final name = user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '';
+          await SupabaseService.instance.upsertUserProfile(
+            userId: user.id,
+            email: email,
+            fullName: name,
+            role: 'customer',
+          );
         } else {
           final status = await SupabaseService.instance.getProviderRegistrationStatus(user.id);
           if (status == null) {
