@@ -95,11 +95,17 @@ Future<String> _fetchRoleFromDb() async {
 
     final result = await SupabaseService.instance.client
         .from('user_profiles')
-        .select('role')
+        .select('active_role, role')
         .eq('id', user.id)
         .maybeSingle();
 
-    final role = result?['role'] as String? ?? 'customer';
+    // Prefer active_role (set explicitly at login/switch time).
+    // Fall back to role if active_role is missing (older rows).
+    final activeRole = result?['active_role'] as String?;
+    final fallbackRole = result?['role'] as String?;
+    final role = (activeRole != null && activeRole.isNotEmpty)
+        ? activeRole
+        : (fallbackRole ?? 'customer');
 
     // SECURITY: Validate role is one of the known values before caching.
     // This prevents unexpected values from being used for access control.

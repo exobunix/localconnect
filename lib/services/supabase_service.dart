@@ -158,6 +158,13 @@ class SupabaseService {
   }
 
   Future<void> signOut() async {
+    // Clear cached role state before signing out so no stale role leaks
+    // into the next session (important when switching between accounts).
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('active_role');
+      await prefs.remove('user_roles');
+    } catch (_) {}
     await client.auth.signOut();
   }
 
@@ -275,10 +282,16 @@ class SupabaseService {
     String role = 'customer',
     String city = 'Pune',
   }) async {
+    // Merge roles[] from existing profile so we accumulate, not overwrite.
     List<String> combinedRoles = [role];
+    // For existing profiles, preserve their current active_role so manual
+    // role-switching is not reset on every profile update.
+    String activeRoleToSet = role;
+
     try {
       final existing = await getUserProfile(userId);
       if (existing != null) {
+        // Accumulate roles array
         final exRoles = existing['roles'];
         if (exRoles is List) {
           combinedRoles = List<String>.from(exRoles.map((e) => e.toString()));
@@ -286,6 +299,11 @@ class SupabaseService {
         } else {
           final exRole = existing['role'] as String? ?? 'customer';
           combinedRoles = {exRole, role}.toList();
+        }
+        // Keep the user's current active_role unless this is their first login.
+        final existingActiveRole = existing['active_role'] as String?;
+        if (existingActiveRole != null && existingActiveRole.isNotEmpty) {
+          activeRoleToSet = existingActiveRole;
         }
       }
     } catch (_) {}
@@ -295,9 +313,11 @@ class SupabaseService {
       'email': email.trim().toLowerCase(),
       'full_name': fullName.trim(),
       'phone': phone.trim(),
+      // 'role' records the role that was used for this upsert (last registered role).
       'role': role,
       'roles': combinedRoles,
-      'active_role': role,
+      // 'active_role' is what the user actually sees — preserved if they switched.
+      'active_role': activeRoleToSet,
       'city': city,
       'is_active': true,
       'updated_at': DateTime.now().toIso8601String(),
@@ -305,12 +325,14 @@ class SupabaseService {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('active_role', role);
+      await prefs.setString('active_role', activeRoleToSet);
       await prefs.setStringList('user_roles', combinedRoles);
     } catch (_) {}
   }
 
-  /// Switch the active role between 'customer' and 'provider' for dual-account users
+  /// Switch the active role between 'customer' and 'provider' for dual-account users.
+  /// Only [active_role] is updated — the permanent [role] column is never overwritten,
+  /// so both customer and provider contexts remain intact on the same auth user.
   Future<void> switchActiveRole(String newRole) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -319,7 +341,8 @@ class SupabaseService {
       if (uid != null) {
         await client.from('user_profiles').update({
           'active_role': newRole,
-          'role': newRole,
+          // Do NOT touch 'role' — it records which roles are registered,
+          // not which one is currently active.
         }).eq('id', uid);
       }
     } catch (e) {

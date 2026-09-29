@@ -30,11 +30,17 @@ Future<String> _fetchUserRole() async {
   try {
     final response = await SupabaseService.instance.client
         .from('user_profiles')
-        .select('role')
+        .select('active_role, role')
         .eq('id', user.id)
         .maybeSingle();
-    if (response != null && response['role'] != null) {
-      return response['role'] as String;
+    if (response != null) {
+      // Prefer active_role (set explicitly at login/switch), fall back to role.
+      final activeRole = response['active_role'] as String?;
+      final baseRole = response['role'] as String?;
+      final resolved = (activeRole != null && activeRole.isNotEmpty)
+          ? activeRole
+          : baseRole;
+      if (resolved != null && resolved.isNotEmpty) return resolved;
     }
   } catch (_) {}
 
@@ -452,13 +458,16 @@ class _LoginScreenState extends State<LoginScreen>
         final errStr = e.toString();
         String displayError = 'Google Sign-In failed. Please try again.';
         if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
-          displayError = 'Google Sign-In setup issue: App SHA-1 fingerprint is not configured in Google Cloud Console.';
+          // ApiException 10 can occur if the Google Services JSON client_id or
+          // SHA-1 fingerprint isn't propagated yet. Ask the user to retry; the
+          // dev should verify google-services.json has the correct client_ids.
+          displayError = 'Google Sign-In is temporarily unavailable. Please try again or use email & password.';
         } else if (errStr.contains('network') || errStr.contains('SocketException')) {
           displayError = 'Network error. Please check your internet connection.';
         } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
           displayError = 'Google Sign-In was cancelled.';
         } else {
-          displayError = 'Google Sign-In failed: $e';
+          displayError = 'Google Sign-In failed. Please try again.';
         }
         setState(() {
           _errorMessage = displayError;

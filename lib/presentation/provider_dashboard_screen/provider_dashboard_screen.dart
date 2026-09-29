@@ -1210,7 +1210,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      extendBody: true,
+      // extendBody intentionally removed — the pill nav widget handles its own
+      // bottom inset via MediaQuery so content is never hidden behind it.
       body: Stack(
         children: [
           _isLoading

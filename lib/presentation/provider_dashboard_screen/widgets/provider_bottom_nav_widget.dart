@@ -28,8 +28,12 @@ class ProviderBottomNavWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Always respect the system bottom inset (Android nav bar / iOS home indicator)
+    // so the pill is never clipped behind the system UI.
+    final systemBottom = MediaQuery.of(context).padding.bottom;
+    final bottomPad = systemBottom > 0 ? systemBottom + 8.0 : 20.0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad),
       child: Container(
         height: 68,
         decoration: BoxDecoration(

@@ -417,9 +417,9 @@ class _SignupScreenState extends State<SignupScreen>
     } catch (e) {
       if (mounted) {
         final errStr = e.toString();
-        String displayError = 'Google Sign-In failed: $e';
+        String displayError = 'Google Sign-In failed. Please try again.';
         if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
-          displayError = 'Google Sign-In setup issue: App SHA-1 fingerprint is not configured in Google Cloud Console.';
+          displayError = 'Google Sign-In is temporarily unavailable. Please try again or use email & password.';
         } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
           displayError = 'Google Sign-In was cancelled.';
         }
@@ -629,9 +629,9 @@ class _SignupScreenState extends State<SignupScreen>
             subtitle: 'Manage your business',
             isSelected: _selectedRole == 1,
             color: const Color(0xFFE65100),
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.providerRegistrationScreen);
-            },
+            // Select the provider role in-form; the actual provider
+            // registration screen is opened after successful signup.
+            onTap: () => setState(() => _selectedRole = 1),
           ),
         ),
       ],
