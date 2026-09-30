@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../routes/app_routes.dart';
@@ -38,6 +39,7 @@ class _SignupScreenState extends State<SignupScreen>
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
+  StreamSubscription<AuthState>? _authSub;
 
   @override
   void initState() {
@@ -64,6 +66,26 @@ class _SignupScreenState extends State<SignupScreen>
       _isGoogleEmailLocked = true;
     }
 
+    _authSub = SupabaseService.instance.authStateChanges.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn && mounted) {
+        final user = data.session?.user ?? SupabaseService.instance.currentUser;
+        if (user != null) {
+          setState(() {
+            _emailController.text = user.email ?? '';
+            final metaName = user.userMetadata?['full_name'] as String?;
+            if (metaName != null &&
+                metaName.isNotEmpty &&
+                _nameController.text.isEmpty) {
+              _nameController.text = metaName;
+            }
+            _isGoogleEmailLocked = true;
+            _isGoogleLoading = false;
+            _errorMessage = null;
+          });
+        }
+      }
+    });
+
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -74,6 +96,7 @@ class _SignupScreenState extends State<SignupScreen>
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _animController.dispose();
     _nameController.dispose();
     _emailController.dispose();
@@ -301,8 +324,35 @@ class _SignupScreenState extends State<SignupScreen>
     } catch (e, stackTrace) {
       debugPrint('GOOGLE_SIGN_IN_ERROR: $e');
       debugPrintStack(stackTrace: stackTrace);
+
+      final errStr = e.toString();
+      if (!kIsWeb &&
+          (errStr.contains('10') ||
+              errStr.contains('ApiException') ||
+              errStr.contains('DEVELOPER_ERROR') ||
+              errStr.contains('sign_in_failed'))) {
+        debugPrint(
+            'Native Google Sign-In failed with configuration error ($e). Falling back to Supabase OAuth in signup...');
+        try {
+          final targetRole = _selectedRole == 0 ? 'customer' : 'provider';
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('google_signin_role', targetRole);
+            await prefs.setString('google_signin_flow', 'signup');
+          } catch (_) {}
+
+          await SupabaseService.instance.client.auth.signInWithOAuth(
+            OAuthProvider.google,
+            redirectTo: 'io.supabase.localconnect://login-callback',
+            authScreenLaunchMode: LaunchMode.externalApplication,
+          );
+          return;
+        } catch (oauthError) {
+          debugPrint('OAuth fallback error: $oauthError');
+        }
+      }
+
       if (mounted) {
-        final errStr = e.toString();
         String displayError = 'Google Sign-In failed. Please try again.';
         if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
           displayError = kDebugMode

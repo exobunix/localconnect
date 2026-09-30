@@ -22,6 +22,30 @@
           }
         },
         {
+          "client_id": "1053905240243-play-app-signing.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avdar.localconnect",
+            "certificate_hash": "4854836bce531ca5fb159a6732db689a1e32b1fb"
+          }
+        },
+        {
+          "client_id": "1053905240243-play-previous-signing.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avdar.localconnect",
+            "certificate_hash": "8f7fd6527e4150c4fddc88c0b94dc61c1c1a4349"
+          }
+        },
+        {
+          "client_id": "1053905240243-upload-key.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avdar.localconnect",
+            "certificate_hash": "a21e345544da1f9895a126c91d88fbe361448737"
+          }
+        },
+        {
           "client_id": "1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com",
           "client_type": 3
         },
@@ -31,6 +55,30 @@
           "android_info": {
             "package_name": "com.avdar.localconnect",
             "certificate_hash": "545df2a5063126ca4761e29bb8b9931dfbc513f5"
+          }
+        },
+        {
+          "client_id": "78703580798-play-app-signing.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avdar.localconnect",
+            "certificate_hash": "4854836bce531ca5fb159a6732db689a1e32b1fb"
+          }
+        },
+        {
+          "client_id": "78703580798-play-previous-signing.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avdar.localconnect",
+            "certificate_hash": "8f7fd6527e4150c4fddc88c0b94dc61c1c1a4349"
+          }
+        },
+        {
+          "client_id": "78703580798-upload-key.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avdar.localconnect",
+            "certificate_hash": "a21e345544da1f9895a126c91d88fbe361448737"
           }
         },
         {

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -132,6 +133,8 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
 
   final int _totalSteps = 5;
 
+  StreamSubscription<AuthState>? _authSub;
+
   @override
   void initState() {
     super.initState();
@@ -147,6 +150,26 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
       _ownerNameController.text =
           currentU!.userMetadata!['full_name'].toString();
     }
+
+    _authSub = SupabaseService.instance.authStateChanges.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn && mounted) {
+        final u = data.session?.user ?? SupabaseService.instance.currentUser;
+        if (u != null) {
+          setState(() {
+            _emailController.text = u.email ?? '';
+            final name = u.userMetadata?['full_name'] as String?;
+            if (name != null &&
+                name.isNotEmpty &&
+                _ownerNameController.text.isEmpty) {
+              _ownerNameController.text = name;
+            }
+            _isGoogleLoading = false;
+            _errorMessage = null;
+          });
+        }
+      }
+    });
+
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -178,6 +201,7 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _animController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -769,6 +793,33 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     } catch (e, stackTrace) {
       debugPrint('GOOGLE_SIGN_IN_ERROR: $e');
       debugPrintStack(stackTrace: stackTrace);
+
+      final errStr = e.toString();
+      if (!kIsWeb &&
+          (errStr.contains('10') ||
+              errStr.contains('ApiException') ||
+              errStr.contains('DEVELOPER_ERROR') ||
+              errStr.contains('sign_in_failed'))) {
+        debugPrint(
+            'Native Google Sign-In failed with configuration error ($e). Falling back to Supabase OAuth in provider reg...');
+        try {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('google_signin_role', 'provider');
+          } catch (_) {}
+
+          await SupabaseService.instance.client.auth.signInWithOAuth(
+            OAuthProvider.google,
+            redirectTo: 'io.supabase.localconnect://login-callback',
+            queryParams: {'role': 'provider'},
+            authScreenLaunchMode: LaunchMode.externalApplication,
+          );
+          return;
+        } catch (oauthError) {
+          debugPrint('OAuth fallback error: $oauthError');
+        }
+      }
+
       if (mounted) {
         setState(() {
           _isGoogleLoading = false;

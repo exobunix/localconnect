@@ -30,11 +30,17 @@ Future<String> _fetchUserRole() async {
   try {
     final response = await SupabaseService.instance.client
         .from('user_profiles')
-        .select('role')
+        .select('active_role, role')
         .eq('id', user.id)
         .maybeSingle();
-    if (response != null && response['role'] != null) {
-      return response['role'] as String;
+    if (response != null) {
+      // Prefer active_role (set explicitly at login/switch), fall back to role.
+      final activeRole = response['active_role'] as String?;
+      final baseRole = response['role'] as String?;
+      final resolved = (activeRole != null && activeRole.isNotEmpty)
+          ? activeRole
+          : baseRole;
+      if (resolved != null && resolved.isNotEmpty) return resolved;
     }
   } catch (_) {}
 
@@ -64,6 +70,7 @@ class _LoginScreenState extends State<LoginScreen>
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
+  StreamSubscription<AuthState>? _authSub;
 
   @override
   void initState() {
@@ -80,6 +87,12 @@ class _LoginScreenState extends State<LoginScreen>
     _animController.forward();
     _loadSavedCredentials();
     _checkPendingOAuthOrSession();
+
+    _authSub = SupabaseService.instance.authStateChanges.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn && mounted) {
+        _checkPendingOAuthOrSession();
+      }
+    });
   }
 
   Future<void> _checkPendingOAuthOrSession() async {
@@ -105,10 +118,20 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       googleSignInRole = html.window.localStorage['google_signin_role'];
     } catch (_) {}
+    if (googleSignInRole == null || googleSignInRole.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        googleSignInRole = prefs.getString('google_signin_role');
+      } catch (_) {}
+    }
 
     if (googleSignInRole != null && googleSignInRole.isNotEmpty) {
       try {
         html.window.localStorage.remove('google_signin_role');
+      } catch (_) {}
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('google_signin_role');
       } catch (_) {}
 
       if (googleSignInRole == 'customer') {
@@ -204,6 +227,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _animController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -450,8 +474,35 @@ class _LoginScreenState extends State<LoginScreen>
         }
         return;
       }
+      final errStr = e.toString();
+      // If native sign-in throws ApiException 10 / DEVELOPER_ERROR / configuration issue, fallback to OAuth:
+      if (!kIsWeb &&
+          (errStr.contains('10') ||
+              errStr.contains('ApiException') ||
+              errStr.contains('DEVELOPER_ERROR') ||
+              errStr.contains('sign_in_failed'))) {
+        debugPrint(
+            'Native Google Sign-In returned configuration error ($e). Falling back to Supabase OAuth...');
+        try {
+          final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('google_signin_role', roleStr);
+          } catch (_) {}
+          if (_rememberMe) await _saveRememberMe(true);
+
+          await SupabaseService.instance.client.auth.signInWithOAuth(
+            OAuthProvider.google,
+            redirectTo: 'io.supabase.localconnect://login-callback',
+            authScreenLaunchMode: LaunchMode.externalApplication,
+          );
+          return;
+        } catch (oauthError) {
+          debugPrint('OAuth fallback error: $oauthError');
+        }
+      }
+
       if (mounted) {
-        final errStr = e.toString();
         String displayError = 'Google Sign-In failed. Please try again.';
         if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
           displayError = kDebugMode
