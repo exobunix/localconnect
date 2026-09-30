@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "78703580798-rvfa0g5oejdqtu6t9uc4usa95khq8rde.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avdar.localconnect",
+            "certificate_hash": "4854836bce531ca5fb159a6732db689a1e32b1fb"
+          }
+        },
+        {
+          "client_id": "78703580798-sg3ovpnos5ih8pqijvckvpm4o4qu6rb0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avdar.localconnect",
+            "certificate_hash": "545df2a5063126ca4761e29bb8b9931dfbc513f5"
+          }
+        },
+        {
           "client_id": "78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com",
           "client_type": 3
         }
