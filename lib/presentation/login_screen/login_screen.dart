@@ -388,32 +388,38 @@ class _LoginScreenState extends State<LoginScreen>
       const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
       final effectiveClientId = webClientId.isNotEmpty
           ? webClientId
-          : '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com';
+          : '78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com';
 
+      debugPrint('GOOGLE_SIGN_IN_STARTED: serverClientId=$effectiveClientId');
       final googleSignIn = GoogleSignIn(
         serverClientId: effectiveClientId,
+        scopes: ['email', 'profile'],
       );
       googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
-        if (mounted) setState(() => _isGoogleLoading = false);
+        debugPrint('GOOGLE_SIGN_IN_CANCELLED: User dismissed the account picker');
         return;
       }
+      debugPrint('GOOGLE_SIGN_IN_SUCCESS: user=${googleUser.email}');
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken ?? googleUser.id;
       final accessToken = googleAuth.accessToken;
 
+      debugPrint('FIREBASE_AUTH_STARTED: Authenticating with Supabase via Google ID Token...');
       await SupabaseService.instance.signInWithGoogleIdToken(
         idToken: idToken,
         accessToken: accessToken,
         email: googleUser.email,
         name: googleUser.displayName,
       );
+      debugPrint('FIREBASE_AUTH_SUCCESS: Session authenticated successfully');
 
       if (!mounted) return;
 
       final user = SupabaseService.instance.currentUser;
       if (user != null) {
         final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
+        debugPrint('BACKEND_AUTH_STARTED: Resolving profile for role=$roleStr');
         if (roleStr == 'customer') {
           final email = user.email ?? googleUser.email;
           final name = user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '';
@@ -429,9 +435,6 @@ class _LoginScreenState extends State<LoginScreen>
             final email = user.email ?? googleUser.email;
             final name = user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '';
             if (mounted) {
-              setState(() {
-                _isGoogleLoading = false;
-              });
               Navigator.pushNamed(
                 context,
                 AppRoutes.providerRegistrationScreen,
@@ -448,6 +451,7 @@ class _LoginScreenState extends State<LoginScreen>
             UserAttributes(data: {'role': roleStr}),
           );
         }
+        debugPrint('BACKEND_AUTH_SUCCESS: User setup complete');
       }
 
       if (_rememberMe) await _saveRememberMe(true);
@@ -459,7 +463,6 @@ class _LoginScreenState extends State<LoginScreen>
       if (e.toString().contains('USER_NOT_REGISTERED')) {
         if (mounted) {
           setState(() {
-            _isGoogleLoading = false;
             _errorMessage = null;
           });
           Navigator.push(
@@ -475,38 +478,12 @@ class _LoginScreenState extends State<LoginScreen>
         return;
       }
       final errStr = e.toString();
-      // If native sign-in throws ApiException 10 / DEVELOPER_ERROR / configuration issue, fallback to OAuth:
-      if (!kIsWeb &&
-          (errStr.contains('10') ||
-              errStr.contains('ApiException') ||
-              errStr.contains('DEVELOPER_ERROR') ||
-              errStr.contains('sign_in_failed'))) {
-        debugPrint(
-            'Native Google Sign-In returned configuration error ($e). Falling back to Supabase OAuth...');
-        try {
-          final roleStr = _selectedRole == 0 ? 'customer' : 'provider';
-          try {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('google_signin_role', roleStr);
-          } catch (_) {}
-          if (_rememberMe) await _saveRememberMe(true);
-
-          await SupabaseService.instance.client.auth.signInWithOAuth(
-            OAuthProvider.google,
-            redirectTo: 'io.supabase.localconnect://login-callback',
-            authScreenLaunchMode: LaunchMode.externalApplication,
-          );
-          return;
-        } catch (oauthError) {
-          debugPrint('OAuth fallback error: $oauthError');
-        }
-      }
 
       if (mounted) {
         String displayError = 'Google Sign-In failed. Please try again.';
         if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
           displayError = kDebugMode
-              ? 'Google Sign-In setup error (ApiException 10): Ensure SHA-1 & Web Client ID match Google Cloud / Firebase Console. Detail: $e'
+              ? 'Google Sign-In configuration error (ApiException 10). Verify SHA-1 & Web Client ID in Google Cloud / Firebase Console. Detail: $e'
               : 'Google Sign-In configuration error (Code 10). Please verify Google Cloud SHA-1 and OAuth client settings.';
         } else if (errStr.contains('network') || errStr.contains('SocketException')) {
           displayError = 'Network error. Please check your internet connection.';
@@ -517,6 +494,11 @@ class _LoginScreenState extends State<LoginScreen>
         }
         setState(() {
           _errorMessage = displayError;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
           _isGoogleLoading = false;
         });
       }

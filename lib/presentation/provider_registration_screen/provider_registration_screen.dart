@@ -7,7 +7,6 @@ import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -756,24 +755,31 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
           String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
       final effectiveClientId = webClientId.isNotEmpty
           ? webClientId
-          : '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com';
+          : '78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com';
 
-      final googleSignIn = GoogleSignIn(serverClientId: effectiveClientId);
+      debugPrint('GOOGLE_SIGN_IN_STARTED (ProviderReg): serverClientId=$effectiveClientId');
+      final googleSignIn = GoogleSignIn(
+        serverClientId: effectiveClientId,
+        scopes: ['email', 'profile'],
+      );
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
-        if (mounted) setState(() => _isGoogleLoading = false);
+        debugPrint('GOOGLE_SIGN_IN_CANCELLED (ProviderReg): User dismissed account picker');
         return;
       }
+      debugPrint('GOOGLE_SIGN_IN_SUCCESS (ProviderReg): user=${googleUser.email}');
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken ?? googleUser.id;
       final accessToken = googleAuth.accessToken;
 
+      debugPrint('FIREBASE_AUTH_STARTED (ProviderReg): Authenticating with Supabase via Google ID Token...');
       await SupabaseService.instance.signInWithGoogleIdToken(
         idToken: idToken,
         accessToken: accessToken,
         email: googleUser.email,
         name: googleUser.displayName,
       );
+      debugPrint('FIREBASE_AUTH_SUCCESS (ProviderReg): Session established');
 
       final user = SupabaseService.instance.currentUser;
       if (user != null) {
@@ -786,7 +792,6 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
                   googleUser.displayName ??
                   '';
             }
-            _isGoogleLoading = false;
           });
         }
       }
@@ -795,35 +800,23 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
       debugPrintStack(stackTrace: stackTrace);
 
       final errStr = e.toString();
-      if (!kIsWeb &&
-          (errStr.contains('10') ||
-              errStr.contains('ApiException') ||
-              errStr.contains('DEVELOPER_ERROR') ||
-              errStr.contains('sign_in_failed'))) {
-        debugPrint(
-            'Native Google Sign-In failed with configuration error ($e). Falling back to Supabase OAuth in provider reg...');
-        try {
-          try {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('google_signin_role', 'provider');
-          } catch (_) {}
-
-          await SupabaseService.instance.client.auth.signInWithOAuth(
-            OAuthProvider.google,
-            redirectTo: 'io.supabase.localconnect://login-callback',
-            queryParams: {'role': 'provider'},
-            authScreenLaunchMode: LaunchMode.externalApplication,
-          );
-          return;
-        } catch (oauthError) {
-          debugPrint('OAuth fallback error: $oauthError');
+      if (mounted) {
+        String displayError = 'Google sign-in failed: $e';
+        if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
+          displayError = kDebugMode
+              ? 'Google Sign-In configuration error (ApiException 10). Verify SHA-1 & Web Client ID in Google Cloud / Firebase Console. Detail: $e'
+              : 'Google Sign-In configuration error (Code 10). Please verify Google Cloud SHA-1 and OAuth client settings.';
+        } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
+          displayError = 'Google Sign-In was cancelled.';
         }
+        setState(() {
+          _errorMessage = displayError;
+        });
       }
-
+    } finally {
       if (mounted) {
         setState(() {
           _isGoogleLoading = false;
-          _errorMessage = 'Google sign-in failed: $e';
         });
       }
     }

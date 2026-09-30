@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../routes/app_routes.dart';
@@ -233,31 +232,36 @@ class _SignupScreenState extends State<SignupScreen>
         return;
       }
 
+      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
+      final effectiveClientId = webClientId.isNotEmpty
+          ? webClientId
+          : '78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com';
+
+      debugPrint('GOOGLE_SIGN_IN_STARTED (Signup): serverClientId=$effectiveClientId');
       final GoogleSignIn googleSignIn = GoogleSignIn(
-        serverClientId: const String.fromEnvironment(
-          'GOOGLE_WEB_CLIENT_ID',
-          defaultValue:
-              '1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com',
-        ),
+        serverClientId: effectiveClientId,
         scopes: ['email', 'profile'],
       );
 
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
-        if (mounted) setState(() => _isGoogleLoading = false);
+        debugPrint('GOOGLE_SIGN_IN_CANCELLED (Signup): User dismissed the account picker');
         return;
       }
+      debugPrint('GOOGLE_SIGN_IN_SUCCESS (Signup): user=${googleUser.email}');
 
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken ?? googleUser.id;
       final accessToken = googleAuth.accessToken;
 
+      debugPrint('FIREBASE_AUTH_STARTED (Signup): Authenticating with Supabase via Google ID Token...');
       await SupabaseService.instance.signInWithGoogleIdToken(
         idToken: idToken,
         accessToken: accessToken,
         email: googleUser.email,
         name: googleUser.displayName,
       );
+      debugPrint('FIREBASE_AUTH_SUCCESS (Signup): Session established');
 
       if (!mounted) return;
 
@@ -284,7 +288,6 @@ class _SignupScreenState extends State<SignupScreen>
             _phoneController.text = existingPhone.replaceAll(RegExp(r'\D'), '');
           }
           _isGoogleEmailLocked = true;
-          _isGoogleLoading = false;
         });
 
         // If phone is already present and valid, finish registration immediately
@@ -326,37 +329,12 @@ class _SignupScreenState extends State<SignupScreen>
       debugPrintStack(stackTrace: stackTrace);
 
       final errStr = e.toString();
-      if (!kIsWeb &&
-          (errStr.contains('10') ||
-              errStr.contains('ApiException') ||
-              errStr.contains('DEVELOPER_ERROR') ||
-              errStr.contains('sign_in_failed'))) {
-        debugPrint(
-            'Native Google Sign-In failed with configuration error ($e). Falling back to Supabase OAuth in signup...');
-        try {
-          final targetRole = _selectedRole == 0 ? 'customer' : 'provider';
-          try {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('google_signin_role', targetRole);
-            await prefs.setString('google_signin_flow', 'signup');
-          } catch (_) {}
-
-          await SupabaseService.instance.client.auth.signInWithOAuth(
-            OAuthProvider.google,
-            redirectTo: 'io.supabase.localconnect://login-callback',
-            authScreenLaunchMode: LaunchMode.externalApplication,
-          );
-          return;
-        } catch (oauthError) {
-          debugPrint('OAuth fallback error: $oauthError');
-        }
-      }
 
       if (mounted) {
         String displayError = 'Google Sign-In failed. Please try again.';
         if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
           displayError = kDebugMode
-              ? 'Google Sign-In setup error (ApiException 10): Ensure SHA-1 & Web Client ID match Google Cloud / Firebase Console. Detail: $e'
+              ? 'Google Sign-In configuration error (ApiException 10). Verify SHA-1 & Web Client ID in Google Cloud / Firebase Console. Detail: $e'
               : 'Google Sign-In configuration error (Code 10). Please verify Google Cloud SHA-1 and OAuth client settings.';
         } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
           displayError = 'Google Sign-In was cancelled.';
@@ -364,8 +342,13 @@ class _SignupScreenState extends State<SignupScreen>
           displayError = kDebugMode ? 'Google Sign-In error: $e' : 'Google Sign-In failed. Please try again.';
         }
         setState(() {
-          _isGoogleLoading = false;
           _errorMessage = displayError;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGoogleLoading = false;
         });
       }
     }
