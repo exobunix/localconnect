@@ -77,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // 2. Request GPS location dynamically
     try {
       final loc = await LocationService.instance.getGpsLocation(
-        timeout: const Duration(seconds: 6),
+        timeout: const Duration(seconds: 12),
       );
       if (loc != null && loc.displayCity.isNotEmpty && mounted) {
         setState(() {

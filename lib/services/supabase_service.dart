@@ -998,15 +998,17 @@ class SupabaseService {
 
       // Notify provider of new order request
       if (safeProviderId != null && safeProviderId.isNotEmpty) {
-        // Look up the provider's user_id
+        // Look up the provider's user_id & details
         try {
           final providerRow = await client
               .from('service_providers')
-              .select('user_id')
-              .eq('id', safeProviderId)
+              .select('id, user_id, business_name')
+              .or('id.eq.$safeProviderId,user_id.eq.$safeProviderId')
               .maybeSingle();
-          final providerUserId = providerRow?['user_id'] as String?;
-          if (providerUserId != null && providerUserId.isNotEmpty) {
+          final providerUserId = (providerRow?['user_id'] as String?) ?? safeProviderId;
+          final resolvedProviderId = (providerRow?['id'] as String?) ?? safeProviderId;
+
+          if (providerUserId.isNotEmpty) {
             await insertOrderNotification(
               userId: providerUserId,
               title: '🔔 New Booking Request',
@@ -1021,6 +1023,20 @@ class SupabaseService {
                 'is_continuous_alert': true,
               },
             );
+
+            // Instant continuous ringing broadcast to provider device
+            try {
+              await NotificationService.instance.sendProviderContinuousAlert(
+                targetUserId: providerUserId,
+                targetProviderId: resolvedProviderId,
+                title: '🔔 New Booking Request',
+                body: '$customerName booked $service ($orderNumber).',
+                bookingId: response['id']?.toString() ?? orderNumber,
+                customerName: customerName,
+                serviceName: service,
+                amount: numericAmount.toString(),
+              );
+            } catch (_) {}
           }
         } catch (_) {}
       }
@@ -2102,17 +2118,37 @@ class SupabaseService {
       return;
     } catch (_) {}
 
-    await client.from('subcategories').upsert({
-      'id': id,
-      'category_id': categoryId,
-      'name': name,
-      'name_marathi': nameMarathi,
-      'image_url': imageUrl,
-      'description': description,
-      'is_active': isActive,
-      'sort_order': sortOrder,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'id');
+    // 1. Attempt standard upsert with all subcategory attributes (no updated_at since column does not exist)
+    try {
+      await client.from('subcategories').upsert({
+        'id': id,
+        'category_id': categoryId,
+        'name': name,
+        'name_marathi': nameMarathi,
+        'image_url': imageUrl,
+        'description': description,
+        'is_active': isActive,
+        'sort_order': sortOrder,
+      }, onConflict: 'id');
+      return;
+    } catch (e) {
+      debugPrint('[SupabaseService] adminAddSubcategory full upsert note: $e');
+    }
+
+    // 2. Fallback without image_url/description in case schema is older
+    try {
+      await client.from('subcategories').upsert({
+        'id': id,
+        'category_id': categoryId,
+        'name': name,
+        'name_marathi': nameMarathi,
+        'is_active': isActive,
+        'sort_order': sortOrder,
+      }, onConflict: 'id');
+    } catch (fallbackErr) {
+      debugPrint('[SupabaseService] adminAddSubcategory minimal upsert failed: $fallbackErr');
+      rethrow;
+    }
   }
 
   Future<void> adminUpdateSubcategory({
@@ -2131,9 +2167,18 @@ class SupabaseService {
       'description': description,
       if (isActive != null) 'is_active': isActive,
       if (sortOrder != null) 'sort_order': sortOrder,
-      'updated_at': DateTime.now().toIso8601String(),
     };
-    await client.from('subcategories').update(updates).eq('id', id);
+    try {
+      await client.from('subcategories').update(updates).eq('id', id);
+    } catch (e) {
+      // Fallback: update core fields if optional columns fail
+      await client.from('subcategories').update({
+        'name': name,
+        'name_marathi': nameMarathi,
+        if (isActive != null) 'is_active': isActive,
+        if (sortOrder != null) 'sort_order': sortOrder,
+      }).eq('id', id);
+    }
   }
 
   Future<void> adminDeleteSubcategory(String id) async {
@@ -3996,18 +4041,155 @@ class SupabaseService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> adminGetAllEnquiries() async {
+  Future<List<Map<String, dynamic>>> adminGetAllEnquiries({String? areaFilter}) async {
     try {
-      final response = await client
-          .from('enquiries')
-          .select('*')
-          .order('created_at', ascending: false)
-          .limit(200);
+      var query = client.from('enquiries').select('*');
+      final currentArea = areaFilter ?? currentAdminArea;
+      final role = currentAdminRole;
+      if (role != 'super_admin' && currentArea.isNotEmpty && currentArea != 'ALL') {
+        // Filter by assigned area for Area Admin
+        query = query.or('category.ilike.%$currentArea%,subcategory.ilike.%$currentArea%,message.ilike.%$currentArea%');
+      }
+      final response = await query.order('created_at', ascending: false).limit(300);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('[SupabaseService] adminGetAllEnquiries error: $e');
       return [];
     }
+  }
+
+  /// Get active service providers in an area/category suitable for manual request dispatch
+  Future<List<Map<String, dynamic>>> adminGetProvidersForDispatch({
+    String? category,
+    String? subcategory,
+    String? city,
+  }) async {
+    try {
+      var builder = client
+          .from('service_providers')
+          .select('id, user_id, business_name, owner_name, phone, whatsapp_number, category, subcategory, city, rating, is_active, is_verified')
+          .eq('is_active', true);
+
+      if (category != null && category.trim().isNotEmpty) {
+        builder = builder.ilike('category', '%${category.trim()}%');
+      }
+      if (city != null && city.trim().isNotEmpty && city.toLowerCase() != 'all') {
+        builder = builder.ilike('city', '%${city.trim()}%');
+      }
+
+      final res = await builder.order('rating', ascending: false).limit(50);
+      final list = List<Map<String, dynamic>>.from(res);
+      if (list.isNotEmpty) return list;
+
+      // Fallback: match by category only (without city filter if no local provider found)
+      if (category != null && category.trim().isNotEmpty) {
+        final catRes = await client
+            .from('service_providers')
+            .select('id, user_id, business_name, owner_name, phone, whatsapp_number, category, subcategory, city, rating, is_active, is_verified')
+            .eq('is_active', true)
+            .ilike('category', '%${category.trim()}%')
+            .limit(30);
+        return List<Map<String, dynamic>>.from(catRes);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('[SupabaseService] adminGetProvidersForDispatch error: $e');
+      try {
+        final res = await client
+            .from('service_providers')
+            .select('id, user_id, business_name, owner_name, phone, whatsapp_number, category, subcategory, city, rating, is_active')
+            .eq('is_active', true)
+            .limit(30);
+        return List<Map<String, dynamic>>.from(res);
+      } catch (_) {
+        return [];
+      }
+    }
+  }
+
+  /// Admin/Area Admin dispatches a service request/enquiry directly to suitable service providers
+  Future<Map<String, dynamic>> adminDispatchEnquiryToProviders({
+    required String enquiryId,
+    required List<Map<String, dynamic>> targetProviders,
+    required String dispatchNote,
+    required String customerName,
+    required String customerPhone,
+    required String serviceTitle,
+    required String category,
+    required String subcategory,
+    String? preferredDate,
+    String? preferredTime,
+    String? requirementMessage,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    int notifiedCount = 0;
+    final List<String> providerIds = [];
+    final List<String> providerNames = [];
+
+    for (final p in targetProviders) {
+      final pId = p['id']?.toString() ?? '';
+      final pUserId = (p['user_id']?.toString()) ?? pId;
+      final bName = p['business_name']?.toString() ?? p['owner_name']?.toString() ?? 'Partner';
+      providerIds.add(pId);
+      providerNames.add(bName);
+
+      // 1. Insert push notification in DB for provider
+      try {
+        await insertOrderNotification(
+          userId: pUserId,
+          title: '🚨 Admin Dispatched Service Request (#$enquiryId)',
+          body: 'Admin assigned a customer request for $serviceTitle from $customerName ($customerPhone). Note: $dispatchNote',
+          type: 'enquiry',
+          metadata: {
+            'enquiry_id': enquiryId,
+            'customer_name': customerName,
+            'customer_phone': customerPhone,
+            'service': serviceTitle,
+            'category': category,
+            'subcategory': subcategory,
+            'is_continuous_alert': true,
+            'dispatched_by_admin': true,
+            'dispatch_note': dispatchNote,
+          },
+        );
+      } catch (_) {}
+
+      // 2. Direct continuous ringing alert broadcast to provider device
+      try {
+        await NotificationService.instance.sendProviderContinuousAlert(
+          targetUserId: pUserId,
+          targetProviderId: pId,
+          title: '🚨 Admin Dispatched Service Request',
+          body: 'Customer $customerName needs $serviceTitle in your area! Tap to accept or respond.',
+          enquiryId: enquiryId,
+          customerName: customerName,
+          customerPhone: customerPhone,
+          serviceName: serviceTitle,
+          subcategory: subcategory,
+          message: requirementMessage ?? dispatchNote,
+          isEnquiry: true,
+        );
+        notifiedCount++;
+      } catch (_) {}
+    }
+
+    // 3. Update enquiry row in database with dispatch metadata and status
+    final dispatchSummary = 'Dispatched to ${targetProviders.length} providers (${providerNames.take(3).join(', ')}${providerNames.length > 3 ? '...' : ''}). Note: $dispatchNote';
+    try {
+      await client.from('enquiries').update({
+        'status': 'dispatched',
+        'provider_name': providerNames.isNotEmpty ? providerNames.first : 'Area Providers',
+        'provider_id': providerIds.isNotEmpty ? providerIds.first : null,
+        'updated_at': now,
+      }).eq('id', enquiryId);
+    } catch (_) {}
+
+    return {
+      'success': true,
+      'dispatched_count': targetProviders.length,
+      'notified_count': notifiedCount,
+      'summary': dispatchSummary,
+    };
   }
 
   Future<bool> replyToEnquiry({

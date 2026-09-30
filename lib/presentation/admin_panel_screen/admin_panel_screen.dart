@@ -395,9 +395,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 Navigator.pushNamed(context, AppRoutes.adminOrderManagementScreen),
           ),
           _buildSettingsTile(
-            icon: Icons.contact_mail_rounded,
-            title: 'Enquiries & Quotations',
-            subtitle: 'Monitor all customer leads, enquiries, partner replies & quotes',
+            icon: Icons.assignment_turned_in_rounded,
+            title: 'Service Requests & Quotations',
+            subtitle: 'Track customer requests, dispatch to area providers & monitor replies',
             color: const Color(0xFF1E88E5),
             onTap: () => Navigator.push(
               context,
@@ -567,9 +567,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             ),
           ),
           _buildSettingsTile(
-            icon: Icons.request_quote_rounded,
-            title: 'Quotation Monitoring',
-            subtitle: 'Monitor all enquiries, quotations & analytics',
+            icon: Icons.assignment_turned_in_rounded,
+            title: 'Service Requests & Quotations',
+            subtitle: 'Track customer requests, dispatch to area providers & monitor replies',
             color: const Color(0xFF7B1FA2),
             onTap: () => Navigator.push(
               context,

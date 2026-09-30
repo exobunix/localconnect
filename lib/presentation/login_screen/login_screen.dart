@@ -435,7 +435,9 @@ class _LoginScreenState extends State<LoginScreen>
       if (_rememberMe) await _saveRememberMe(true);
 
       if (mounted) _navigateByRole();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('GOOGLE_SIGN_IN_ERROR: $e');
+      debugPrintStack(stackTrace: stackTrace);
       if (e.toString().contains('USER_NOT_REGISTERED')) {
         if (mounted) {
           setState(() {
@@ -458,16 +460,15 @@ class _LoginScreenState extends State<LoginScreen>
         final errStr = e.toString();
         String displayError = 'Google Sign-In failed. Please try again.';
         if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
-          // ApiException 10 can occur if the Google Services JSON client_id or
-          // SHA-1 fingerprint isn't propagated yet. Ask the user to retry; the
-          // dev should verify google-services.json has the correct client_ids.
-          displayError = 'Google Sign-In is temporarily unavailable. Please try again or use email & password.';
+          displayError = kDebugMode
+              ? 'Google Sign-In setup error (ApiException 10): Ensure SHA-1 & Web Client ID match Google Cloud / Firebase Console. Detail: $e'
+              : 'Google Sign-In configuration error (Code 10). Please verify Google Cloud SHA-1 and OAuth client settings.';
         } else if (errStr.contains('network') || errStr.contains('SocketException')) {
           displayError = 'Network error. Please check your internet connection.';
         } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
           displayError = 'Google Sign-In was cancelled.';
         } else {
-          displayError = 'Google Sign-In failed. Please try again.';
+          displayError = kDebugMode ? 'Google Sign-In error: $e' : 'Google Sign-In failed. Please try again.';
         }
         setState(() {
           _errorMessage = displayError;

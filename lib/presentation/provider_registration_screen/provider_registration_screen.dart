@@ -766,7 +766,9 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
           });
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('GOOGLE_SIGN_IN_ERROR: $e');
+      debugPrintStack(stackTrace: stackTrace);
       if (mounted) {
         setState(() {
           _isGoogleLoading = false;
@@ -915,24 +917,6 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
                     ),
                   ),
                   SizedBox(height: 1.5.h),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider(color: Color(0xFFCBD5E1))),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 2.w),
-                        child: Text(
-                          'OR FILL MANUALLY',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 8.5.sp,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF94A3B8),
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                      const Expanded(child: Divider(color: Color(0xFFCBD5E1))),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -952,10 +936,26 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
           SizedBox(height: 2.h),
           _buildTextField(
             controller: _emailController,
-            label: 'Email Address *',
-            hint: 'business@example.com',
+            label: 'Email Address (Google Account) *',
+            hint: 'Connect Google account to set email',
             icon: Icons.email_rounded,
+            readOnly: true,
             keyboardType: TextInputType.emailAddress,
+            onTap: () {
+              if (currentU == null || _emailController.text.trim().isEmpty) {
+                _handleGoogleSignIn();
+              }
+            },
+            suffixIcon: _emailController.text.trim().isNotEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Icon(Icons.verified_user_rounded, color: Color(0xFF2E7D32), size: 18),
+                  )
+                : TextButton.icon(
+                    onPressed: _isGoogleLoading ? null : _handleGoogleSignIn,
+                    icon: const Icon(Icons.account_circle_outlined, size: 16),
+                    label: const Text('Connect', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
           ),
           if (currentU == null) ...[
             SizedBox(height: 2.h),
@@ -2151,6 +2151,8 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     bool obscureText = false,
+    bool readOnly = false,
+    VoidCallback? onTap,
     Widget? suffixIcon,
     int maxLines = 1,
   }) {
@@ -2168,6 +2170,8 @@ class _ProviderRegistrationScreenState extends State<ProviderRegistrationScreen>
         SizedBox(height: 0.8.h),
         TextFormField(
           controller: controller,
+          readOnly: readOnly,
+          onTap: onTap,
           keyboardType: keyboardType,
           obscureText: obscureText,
           maxLines: maxLines,

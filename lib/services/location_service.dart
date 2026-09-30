@@ -172,7 +172,9 @@ class LocationService {
   Future<bool> requestPermission() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled && !kIsWeb) return false;
+      if (!serviceEnabled && !kIsWeb) {
+        debugPrint('[LocationService] Location service disabled, checking permissions anyway.');
+      }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -187,11 +189,21 @@ class LocationService {
   }
 
   Future<Position?> getCurrentPosition({
-    Duration timeout = const Duration(seconds: 8),
+    Duration timeout = const Duration(seconds: 12),
   }) async {
+    Position? lastKnown;
+    try {
+      // 1. Grab last known position immediately as instant fallback
+      lastKnown = await Geolocator.getLastKnownPosition();
+    } catch (_) {}
+
     try {
       final granted = await requestPermission();
-      if (!granted) return null;
+      if (!granted) {
+        return lastKnown;
+      }
+
+      // 2. Fetch fresh GPS position with medium accuracy
       return await Geolocator.getCurrentPosition(
         locationSettings: LocationSettings(
           accuracy: LocationAccuracy.medium,
@@ -199,14 +211,27 @@ class LocationService {
         ),
       );
     } catch (e) {
-      debugPrint('[LocationService] getCurrentPosition error: $e');
-      return null;
+      debugPrint('[LocationService] getCurrentPosition timeout/fail: $e; falling back to lastKnown: $lastKnown');
+      if (lastKnown != null) return lastKnown;
+
+      // 3. Fallback: lowest accuracy (network/cell tower)
+      try {
+        return await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.low,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+      } catch (_) {
+        return null;
+      }
     }
   }
 
-  // ─── Reverse Geocoding (Nominatim - free, no key required) ───────────────
+  // ─── Reverse Geocoding (Nominatim + BigDataCloud Fallback) ────────────────
 
   Future<LocationData?> reverseGeocode(double lat, double lng) async {
+    // 1. Primary: Nominatim OpenStreetMap
     try {
       final response = await _dio.get(
         'https://nominatim.openstreetmap.org/reverse',
@@ -216,9 +241,13 @@ class LocationService {
           'format': 'json',
           'addressdetails': 1,
         },
-        options: Options(headers: {'User-Agent': 'LocalConnect/1.0'}),
+        options: Options(
+          headers: {'User-Agent': 'LocalConnectApp/2.0 (contact@localconnect.app)'},
+          sendTimeout: const Duration(seconds: 6),
+          receiveTimeout: const Duration(seconds: 6),
+        ),
       );
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
         final data = response.data as Map<String, dynamic>;
         final addr = data['address'] as Map<String, dynamic>? ?? {};
         final displayName = data['display_name'] as String? ?? '';
@@ -249,13 +278,59 @@ class LocationService {
         final state = addr['state'] as String? ?? 'Maharashtra';
         final pincode = addr['postcode'] as String? ?? '';
 
+        if (city.isNotEmpty || district.isNotEmpty || village.isNotEmpty) {
+          return LocationData(
+            latitude: lat,
+            longitude: lng,
+            fullAddress: displayName,
+            village: village,
+            city: city,
+            taluka: taluka,
+            district: district,
+            state: state,
+            pincode: pincode,
+            method: 'gps',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[LocationService] Nominatim reverse geocode note: $e');
+    }
+
+    // 2. Secondary: BigDataCloud Reverse Geocoding API (free client-side API, fast & reliable)
+    try {
+      final bdcRes = await _dio.get(
+        'https://api.bigdatacloud.net/data/reverse-geocode-client',
+        queryParameters: {
+          'latitude': lat,
+          'longitude': lng,
+          'localityLanguage': 'en',
+        },
+        options: Options(
+          sendTimeout: const Duration(seconds: 6),
+          receiveTimeout: const Duration(seconds: 6),
+        ),
+      );
+      if (bdcRes.statusCode == 200 && bdcRes.data is Map<String, dynamic>) {
+        final data = bdcRes.data as Map<String, dynamic>;
+        final city = (data['city'] as String? ?? '').isNotEmpty
+            ? (data['city'] as String)
+            : (data['locality'] as String? ?? '');
+        final district = data['principalSubdivision'] as String? ?? '';
+        final state = data['principalSubdivision'] as String? ?? 'Maharashtra';
+        final pincode = data['postcode'] as String? ?? '';
+        final locality = data['locality'] as String? ?? '';
+
+        final fullAddr = [locality, city, district, state]
+            .where((s) => s.isNotEmpty)
+            .join(', ');
+
         return LocationData(
           latitude: lat,
           longitude: lng,
-          fullAddress: displayName,
-          village: village,
+          fullAddress: fullAddr.isNotEmpty ? fullAddr : '$lat, $lng',
+          village: locality,
           city: city,
-          taluka: taluka,
           district: district,
           state: state,
           pincode: pincode,
@@ -263,15 +338,16 @@ class LocationService {
         );
       }
     } catch (e) {
-      debugPrint('Reverse geocode error: $e');
+      debugPrint('[LocationService] BigDataCloud reverse geocode note: $e');
     }
+
     return null;
   }
 
   // ─── GPS Location ─────────────────────────────────────────────────────────
 
   Future<LocationData?> getGpsLocation({
-    Duration timeout = const Duration(seconds: 8),
+    Duration timeout = const Duration(seconds: 12),
   }) async {
     final pos = await getCurrentPosition(timeout: timeout);
     if (pos == null) {

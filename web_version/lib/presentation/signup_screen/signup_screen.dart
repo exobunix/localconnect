@@ -30,22 +30,11 @@ class _SignupScreenState extends State<SignupScreen>
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
 
-  bool _obscurePassword = true;
-  bool _obscureConfirm = true;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
   bool _isGoogleEmailLocked = false;
   String? _errorMessage;
-
-  // Password strength indicators
-  bool _hasMinLength = false;
-  bool _hasUppercase = false;
-  bool _hasLowercase = false;
-  bool _hasNumber = false;
-  bool _hasSpecial = false;
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -89,36 +78,21 @@ class _SignupScreenState extends State<SignupScreen>
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
   }
-
-  void _onPasswordChanged(String value) {
-    setState(() {
-      _hasMinLength = value.length >= 8;
-      _hasUppercase = value.contains(RegExp(r'[A-Z]'));
-      _hasLowercase = value.contains(RegExp(r'[a-z]'));
-      _hasNumber = value.contains(RegExp(r'[0-9]'));
-      _hasSpecial = value.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\\/]'));
-    });
-  }
-
-  bool get _isPasswordStrong =>
-      _hasMinLength &&
-      _hasUppercase &&
-      _hasLowercase &&
-      _hasNumber &&
-      _hasSpecial;
 
   Future<void> _handleCustomerRegistration() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
-    final password = _passwordController.text.trim();
-    final confirm = _confirmPasswordController.text.trim();
 
     // 1. Validation
+    if (!_isGoogleEmailLocked || email.isEmpty) {
+      setState(() => _errorMessage = 'Please connect your Google account to set and verify your email.');
+      await _handleGoogleSignIn();
+      return;
+    }
+
     if (name.isEmpty) {
       setState(() => _errorMessage = 'Please enter your full name.');
       return;
@@ -128,46 +102,9 @@ class _SignupScreenState extends State<SignupScreen>
       return;
     }
 
-    // Strict Email Format Validation
-    final emailRegex = RegExp(
-      r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$",
-    );
-    final emailParts = email.split('@');
-    final hasValidDomain = emailParts.length == 2 &&
-        emailParts[1].contains('.') &&
-        emailParts[1].split('.').last.length >= 2;
-
-    if (email.isEmpty || !emailRegex.hasMatch(email) || !hasValidDomain) {
-      setState(() => _errorMessage =
-          'Please enter a valid, complete email address (e.g. name@gmail.com) or sign up with Google.');
-      return;
-    }
-
-    // Reject dummy/fake email domains
-    final domain = emailParts[1].toLowerCase();
-    if (domain == 'test.com' ||
-        domain == 'dummy.com' ||
-        domain == 'fake.com' ||
-        domain == 'example.com') {
-      setState(() => _errorMessage =
-          'Please use your real email address or continue with Google Sign-In.');
-      return;
-    }
-
     if (phone.isEmpty || phone.length != 10) {
       setState(() => _errorMessage = 'Please enter a valid 10-digit mobile number.');
       return;
-    }
-
-    if (!_isGoogleEmailLocked) {
-      if (!_isPasswordStrong) {
-        setState(() => _errorMessage = 'Password must meet all security requirements.');
-        return;
-      }
-      if (password != confirm) {
-        setState(() => _errorMessage = 'Passwords do not match.');
-        return;
-      }
     }
 
     setState(() {
@@ -217,6 +154,7 @@ class _SignupScreenState extends State<SignupScreen>
                 'email': currentUser.email ?? email,
                 'ownerName': name,
                 'phone': phone,
+                'isGoogleAuth': true,
               },
             );
           } else {
@@ -228,90 +166,10 @@ class _SignupScreenState extends State<SignupScreen>
           }
         }
         return;
-      }
-
-      // 3. Normal signup with email & password
-      try {
-        final authResponse = await SupabaseService.instance.signUpWithEmail(
-          email: email,
-          password: password,
-          fullName: name,
-          phone: phone,
-          role: targetRole,
-        );
-
-        final newUserId = authResponse.user?.id;
-        if (newUserId != null) {
-          await SupabaseService.instance.upsertUserProfile(
-            userId: newUserId,
-            email: email,
-            fullName: name,
-            phone: phone,
-            role: targetRole,
-            city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
-          );
-        }
-
-        if (authResponse.session == null) {
-          try {
-            await SupabaseService.instance.signInWithEmail(
-              email: email,
-              password: password,
-            );
-          } catch (_) {}
-        }
-      } on AuthException catch (signUpErr) {
-        // If email already exists in auth, allow linking the second role (customer or provider)
-        if (signUpErr.message.contains('User already registered') ||
-            signUpErr.message.contains('already exists')) {
-          try {
-            final signInRes = await SupabaseService.instance.signInWithEmail(
-              email: email,
-              password: password,
-            );
-            final existingUid = signInRes.user?.id;
-            if (existingUid != null) {
-              await SupabaseService.instance.upsertUserProfile(
-                userId: existingUid,
-                email: email,
-                fullName: name,
-                phone: phone,
-                role: targetRole,
-                city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
-              );
-            }
-          } catch (_) {
-            setState(() {
-              _errorMessage =
-                  'An account with this email already exists. You can log in directly as a $targetRole from the Login screen, or continue with Google.';
-              _isLoading = false;
-            });
-            return;
-          }
-        } else {
-          rethrow;
-        }
-      }
-
-      if (mounted) {
-        if (_selectedRole == 1) {
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            AppRoutes.providerRegistrationScreen,
-            (route) => false,
-            arguments: {
-              'email': email,
-              'ownerName': name,
-              'phone': phone,
-            },
-          );
-        } else {
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            AppRoutes.homeScreen,
-            (route) => false,
-          );
-        }
+      } else {
+        // If session was lost, trigger Google sign-in again
+        await _handleGoogleSignIn();
+        return;
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -381,47 +239,79 @@ class _SignupScreenState extends State<SignupScreen>
       if (!mounted) return;
 
       final user = SupabaseService.instance.currentUser;
+      final targetRole = _selectedRole == 0 ? 'customer' : 'provider';
+      final email = user?.email ?? googleUser.email;
+      final name = user?.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '';
+
+      // Check if existing profile has phone number already
+      Map<String, dynamic>? existingProfile;
       if (user != null) {
-        final targetRole = _selectedRole == 0 ? 'customer' : 'provider';
-
-        await SupabaseService.instance.upsertUserProfile(
-          userId: user.id,
-          email: user.email ?? googleUser.email,
-          fullName: user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '',
-          role: targetRole,
-          city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
-        );
-
-        if (!mounted) return;
-
-        if (targetRole == 'provider') {
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            AppRoutes.providerRegistrationScreen,
-            (route) => false,
-            arguments: {
-              'email': user.email ?? googleUser.email,
-              'ownerName': user.userMetadata?['full_name'] as String? ?? googleUser.displayName ?? '',
-              'isGoogleAuth': true,
-            },
-          );
-        } else {
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            AppRoutes.homeScreen,
-            (route) => false,
-          );
-        }
-        return;
+        existingProfile = await SupabaseService.instance.getUserProfile(user.id);
       }
-    } catch (e) {
+
+      final existingPhone = existingProfile?['phone'] as String?;
+
+      if (mounted) {
+        setState(() {
+          _emailController.text = email;
+          if (_nameController.text.trim().isEmpty && name.isNotEmpty) {
+            _nameController.text = name;
+          }
+          if (existingPhone != null && existingPhone.isNotEmpty && _phoneController.text.trim().isEmpty) {
+            _phoneController.text = existingPhone.replaceAll(RegExp(r'\D'), '');
+          }
+          _isGoogleEmailLocked = true;
+          _isGoogleLoading = false;
+        });
+
+        // If phone is already present and valid, finish registration immediately
+        if (_phoneController.text.trim().length == 10 && user != null) {
+          await SupabaseService.instance.upsertUserProfile(
+            userId: user.id,
+            email: email,
+            fullName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : name,
+            phone: _phoneController.text.trim(),
+            role: targetRole,
+            city: SupabaseService.instance.selectedCity.isNotEmpty ? SupabaseService.instance.selectedCity : '',
+          );
+
+          if (!mounted) return;
+
+          if (targetRole == 'provider') {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.providerRegistrationScreen,
+              (route) => false,
+              arguments: {
+                'email': email,
+                'ownerName': _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : name,
+                'phone': _phoneController.text.trim(),
+                'isGoogleAuth': true,
+              },
+            );
+          } else {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.homeScreen,
+              (route) => false,
+            );
+          }
+        }
+      }
+    } catch (e, stackTrace) {
+      debugPrint('GOOGLE_SIGN_IN_ERROR: $e');
+      debugPrintStack(stackTrace: stackTrace);
       if (mounted) {
         final errStr = e.toString();
-        String displayError = 'Google Sign-In failed: $e';
+        String displayError = 'Google Sign-In failed. Please try again.';
         if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
-          displayError = 'Google Sign-In setup issue: App SHA-1 fingerprint is not configured in Google Cloud Console.';
+          displayError = kDebugMode
+              ? 'Google Sign-In setup error (ApiException 10): Ensure SHA-1 & Web Client ID match Google Cloud / Firebase Console. Detail: $e'
+              : 'Google Sign-In configuration error (Code 10). Please verify Google Cloud SHA-1 and OAuth client settings.';
         } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
           displayError = 'Google Sign-In was cancelled.';
+        } else {
+          displayError = kDebugMode ? 'Google Sign-In error: $e' : 'Google Sign-In failed. Please try again.';
         }
         setState(() {
           _isGoogleLoading = false;
@@ -464,8 +354,6 @@ class _SignupScreenState extends State<SignupScreen>
             SizedBox(height: 1.5.h),
           ],
           _buildGoogleButton(),
-          SizedBox(height: 2.h),
-          _buildOrDivider(),
           SizedBox(height: 2.h),
           _buildSignupForm(),
           SizedBox(height: 2.5.h),
@@ -629,9 +517,9 @@ class _SignupScreenState extends State<SignupScreen>
             subtitle: 'Manage your business',
             isSelected: _selectedRole == 1,
             color: const Color(0xFFE65100),
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.providerRegistrationScreen);
-            },
+            // Select the provider role in-form; the actual provider
+            // registration screen is opened after successful signup.
+            onTap: () => setState(() => _selectedRole = 1),
           ),
         ),
       ],
@@ -691,23 +579,78 @@ class _SignupScreenState extends State<SignupScreen>
           ),
           const SizedBox(height: 14),
 
-          // Email Address
-          _buildFieldLabel('Email Address'),
+          // Email Address (Exclusively set via Google Account - Never manual)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildFieldLabel('Email Address (Google Verified)'),
+              if (_isGoogleEmailLocked && _emailController.text.trim().isNotEmpty)
+                GestureDetector(
+                  onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
+                  child: Text(
+                    'Change Google Account',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 8.5.sp,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1E3A8A),
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 6),
-          TextFormField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            readOnly: _isGoogleEmailLocked,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              color: _isGoogleEmailLocked ? const Color(0xFF44474E) : const Color(0xFF1A1C1E),
-            ),
-            decoration: _inputDecoration(
-              hint: 'Enter your email',
-              icon: Icons.email_outlined,
-              suffixIcon: _isGoogleEmailLocked
-                  ? const Icon(Icons.verified_user_rounded, color: Color(0xFF2E7D32), size: 18)
-                  : null,
+          InkWell(
+            onTap: _isGoogleLoading
+                ? null
+                : () {
+                    if (!_isGoogleEmailLocked || _emailController.text.trim().isEmpty) {
+                      _handleGoogleSignIn();
+                    }
+                  },
+            borderRadius: BorderRadius.circular(12),
+            child: IgnorePointer(
+              ignoring: true,
+              child: TextFormField(
+                controller: _emailController,
+                readOnly: true,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: _isGoogleEmailLocked ? FontWeight.w600 : FontWeight.w400,
+                  color: _isGoogleEmailLocked ? const Color(0xFF1A1C1E) : const Color(0xFF94A3B8),
+                ),
+                decoration: _inputDecoration(
+                  hint: 'Connect Google account to set email',
+                  icon: Icons.email_outlined,
+                  suffixIcon: _isGoogleEmailLocked && _emailController.text.trim().isNotEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.verified_user_rounded, color: Color(0xFF2E7D32), size: 18),
+                              SizedBox(width: 4),
+                              Text(
+                                'Verified',
+                                style: TextStyle(
+                                  color: Color(0xFF2E7D32),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : TextButton.icon(
+                          onPressed: _isGoogleLoading ? null : _handleGoogleSignIn,
+                          icon: const Icon(Icons.account_circle_outlined, size: 16, color: Color(0xFF1E3A8A)),
+                          label: const Text(
+                            'Connect',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A)),
+                          ),
+                        ),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -729,67 +672,14 @@ class _SignupScreenState extends State<SignupScreen>
               prefixText: '+91 ',
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 20),
 
-          if (!_isGoogleEmailLocked) ...[
-            // Password
-            _buildFieldLabel('Password'),
-            const SizedBox(height: 6),
-            TextFormField(
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              onChanged: _onPasswordChanged,
-              style: GoogleFonts.plusJakartaSans(fontSize: 14),
-              decoration: _inputDecoration(
-                hint: 'Create password',
-                icon: Icons.lock_outline_rounded,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                    color: const Color(0xFF90A4AE),
-                    size: 20,
-                  ),
-                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Password Strength Indicators
-            _buildStrengthBox(),
-            const SizedBox(height: 14),
-
-            // Confirm Password
-            _buildFieldLabel('Confirm Password'),
-            const SizedBox(height: 6),
-            TextFormField(
-              controller: _confirmPasswordController,
-              obscureText: _obscureConfirm,
-              style: GoogleFonts.plusJakartaSans(fontSize: 14),
-              decoration: _inputDecoration(
-                hint: 'Confirm password',
-                icon: Icons.lock_outline_rounded,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                    color: const Color(0xFF90A4AE),
-                    size: 20,
-                  ),
-                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ] else ...[
-            const SizedBox(height: 10),
-          ],
-
-          // Create Account Button
+          // Create / Complete Account Button
           SizedBox(
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: _isLoading ? null : _handleCustomerRegistration,
+              onPressed: _isLoading || _isGoogleLoading ? null : _handleCustomerRegistration,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
@@ -870,49 +760,7 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildStrengthBox() {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _strengthItem('At least 8 characters', _hasMinLength),
-          _strengthItem('One uppercase & lowercase letter', _hasUppercase && _hasLowercase),
-          _strengthItem('One number (0-9)', _hasNumber),
-          _strengthItem('One special character (!@#\$...)', _hasSpecial),
-        ],
-      ),
-    );
-  }
 
-  Widget _strengthItem(String label, bool met) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(
-            met ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-            size: 14,
-            color: met ? const Color(0xFF2E7D32) : const Color(0xFFBDBDBD),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 8.5.sp,
-              color: met ? const Color(0xFF2E7D32) : const Color(0xFF74777F),
-              fontWeight: met ? FontWeight.w600 : FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildErrorBox(String message) {
     return Container(
@@ -941,39 +789,23 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
-  Widget _buildOrDivider() {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 3.w),
-          child: Text(
-            'or register with real email',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 9.sp,
-              color: const Color(0xFF90A4AE),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
-      ],
-    );
-  }
-
   Widget _buildGoogleButton() {
+    final isConnected = _isGoogleEmailLocked && _emailController.text.trim().isNotEmpty;
     return GestureDetector(
       onTap: _isGoogleLoading ? null : _handleGoogleSignIn,
       child: Container(
         width: double.infinity,
         padding: EdgeInsets.symmetric(vertical: 1.2.h, horizontal: 3.w),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          color: isConnected ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(14.0),
-          border: Border.all(color: const Color(0xFF4285F4), width: 1.5),
+          border: Border.all(
+            color: isConnected ? const Color(0xFF22C55E) : const Color(0xFF4285F4),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4285F4).withValues(alpha: 0.10),
+              color: (isConnected ? const Color(0xFF22C55E) : const Color(0xFF4285F4)).withValues(alpha: 0.10),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -989,18 +821,20 @@ class _SignupScreenState extends State<SignupScreen>
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.g_mobiledata_rounded,
-                      size: 32,
-                      color: Color(0xFF4285F4),
+                    Icon(
+                      isConnected ? Icons.check_circle_rounded : Icons.g_mobiledata_rounded,
+                      size: isConnected ? 24 : 32,
+                      color: isConnected ? const Color(0xFF16A34A) : const Color(0xFF4285F4),
                     ),
-                    SizedBox(width: 1.w),
+                    SizedBox(width: 2.w),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Sign Up with Google (Recommended)',
+                          isConnected
+                              ? 'Google Account Connected'
+                              : 'Continue with Google (Required)',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 11.sp,
                             fontWeight: FontWeight.w700,
@@ -1008,10 +842,13 @@ class _SignupScreenState extends State<SignupScreen>
                           ),
                         ),
                         Text(
-                          'Instant & verified account with Google',
+                          isConnected
+                              ? '${_emailController.text.trim()} (Tap to switch)'
+                              : 'Auto-fill verified email with Google',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 8.5.sp,
-                            color: const Color(0xFF64748B),
+                            color: isConnected ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                            fontWeight: isConnected ? FontWeight.w600 : FontWeight.w400,
                           ),
                         ),
                       ],

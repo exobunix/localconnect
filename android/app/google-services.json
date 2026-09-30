@@ -22,14 +22,6 @@
           }
         },
         {
-          "client_id": "1053905240243-release.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.avdar.localconnect",
-            "certificate_hash": "a21e345544da1f9895a126c91d88fbe361448737"
-          }
-        },
-        {
           "client_id": "1053905240243-0olgtcdiieuu55s4qnm7792gg8fkndjr.apps.googleusercontent.com",
           "client_type": 3
         },
@@ -39,14 +31,6 @@
           "android_info": {
             "package_name": "com.avdar.localconnect",
             "certificate_hash": "545df2a5063126ca4761e29bb8b9931dfbc513f5"
-          }
-        },
-        {
-          "client_id": "78703580798-release.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.avdar.localconnect",
-            "certificate_hash": "a21e345544da1f9895a126c91d88fbe361448737"
           }
         },
         {

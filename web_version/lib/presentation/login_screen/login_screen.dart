@@ -429,7 +429,9 @@ class _LoginScreenState extends State<LoginScreen>
       if (_rememberMe) await _saveRememberMe(true);
 
       if (mounted) _navigateByRole();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('GOOGLE_SIGN_IN_ERROR: $e');
+      debugPrintStack(stackTrace: stackTrace);
       if (e.toString().contains('USER_NOT_REGISTERED')) {
         if (mounted) {
           setState(() {
@@ -452,13 +454,15 @@ class _LoginScreenState extends State<LoginScreen>
         final errStr = e.toString();
         String displayError = 'Google Sign-In failed. Please try again.';
         if (errStr.contains('ApiException: 10') || errStr.contains('10:')) {
-          displayError = 'Google Sign-In setup issue: App SHA-1 fingerprint is not configured in Google Cloud Console.';
+          displayError = kDebugMode
+              ? 'Google Sign-In setup error (ApiException 10): Ensure SHA-1 & Web Client ID match Google Cloud / Firebase Console. Detail: $e'
+              : 'Google Sign-In configuration error (Code 10). Please verify Google Cloud SHA-1 and OAuth client settings.';
         } else if (errStr.contains('network') || errStr.contains('SocketException')) {
           displayError = 'Network error. Please check your internet connection.';
         } else if (errStr.contains('sign_in_canceled') || errStr.contains('canceled')) {
           displayError = 'Google Sign-In was cancelled.';
         } else {
-          displayError = 'Google Sign-In failed: $e';
+          displayError = kDebugMode ? 'Google Sign-In error: $e' : 'Google Sign-In failed. Please try again.';
         }
         setState(() {
           _errorMessage = displayError;
