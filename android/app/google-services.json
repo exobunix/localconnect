@@ -38,6 +38,14 @@
           }
         },
         {
+          "client_id": "78703580798-vogein0ehcomsokq8ek7ib922fajf3hj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avdar.localconnect",
+            "certificate_hash": "8f7fd6527e4150c4fddc88c0b94dc61c1c1a4349"
+          }
+        },
+        {
           "client_id": "78703580798-ga1vsmbjl90te533l9imt84ub1l12p4d.apps.googleusercontent.com",
           "client_type": 3
         }
