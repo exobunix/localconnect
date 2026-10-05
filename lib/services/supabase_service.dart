@@ -651,6 +651,8 @@ class SupabaseService {
     String? category,
     String? city,
     int limit = 20,
+    String? orderBy,
+    bool ascending = false,
   }) async {
     try {
       var query = client
@@ -662,12 +664,14 @@ class SupabaseService {
         query = query.eq('category', category);
       }
       if (city != null && city.isNotEmpty) {
-        query = query.eq('city', city);
+        query = query.ilike('city', '%$city%');
       }
 
-      final response = await query
-          .order('rating', ascending: false)
-          .limit(limit);
+      final orderedQuery = (orderBy != null)
+          ? query.order(orderBy, ascending: ascending)
+          : query.order('rating', ascending: false);
+
+      final response = await orderedQuery.limit(limit);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
@@ -2101,34 +2105,24 @@ class SupabaseService {
     String nameMarathi = '',
     String imageUrl = '',
     String description = '',
+    String iconName = 'category',
     bool isActive = true,
     int sortOrder = 99,
   }) async {
-    try {
-      await client.rpc('admin_upsert_subcategory', params: {
-        'p_id': id,
-        'p_category_id': categoryId,
-        'p_name': name,
-        'p_name_marathi': nameMarathi,
-        'p_is_active': isActive,
-        'p_description': description,
-        'p_image_url': imageUrl,
-        'p_sort_order': sortOrder,
-      });
-      return;
-    } catch (_) {}
-
-    // 1. Attempt standard upsert with all subcategory attributes (no updated_at since column does not exist)
+    final now = DateTime.now().toIso8601String();
+    // 1. Direct upsert with full fields
     try {
       await client.from('subcategories').upsert({
         'id': id,
         'category_id': categoryId,
         'name': name,
         'name_marathi': nameMarathi,
+        'icon_name': iconName,
         'image_url': imageUrl,
         'description': description,
         'is_active': isActive,
         'sort_order': sortOrder,
+        'updated_at': now,
       }, onConflict: 'id');
       return;
     } catch (e) {
@@ -2142,6 +2136,7 @@ class SupabaseService {
         'category_id': categoryId,
         'name': name,
         'name_marathi': nameMarathi,
+        'icon_name': iconName,
         'is_active': isActive,
         'sort_order': sortOrder,
       }, onConflict: 'id');
@@ -2157,14 +2152,18 @@ class SupabaseService {
     String nameMarathi = '',
     String imageUrl = '',
     String description = '',
+    String? iconName,
     bool? isActive,
     int? sortOrder,
   }) async {
+    final now = DateTime.now().toIso8601String();
     final updates = <String, dynamic>{
       'name': name,
       'name_marathi': nameMarathi,
       'image_url': imageUrl,
       'description': description,
+      'updated_at': now,
+      if (iconName != null && iconName.isNotEmpty) 'icon_name': iconName,
       if (isActive != null) 'is_active': isActive,
       if (sortOrder != null) 'sort_order': sortOrder,
     };
@@ -2175,6 +2174,7 @@ class SupabaseService {
       await client.from('subcategories').update({
         'name': name,
         'name_marathi': nameMarathi,
+        if (iconName != null && iconName.isNotEmpty) 'icon_name': iconName,
         if (isActive != null) 'is_active': isActive,
         if (sortOrder != null) 'sort_order': sortOrder,
       }).eq('id', id);
@@ -3879,8 +3879,13 @@ class SupabaseService {
   }) async {
     final userId = currentUser?.id;
 
+    final effectiveTitle = title.isNotEmpty
+        ? title
+        : (subcategory.isNotEmpty ? '$subcategory Service' : 'Service Requirement');
+
     final data = <String, dynamic>{
-      'title': title,
+      'title': effectiveTitle,
+      'service_title': effectiveTitle,
       'description': description,
       'category': category,
       'subcategory': subcategory,
@@ -3896,7 +3901,39 @@ class SupabaseService {
       data['provider_id'] = providerId;
     }
 
-    await client.from('enquiries').insert(data);
+    String generatedEnquiryId =
+        'ENQ-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    try {
+      final res = await client.from('enquiries').insert(data).select('id').maybeSingle();
+      if (res != null && res['id'] != null) {
+        generatedEnquiryId = res['id'].toString();
+      }
+    } catch (e) {
+      debugPrint('[SupabaseService] sendEnquiry insert note: $e');
+    }
+
+    // Trigger instant notification & continuous alert to provider
+    try {
+      String customerName = 'Customer';
+      String customerPhone = '';
+      if (userId != null) {
+        final profile = await getUserProfile(userId);
+        customerName = profile?['full_name'] as String? ?? 'Customer';
+        customerPhone = profile?['phone'] as String? ?? '';
+      }
+      await NotificationService.instance.notifyEnquirySubmitted(
+        enquiryId: generatedEnquiryId,
+        subcategory: subcategory.isNotEmpty ? subcategory : category,
+        customerId: userId ?? '',
+        customerName: customerName,
+        customerPhone: customerPhone,
+        providerId: providerId,
+        providerName: 'Service Provider',
+        message: description,
+      );
+    } catch (notifErr) {
+      debugPrint('[SupabaseService] sendEnquiry notification dispatch note: $notifErr');
+    }
   }
 
   Future<List<Map<String, dynamic>>> getCustomerEnquiries() async {

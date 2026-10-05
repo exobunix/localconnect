@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -78,6 +79,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   List<Map<String, dynamic>> _providerReviews = [];
   bool _isLoadingReviews = false;
 
+  Timer? _dashboardPollingTimer;
+
   @override
   void initState() {
     super.initState();
@@ -87,6 +90,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
   @override
   void dispose() {
+    _dashboardPollingTimer?.cancel();
     _tabController.dispose();
     _ordersChannel?.unsubscribe();
     super.dispose();
@@ -107,9 +111,21 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         return;
       }
       _providerProfile = provider;
-      await _loadOrders(provider['id'] as String);
+      final providerIdStr = provider['id'] as String;
+      NotificationService.instance.setProviderId(providerIdStr);
+      await _loadOrders(providerIdStr);
       await _loadQuotationCounts();
-      _subscribeToOrders(provider['id'] as String);
+      _subscribeToOrders(providerIdStr);
+
+      // Start periodic poll (every 5 seconds) to ensure real-time responsiveness
+      _dashboardPollingTimer?.cancel();
+      _dashboardPollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (mounted && _providerProfile != null) {
+          _loadOrders(providerIdStr);
+          _loadQuotationCounts();
+        }
+      });
+
       // Load subscription status for dashboard card
       _loadSubscriptionStatus(provider['id'] as String);
       // Load customer reviews for dashboard visibility
@@ -501,6 +517,44 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             }
 
             _loadOrders(providerId);
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'enquiries',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'provider_id',
+            value: providerId,
+          ),
+          callback: (payload) {
+            if (!mounted) return;
+            final newRow = payload.newRecord;
+            final enquiryId = newRow['id']?.toString() ?? '';
+            final customerName = newRow['customer_name'] as String? ?? 'Customer';
+            final service = newRow['service_title'] as String? ?? newRow['subcategory'] as String? ?? 'Service';
+            final msg = newRow['message'] as String? ?? '';
+
+            NotificationService.instance.startContinuousBookingAlert(
+              title: '📩 New Customer Enquiry (#$enquiryId)',
+              body: '$customerName sent an enquiry for $service.',
+              enquiryId: enquiryId,
+              customerName: customerName,
+              serviceName: service,
+              isEnquiry: true,
+            );
+
+            NotificationService.instance.showLocalNotification(
+              id: enquiryId.hashCode,
+              title: '📩 New Customer Enquiry (#$enquiryId)',
+              body: '$customerName sent an enquiry for $service: "$msg"',
+              channelId: 'inquiry_notifications',
+              channelName: 'Customer Enquiries & Ringing Alerts',
+            );
+
+            _loadOrders(providerId);
+            _loadQuotationCounts();
           },
         )
         .subscribe((status, [error]) {
@@ -1210,7 +1264,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      extendBody: true,
+      // extendBody intentionally removed — the pill nav widget handles its own
+      // bottom inset via MediaQuery so content is never hidden behind it.
       body: Stack(
         children: [
           _isLoading

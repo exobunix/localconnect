@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -78,6 +79,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   List<Map<String, dynamic>> _providerReviews = [];
   bool _isLoadingReviews = false;
 
+  Timer? _dashboardPollingTimer;
+
   @override
   void initState() {
     super.initState();
@@ -87,6 +90,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
   @override
   void dispose() {
+    _dashboardPollingTimer?.cancel();
     _tabController.dispose();
     _ordersChannel?.unsubscribe();
     super.dispose();
@@ -112,6 +116,16 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       await _loadOrders(providerIdStr);
       await _loadQuotationCounts();
       _subscribeToOrders(providerIdStr);
+
+      // Start periodic poll (every 5 seconds) to ensure real-time responsiveness
+      _dashboardPollingTimer?.cancel();
+      _dashboardPollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (mounted && _providerProfile != null) {
+          _loadOrders(providerIdStr);
+          _loadQuotationCounts();
+        }
+      });
+
       // Load subscription status for dashboard card
       _loadSubscriptionStatus(provider['id'] as String);
       // Load customer reviews for dashboard visibility

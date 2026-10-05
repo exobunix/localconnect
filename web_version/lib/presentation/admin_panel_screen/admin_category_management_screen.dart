@@ -223,6 +223,49 @@ class _AdminCategoryManagementScreenState
     }
   }
 
+  void _showDeleteSubcategoryConfirmDialog(
+    BuildContext context,
+    Map<String, dynamic> sub,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Delete Subcategory',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to delete the subcategory "${sub['name']}"? This action cannot be undone.',
+          style: GoogleFonts.plusJakartaSans(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _deleteSubcategory(sub['id'] as String);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showDeleteCategoryConfirmDialog(
     BuildContext context,
     Map<String, dynamic> cat,
@@ -761,141 +804,123 @@ class _AdminCategoryManagementScreenState
                                               Wrap(
                                                 spacing: 8,
                                                 runSpacing: 8,
-                                                children: subcategories.map((
-                                                  sub,
-                                                ) {
-                                                  final s =
-                                                      sub
-                                                          as Map<
-                                                            String,
-                                                            dynamic
-                                                          >;
-                                                  final subActive =
-                                                      s['is_active'] as bool? ??
-                                                      true;
-                                                  return Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 10,
-                                                          vertical: 6,
-                                                        ),
-                                                    decoration: BoxDecoration(
-                                                      color: subActive
-                                                          ? AppTheme
-                                                                .surfaceVariant
-                                                          : Colors
-                                                                .grey
-                                                                .shade200,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            20,
-                                                          ),
-                                                      border: Border.all(
-                                                        color: subActive
-                                                            ? AppTheme
-                                                                  .outlineVariant
-                                                            : Colors
-                                                                  .grey
-                                                                  .shade400,
-                                                      ),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        Icon(
-                                                          Icons.label_rounded,
-                                                          size: 14,
-                                                          color: subActive
-                                                              ? AppTheme.primary
-                                                              : Colors.grey,
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 4,
-                                                        ),
-                                                        GestureDetector(
-                                                          onTap: () =>
-                                                              _showEditSubcategoryDialog(
-                                                                context,
-                                                                s,
-                                                              ),
-                                                          child: MouseRegion(
-                                                            cursor:
-                                                                SystemMouseCursors
-                                                                    .click,
-                                                            child: Text(
-                                                              s['name']
-                                                                      as String? ??
-                                                                  '',
-                                                              style: GoogleFonts.plusJakartaSans(
-                                                                fontSize: 11,
-                                                                fontWeight:
-                                                                    FontWeight.w600,
-                                                                color: subActive
-                                                                    ? null
-                                                                    : Colors
-                                                                        .grey,
-                                                                decoration: subActive
-                                                                    ? null
-                                                                    : TextDecoration
-                                                                        .lineThrough,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 4,
-                                                        ),
-                                                        // Toggle hide/unhide
-                                                        GestureDetector(
-                                                          onTap: () async {
-                                                            await SupabaseService
-                                                                .instance
-                                                                .adminToggleSubcategory(
-                                                                  id:
-                                                                      s['id']
-                                                                          as String,
-                                                                  isActive:
-                                                                      !subActive,
-                                                                );
-                                                            CategoryService
-                                                                .instance
-                                                                .invalidateCache();
-                                                            await _loadCategories();
-                                                          },
-                                                          child: Icon(
-                                                            subActive
-                                                                ? Icons
-                                                                      .visibility_rounded
-                                                                : Icons
-                                                                      .visibility_off_rounded,
-                                                            size: 14,
-                                                            color: subActive
-                                                                ? AppTheme
-                                                                      .primary
-                                                                : Colors.grey,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 4,
-                                                        ),
-                                                        GestureDetector(
-                                                          onTap: () =>
-                                                              _deleteSubcategory(
-                                                                s['id']
-                                                                    as String,
-                                                              ),
-                                                          child: const Icon(
-                                                            Icons.close_rounded,
-                                                            size: 14,
-                                                            color: AppTheme
-                                                                .outline,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                }).toList(),
+                                                 children: subcategories.map((
+                                                   sub,
+                                                 ) {
+                                                   final s =
+                                                       sub
+                                                           as Map<
+                                                             String,
+                                                             dynamic
+                                                           >;
+                                                   final subActive =
+                                                       s['is_active'] as bool? ??
+                                                       true;
+                                                   final iconName = s['icon_name'] as String? ?? '';
+                                                   final subIcon = CategoryService.iconFromName(iconName);
+                                                   final subSort = s['sort_order'] ?? 99;
+                                                   return Container(
+                                                     padding:
+                                                         const EdgeInsets.symmetric(
+                                                           horizontal: 10,
+                                                           vertical: 6,
+                                                         ),
+                                                     decoration: BoxDecoration(
+                                                       color: subActive
+                                                           ? AppTheme
+                                                                 .surfaceVariant
+                                                           : Colors
+                                                                 .grey
+                                                                 .shade200,
+                                                       borderRadius:
+                                                           BorderRadius.circular(
+                                                             20,
+                                                           ),
+                                                       border: Border.all(
+                                                         color: subActive
+                                                             ? AppTheme
+                                                                   .outlineVariant
+                                                             : Colors
+                                                                   .grey
+                                                                   .shade400,
+                                                       ),
+                                                     ),
+                                                     child: Row(
+                                                       mainAxisSize: MainAxisSize.min,
+                                                       children: [
+                                                         Icon(
+                                                           subIcon,
+                                                           size: 14,
+                                                           color: subActive
+                                                               ? AppTheme.primary
+                                                               : Colors.grey,
+                                                         ),
+                                                         const SizedBox(width: 6),
+                                                         GestureDetector(
+                                                           onTap: () =>
+                                                               _showEditSubcategoryDialog(
+                                                                 context,
+                                                                 s,
+                                                               ),
+                                                           child: MouseRegion(
+                                                             cursor: SystemMouseCursors.click,
+                                                             child: Text(
+                                                               s['name'] as String? ?? '',
+                                                               style: GoogleFonts.plusJakartaSans(
+                                                                 fontSize: 11,
+                                                                 fontWeight: FontWeight.w600,
+                                                                 color: subActive ? null : Colors.grey,
+                                                                 decoration: subActive ? null : TextDecoration.lineThrough,
+                                                               ),
+                                                             ),
+                                                           ),
+                                                         ),
+                                                         const SizedBox(width: 6),
+                                                         Container(
+                                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                           decoration: BoxDecoration(
+                                                             color: Colors.white,
+                                                             borderRadius: BorderRadius.circular(10),
+                                                             border: Border.all(color: Colors.black12),
+                                                           ),
+                                                           child: Text(
+                                                             '#$subSort',
+                                                             style: GoogleFonts.plusJakartaSans(
+                                                               fontSize: 9,
+                                                               fontWeight: FontWeight.bold,
+                                                               color: const Color(0xFF64748B),
+                                                             ),
+                                                           ),
+                                                         ),
+                                                         const SizedBox(width: 6),
+                                                         GestureDetector(
+                                                           onTap: () async {
+                                                             await SupabaseService.instance.adminToggleSubcategory(
+                                                               id: s['id'] as String,
+                                                               isActive: !subActive,
+                                                             );
+                                                             CategoryService.instance.invalidateCache();
+                                                             await _loadCategories();
+                                                           },
+                                                           child: Icon(
+                                                             subActive ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                                                             size: 14,
+                                                             color: subActive ? AppTheme.primary : Colors.grey,
+                                                           ),
+                                                         ),
+                                                         const SizedBox(width: 6),
+                                                         GestureDetector(
+                                                           onTap: () => _showDeleteSubcategoryConfirmDialog(context, s),
+                                                           child: const Icon(
+                                                             Icons.close_rounded,
+                                                             size: 14,
+                                                             color: Colors.redAccent,
+                                                           ),
+                                                         ),
+                                                       ],
+                                                     ),
+                                                   );
+                                                 }).toList(),
                                               ),
                                             ],
                                           ),
@@ -1211,6 +1236,31 @@ class _AdminCategoryManagementScreenState
     );
   }
 
+  static const List<Map<String, dynamic>> _commonSubcategoryIcons = [
+    {'name': 'plumbing', 'label': 'Plumbing'},
+    {'name': 'electrical_services', 'label': 'Electrical'},
+    {'name': 'cleaning_services', 'label': 'Cleaning'},
+    {'name': 'construction', 'label': 'Construction'},
+    {'name': 'carpenter', 'label': 'Carpenter'},
+    {'name': 'format_paint', 'label': 'Painting'},
+    {'name': 'build', 'label': 'Repair/Tools'},
+    {'name': 'home_repair_service', 'label': 'Home Service'},
+    {'name': 'local_taxi', 'label': 'Auto/Taxi'},
+    {'name': 'directions_car', 'label': 'Car/Taxi'},
+    {'name': 'local_shipping', 'label': 'Tempo/Truck'},
+    {'name': 'electric_rickshaw', 'label': 'E-Rickshaw'},
+    {'name': 'delivery_dining', 'label': 'Delivery'},
+    {'name': 'storefront', 'label': 'Store/Shop'},
+    {'name': 'shopping_basket', 'label': 'Grocery'},
+    {'name': 'fastfood', 'label': 'Food'},
+    {'name': 'camera_alt', 'label': 'Photography'},
+    {'name': 'celebration', 'label': 'Events'},
+    {'name': 'medication', 'label': 'Medical'},
+    {'name': 'spa', 'label': 'Beauty/Salon'},
+    {'name': 'home', 'label': 'Rent/Property'},
+    {'name': 'category', 'label': 'General'},
+  ];
+
   void _showAddSubcategoryDialog(
     BuildContext context,
     Map<String, dynamic> cat,
@@ -1219,121 +1269,200 @@ class _AdminCategoryManagementScreenState
     final marathiCtrl = TextEditingController();
     final imageCtrl = TextEditingController();
     final descCtrl = TextEditingController();
+    final sortCtrl = TextEditingController(text: '10');
+    String selectedIcon = 'category';
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Add Subcategory to ${cat['name']}',
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Subcategory Name (English)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: marathiCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Subcategory Name (Marathi)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: imageCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Photo/Image URL',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
-                    onPressed: () {
-                      final name = nameCtrl.text.trim();
-                      final folderId = name.isNotEmpty
-                          ? name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '')
-                          : 'temp';
-                      _pickAndUploadImage(imageCtrl, 'subcategories', folderId);
-                    },
-                    tooltip: 'Upload Photo',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  labelText: 'Description / Content',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameCtrl.text.trim().isNotEmpty) {
-                final name = nameCtrl.text.trim();
-                final marathi = marathiCtrl.text.trim();
-                final imageUrl = imageCtrl.text.trim();
-                final description = descCtrl.text.trim();
-                Navigator.pop(context);
-                try {
-                  final catId = cat['id'] as String;
-                  final rawSlug = name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '');
-                  final subId = '${catId}_${rawSlug.isNotEmpty ? rawSlug : DateTime.now().millisecondsSinceEpoch}';
-                  await SupabaseService.instance.adminAddSubcategory(
-                    categoryId: catId,
-                    id: subId,
-                    name: name,
-                    nameMarathi: marathi,
-                    imageUrl: imageUrl,
-                    description: description,
-                  );
-                  CategoryService.instance.invalidateCache();
-                  await _loadCategories();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Subcategory "$name" added to ${cat['name']}!'),
-                        backgroundColor: const Color(0xFF00C853),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error adding subcategory: $e'),
-                        backgroundColor: Colors.red.shade700,
-                      ),
-                    );
-                  }
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            child: Text(
-              'Add',
-              style: GoogleFonts.plusJakartaSans(color: Colors.white),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Add Subcategory to ${cat['name']}',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
             ),
           ),
-        ],
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Subcategory Name (English) *',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: marathiCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Subcategory Name (Marathi)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: selectedIcon,
+                          decoration: InputDecoration(
+                            labelText: 'Icon',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
+                          items: _commonSubcategoryIcons.map((item) {
+                            final iName = item['name'] as String;
+                            final iLabel = item['label'] as String;
+                            return DropdownMenuItem<String>(
+                              value: iName,
+                              child: Row(
+                                children: [
+                                  Icon(CategoryService.iconFromName(iName), size: 18, color: AppTheme.primary),
+                                  const SizedBox(width: 8),
+                                  Text(iLabel, style: GoogleFonts.plusJakartaSans(fontSize: 12)),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setDialogState(() => selectedIcon = val);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 90,
+                        child: TextField(
+                          controller: sortCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Sort Order',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: imageCtrl,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Photo/Image URL',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
+                        onPressed: () async {
+                          final name = nameCtrl.text.trim();
+                          final folderId = name.isNotEmpty
+                              ? name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '')
+                              : 'temp';
+                          await _pickAndUploadImage(imageCtrl, 'subcategories', folderId);
+                          setDialogState(() {});
+                        },
+                        tooltip: 'Upload Photo',
+                      ),
+                    ),
+                  ),
+                  if (imageCtrl.text.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        imageCtrl.text.trim(),
+                        height: 90,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 50,
+                          color: Colors.grey.shade200,
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Image preview unavailable',
+                            style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.grey),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: descCtrl,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'Description / Details',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameCtrl.text.trim().isNotEmpty) {
+                  final name = nameCtrl.text.trim();
+                  final marathi = marathiCtrl.text.trim();
+                  final imageUrl = imageCtrl.text.trim();
+                  final description = descCtrl.text.trim();
+                  final sortOrder = int.tryParse(sortCtrl.text.trim()) ?? 10;
+                  Navigator.pop(context);
+                  try {
+                    final catId = cat['id'] as String;
+                    final rawSlug = name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '');
+                    final subId = '${catId}_${rawSlug.isNotEmpty ? rawSlug : DateTime.now().millisecondsSinceEpoch}';
+                    await SupabaseService.instance.adminAddSubcategory(
+                      categoryId: catId,
+                      id: subId,
+                      name: name,
+                      nameMarathi: marathi,
+                      imageUrl: imageUrl,
+                      description: description,
+                      iconName: selectedIcon,
+                      sortOrder: sortOrder,
+                    );
+                    CategoryService.instance.invalidateCache();
+                    await _loadCategories();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Subcategory "$name" added successfully!'),
+                          backgroundColor: const Color(0xFF00C853),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error adding subcategory: $e'),
+                          backgroundColor: Colors.red.shade700,
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+              child: Text(
+                'Add Subcategory',
+                style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1346,117 +1475,198 @@ class _AdminCategoryManagementScreenState
     final marathiCtrl = TextEditingController(text: sub['name_marathi'] as String? ?? '');
     final imageCtrl = TextEditingController(text: sub['image_url'] as String? ?? '');
     final descCtrl = TextEditingController(text: sub['description'] as String? ?? '');
+    final sortCtrl = TextEditingController(text: '${sub['sort_order'] ?? 10}');
+    String selectedIcon = (sub['icon_name'] as String?)?.isNotEmpty == true
+        ? sub['icon_name'] as String
+        : 'category';
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Edit Subcategory',
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Subcategory Name (English)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: marathiCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Subcategory Name (Marathi)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: imageCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Photo/Image URL',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
-                    onPressed: () {
-                      final name = nameCtrl.text.trim();
-                      final folderId = name.isNotEmpty
-                          ? name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '')
-                          : 'temp';
-                      _pickAndUploadImage(imageCtrl, 'subcategories', folderId);
-                    },
-                    tooltip: 'Upload Photo',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  labelText: 'Description / Content',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameCtrl.text.trim().isNotEmpty) {
-                final name = nameCtrl.text.trim();
-                final marathi = marathiCtrl.text.trim();
-                final imageUrl = imageCtrl.text.trim();
-                final description = descCtrl.text.trim();
-                Navigator.pop(context);
-                try {
-                  await SupabaseService.instance.adminUpdateSubcategory(
-                    id: sub['id'] as String,
-                    name: name,
-                    nameMarathi: marathi,
-                    imageUrl: imageUrl,
-                    description: description,
-                  );
-                  CategoryService.instance.invalidateCache();
-                  await _loadCategories();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Subcategory "$name" updated successfully!'),
-                        backgroundColor: const Color(0xFF00C853),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error updating subcategory: $e'),
-                        backgroundColor: Colors.red.shade700,
-                      ),
-                    );
-                  }
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            child: Text(
-              'Save',
-              style: GoogleFonts.plusJakartaSans(color: Colors.white),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Edit Subcategory',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
             ),
           ),
-        ],
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Subcategory Name (English) *',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: marathiCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Subcategory Name (Marathi)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _commonSubcategoryIcons.any((i) => i['name'] == selectedIcon) ? selectedIcon : 'category',
+                          decoration: InputDecoration(
+                            labelText: 'Icon',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
+                          items: _commonSubcategoryIcons.map((item) {
+                            final iName = item['name'] as String;
+                            final iLabel = item['label'] as String;
+                            return DropdownMenuItem<String>(
+                              value: iName,
+                              child: Row(
+                                children: [
+                                  Icon(CategoryService.iconFromName(iName), size: 18, color: AppTheme.primary),
+                                  const SizedBox(width: 8),
+                                  Text(iLabel, style: GoogleFonts.plusJakartaSans(fontSize: 12)),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setDialogState(() => selectedIcon = val);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 90,
+                        child: TextField(
+                          controller: sortCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Sort Order',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: imageCtrl,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Photo/Image URL',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
+                        onPressed: () async {
+                          final name = nameCtrl.text.trim();
+                          final folderId = name.isNotEmpty
+                              ? name.toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '')
+                              : 'temp';
+                          await _pickAndUploadImage(imageCtrl, 'subcategories', folderId);
+                          setDialogState(() {});
+                        },
+                        tooltip: 'Upload Photo',
+                      ),
+                    ),
+                  ),
+                  if (imageCtrl.text.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        imageCtrl.text.trim(),
+                        height: 90,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 50,
+                          color: Colors.grey.shade200,
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Image preview unavailable',
+                            style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.grey),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: descCtrl,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'Description / Details',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameCtrl.text.trim().isNotEmpty) {
+                  final name = nameCtrl.text.trim();
+                  final marathi = marathiCtrl.text.trim();
+                  final imageUrl = imageCtrl.text.trim();
+                  final description = descCtrl.text.trim();
+                  final sortOrder = int.tryParse(sortCtrl.text.trim()) ?? 10;
+                  Navigator.pop(context);
+                  try {
+                    await SupabaseService.instance.adminUpdateSubcategory(
+                      id: sub['id'] as String,
+                      name: name,
+                      nameMarathi: marathi,
+                      imageUrl: imageUrl,
+                      description: description,
+                      iconName: selectedIcon,
+                      sortOrder: sortOrder,
+                    );
+                    CategoryService.instance.invalidateCache();
+                    await _loadCategories();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Subcategory "$name" updated successfully!'),
+                          backgroundColor: const Color(0xFF00C853),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error updating subcategory: $e'),
+                          backgroundColor: Colors.red.shade700,
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+              child: Text(
+                'Save Changes',
+                style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

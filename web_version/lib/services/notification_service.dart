@@ -815,78 +815,81 @@ class NotificationService {
         } catch (_) {}
       }
 
-      // 1. Notify Provider (Continuous alert trigger)
+      // 1. Notify Provider via Database Notification
       if (targetProviderUserId != null && targetProviderUserId.isNotEmpty) {
-        await SupabaseService.instance.client.from('notifications').insert({
-          'user_id': targetProviderUserId,
-          'title': '📩 New Customer Enquiry (#$enquiryId)',
-          'body':
-              '$customerName ($customerPhone) sent an enquiry for $subcategory: "$message"',
-          'type': 'enquiry',
-          'metadata': {
-            'enquiry_id': enquiryId,
-            'customer_id': customerId,
-            'customer_name': customerName,
-            'customer_phone': customerPhone,
-            'provider_id': providerId,
-            'provider_name': providerName,
-            'subcategory': subcategory,
-            'service': subcategory,
-            'message': message,
-            'is_continuous_alert': true,
-          },
-          'is_read': false,
-          'created_at': now,
-        });
-
-        // Instant broadcast trigger so provider's active device rings immediately
         try {
-          final broadcastChannel = SupabaseService.instance.client
-              .channel('public:global_notifications_and_broadcasts');
-          await broadcastChannel.sendBroadcastMessage(
-            event: 'provider_continuous_alert',
-            payload: {
-              'target_user_id': targetProviderUserId,
-              'target_provider_id': providerId,
-              'title': '📩 New Customer Enquiry (#$enquiryId)',
-              'body': '$customerName sent an enquiry for $subcategory.',
+          await SupabaseService.instance.client.from('notifications').insert({
+            'user_id': targetProviderUserId,
+            'title': '📩 New Customer Enquiry (#$enquiryId)',
+            'body':
+                '$customerName ($customerPhone) sent an enquiry for $subcategory: "$message"',
+            'type': 'enquiry',
+            'metadata': {
               'enquiry_id': enquiryId,
+              'customer_id': customerId,
               'customer_name': customerName,
               'customer_phone': customerPhone,
+              'provider_id': providerId,
+              'provider_name': providerName,
               'subcategory': subcategory,
               'service': subcategory,
               'message': message,
-              'is_enquiry': true,
-              'timestamp': now,
+              'is_continuous_alert': true,
             },
+            'is_read': false,
+            'created_at': now,
+          });
+        } catch (provDbErr) {
+          debugPrint('[NotificationService] Provider db notification note: $provDbErr');
+        }
+
+        // Trigger instant continuous ringing broadcast to provider device
+        try {
+          await sendProviderContinuousAlert(
+            targetUserId: targetProviderUserId,
+            targetProviderId: providerId,
+            title: '📩 New Customer Enquiry (#$enquiryId)',
+            body: '$customerName sent an enquiry for $subcategory.',
+            enquiryId: enquiryId,
+            customerName: customerName,
+            customerPhone: customerPhone,
+            serviceName: subcategory,
+            subcategory: subcategory,
+            message: message,
+            isEnquiry: true,
           );
-        } catch (_) {}
+        } catch (bcastErr) {
+          debugPrint('[NotificationService] Provider broadcast note: $bcastErr');
+        }
       }
 
       // 2. Notify Customer (Single chime)
       if (customerId.isNotEmpty) {
-        await SupabaseService.instance.client.from('notifications').insert({
-          'user_id': customerId,
-          'title': 'Enquiry Submitted (#$enquiryId)',
-          'body': 'Your enquiry for $subcategory has reached $providerName.',
-          'type': 'enquiry',
-          'metadata': {'enquiry_id': enquiryId},
-          'is_read': false,
-          'created_at': now,
-        });
+        try {
+          await SupabaseService.instance.client.from('notifications').insert({
+            'user_id': customerId,
+            'title': 'Enquiry Submitted (#$enquiryId)',
+            'body': 'Your enquiry for $subcategory has reached $providerName.',
+            'type': 'enquiry',
+            'metadata': {'enquiry_id': enquiryId},
+            'is_read': false,
+            'created_at': now,
+          });
+        } catch (_) {}
       }
 
       // 3. Notify Admin (Single chime)
-      await SupabaseService.instance.client.from('notifications').insert({
-        'user_id': null,
-        'target_audience': 'admin',
-        'title': '📋 New Platform Enquiry (#$enquiryId)',
-        'body': '$customerName ➔ $providerName ($subcategory)',
-        'type': 'admin_broadcast',
-        'metadata': {'enquiry_id': enquiryId, 'audience': 'admin'},
-        'is_read': false,
-        'created_at': now,
-      });
+      try {
+        await SupabaseService.instance.client.from('notifications').insert({
+          'target_audience': 'admin',
+          'title': '📋 New Platform Enquiry (#$enquiryId)',
+          'body': '$customerName ➔ $providerName ($subcategory)',
+          'type': 'admin_broadcast',
+          'metadata': {'enquiry_id': enquiryId, 'audience': 'admin'},
+          'is_read': false,
+          'created_at': now,
+        });
+      } catch (_) {}
     } catch (e) {
       debugPrint('[NotificationService] notifyEnquirySubmitted error: $e');
     }
@@ -895,6 +898,60 @@ class NotificationService {
   // ─── GLOBAL REALTIME BROADCAST & NOTIFICATION LISTENER ────────────────────
 
   RealtimeChannel? _broadcastChannel;
+  String? _cachedProviderId;
+
+  /// Cache current provider ID on this device so incoming alerts match instantly
+  void setProviderId(String id) {
+    _cachedProviderId = id;
+  }
+
+  /// Send continuous alert broadcast to a provider
+  Future<void> sendProviderContinuousAlert({
+    required String targetUserId,
+    String? targetProviderId,
+    required String title,
+    required String body,
+    String? bookingId,
+    String? enquiryId,
+    String? customerName,
+    String? customerPhone,
+    String? serviceName,
+    String? subcategory,
+    String? message,
+    String? amount,
+    bool isEnquiry = false,
+  }) async {
+    try {
+      if (_broadcastChannel == null) {
+        startListeningToBroadcastNotifications();
+      }
+      final channel = _broadcastChannel ??
+          SupabaseService.instance.client
+              .channel('public:global_notifications_and_broadcasts');
+
+      await channel.sendBroadcastMessage(
+        event: 'provider_continuous_alert',
+        payload: {
+          'target_user_id': targetUserId,
+          'target_provider_id': targetProviderId,
+          'title': title,
+          'body': body,
+          'booking_id': bookingId,
+          'enquiry_id': enquiryId,
+          'customer_name': customerName,
+          'customer_phone': customerPhone,
+          'service': serviceName ?? subcategory,
+          'subcategory': subcategory,
+          'message': message,
+          'amount': amount,
+          'is_enquiry': isEnquiry,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+    } catch (e) {
+      debugPrint('[NotificationService] sendProviderContinuousAlert broadcast error: $e');
+    }
+  }
 
   /// Starts listening to real-time notification insertions, chat messages, and admin broadcasts
   void startListeningToBroadcastNotifications() {
@@ -904,28 +961,62 @@ class NotificationService {
           .channel('public:global_notifications_and_broadcasts')
           .onBroadcast(
             event: 'provider_continuous_alert',
-            callback: (payload) {
+            callback: (payload) async {
               final targetUserId = payload['target_user_id'] as String?;
               final targetProviderId = payload['target_provider_id'] as String?;
               final currentUserId = SupabaseService.instance.currentUser?.id;
+
+              // Ensure cached provider ID is available
+              if (_cachedProviderId == null && currentUserId != null) {
+                try {
+                  final sp = await SupabaseService.instance.getMyProviderProfile();
+                  if (sp != null && sp['id'] != null) {
+                    _cachedProviderId = sp['id'] as String;
+                  }
+                } catch (_) {}
+              }
 
               bool applies = false;
               if (currentUserId != null) {
                 if (targetUserId != null && targetUserId == currentUserId) {
                   applies = true;
-                } else if (targetProviderId != null && targetProviderId == currentUserId) {
+                } else if (targetProviderId != null &&
+                    (targetProviderId == currentUserId || targetProviderId == _cachedProviderId)) {
                   applies = true;
                 }
               }
 
               if (applies) {
+                final isEnquiry = payload['is_enquiry'] == true;
+                final title = payload['title'] as String? ?? (isEnquiry ? '📩 New Customer Enquiry' : '🔔 New Booking Request');
+                final body = payload['body'] as String? ?? 'A customer submitted a request.';
+                final enquiryId = payload['enquiry_id']?.toString();
+                final bookingId = payload['booking_id']?.toString();
+                final customerName = payload['customer_name'] as String?;
+                final serviceName = payload['service'] as String? ?? payload['subcategory'] as String?;
+                final amount = payload['amount']?.toString();
+
+                // 1. Play continuous audio loop & show top sticky banner
                 startContinuousBookingAlert(
-                  title: payload['title'] as String? ?? '📩 New Customer Enquiry',
-                  body: payload['body'] as String? ?? 'A customer sent an enquiry.',
-                  enquiryId: payload['enquiry_id']?.toString(),
-                  customerName: payload['customer_name'] as String?,
-                  serviceName: payload['service'] as String? ?? payload['subcategory'] as String?,
-                  isEnquiry: true,
+                  title: title,
+                  body: body,
+                  bookingId: bookingId,
+                  enquiryId: enquiryId,
+                  customerName: customerName,
+                  serviceName: serviceName,
+                  amount: amount,
+                  isEnquiry: isEnquiry,
+                );
+
+                // 2. High priority Android local notification in notification shade
+                showLocalNotification(
+                  id: (bookingId ?? enquiryId ?? DateTime.now().millisecondsSinceEpoch.toString()).hashCode,
+                  title: title,
+                  body: body,
+                  channelId: 'inquiry_notifications',
+                  channelName: 'Customer Enquiries & Ringing Alerts',
+                  importance: Importance.max,
+                  priority: Priority.high,
                 );
               }
             },
@@ -1004,6 +1095,17 @@ class NotificationService {
                   amount: metadata['amount']?.toString(),
                   isEnquiry: isEnquiry,
                 );
+
+                // Show system notification with sound & vibration in notification shade
+                showLocalNotification(
+                  id: (bookingId ?? enquiryId ?? DateTime.now().millisecondsSinceEpoch.toString()).hashCode,
+                  title: title,
+                  body: body,
+                  channelId: 'inquiry_notifications',
+                  channelName: 'Customer Enquiries & Ringing Alerts',
+                  importance: Importance.max,
+                  priority: Priority.high,
+                );
               } else {
                 // Customer or Admin or normal notification gets single chime sound!
                 playNotificationSound();
@@ -1020,9 +1122,67 @@ class NotificationService {
             },
           )
           .subscribe();
+      _startPeriodicAlertPoll();
     } catch (e) {
       debugPrint('[NotificationService] Broadcast listener error: $e');
     }
+  }
+
+  Timer? _alertPollTimer;
+  final Set<String> _handledAlertNotificationIds = {};
+
+  void _startPeriodicAlertPoll() {
+    _alertPollTimer?.cancel();
+    _alertPollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      final user = SupabaseService.instance.currentUser;
+      if (user == null) return;
+      try {
+        final res = await SupabaseService.instance.client
+            .from('notifications')
+            .select()
+            .eq('user_id', user.id)
+            .eq('is_read', false)
+            .order('created_at', ascending: false)
+            .limit(10);
+        final list = List<Map<String, dynamic>>.from(res);
+        for (final item in list) {
+          final id = item['id']?.toString() ?? '';
+          if (_handledAlertNotificationIds.contains(id)) continue;
+          final meta = item['metadata'] as Map<String, dynamic>? ?? {};
+          final isContinuous = meta['is_continuous_alert'] == true;
+          if (isContinuous) {
+            _handledAlertNotificationIds.add(id);
+            final title = item['title'] as String? ?? '📩 New Service Request';
+            final body = item['body'] as String? ?? '';
+            final type = item['type'] as String? ?? 'enquiry';
+            final isEnquiry = type == 'enquiry';
+            final bookingId = meta['order_id']?.toString() ?? meta['booking_id']?.toString();
+            final enquiryId = meta['enquiry_id']?.toString();
+
+            startContinuousBookingAlert(
+              title: title,
+              body: body,
+              bookingId: bookingId,
+              enquiryId: enquiryId,
+              customerName: meta['customer_name'] as String?,
+              serviceName: meta['service'] as String? ?? meta['subcategory'] as String?,
+              amount: meta['amount']?.toString(),
+              isEnquiry: isEnquiry,
+            );
+
+            showLocalNotification(
+              id: (bookingId ?? enquiryId ?? id).hashCode,
+              title: title,
+              body: body,
+              channelId: 'inquiry_notifications',
+              channelName: 'Customer Enquiries & Ringing Alerts',
+              importance: Importance.max,
+              priority: Priority.high,
+            );
+          }
+        }
+      } catch (_) {}
+    });
   }
 
   IconData _getToastIcon(String type) {

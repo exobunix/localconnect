@@ -226,6 +226,8 @@ class CategoryService {
 
   // ─── Icon mapping ─────────────────────────────────────────────────────────
 
+  static IconData iconFromName(String name) => _iconFromName(name);
+
   static IconData _iconFromName(String name) {
     const map = <String, IconData>{
       'storefront': Icons.storefront_rounded,

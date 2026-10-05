@@ -127,7 +127,7 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
       _expansionMessage = null;
     });
     try {
-      final data = await SupabaseService.instance.getProviders(limit: 100);
+      final data = await SupabaseService.instance.getProviders(limit: 500);
       if (mounted) {
         setState(() {
           _providers = data;
@@ -138,6 +138,84 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  static final Map<String, LatLng> _knownCityCoords = {
+    'roha': const LatLng(18.4400, 73.1200),
+    'rohs': const LatLng(18.4400, 73.1200),
+    'varse': const LatLng(18.4450, 73.1250),
+    'murud': const LatLng(18.3200, 72.9600),
+    'revdanda': const LatLng(18.5500, 72.9300),
+    'nagothane': const LatLng(18.5500, 73.1500),
+    'alibag': const LatLng(18.6414, 72.8722),
+    'alibaug': const LatLng(18.6414, 72.8722),
+    'pen': const LatLng(18.7400, 73.0900),
+    'mangaon': const LatLng(18.2300, 73.2800),
+    'mahad': const LatLng(18.0800, 73.4200),
+    'poladpur': const LatLng(17.9800, 73.5200),
+    'shrivardhan': const LatLng(18.0400, 73.0200),
+    'panvel': const LatLng(18.9894, 73.1175),
+    'khopoli': const LatLng(18.7900, 73.3400),
+    'karjat': const LatLng(18.9100, 73.3200),
+    'lonavala': const LatLng(18.7557, 73.4091),
+    'pune': const LatLng(18.5204, 73.8567),
+    'mumbai': const LatLng(19.0760, 72.8777),
+    'navi mumbai': const LatLng(19.0330, 73.0297),
+    'thane': const LatLng(19.2183, 72.9781),
+    'nashik': const LatLng(19.9975, 73.7898),
+    'kolhapur': const LatLng(16.7050, 74.2433),
+    'aurangabad': const LatLng(19.8762, 75.3433),
+    'nagpur': const LatLng(21.1458, 79.0882),
+  };
+
+  LatLng _resolveProviderLocation(Map<String, dynamic> p) {
+    final bLat = (p['business_latitude'] as num?)?.toDouble();
+    final bLng = (p['business_longitude'] as num?)?.toDouble();
+    final lat = (p['lat'] as num?)?.toDouble() ?? (p['latitude'] as num?)?.toDouble();
+    final lng = (p['lng'] as num?)?.toDouble() ?? (p['longitude'] as num?)?.toDouble();
+
+    final idHash = (p['id']?.toString() ?? '').hashCode.abs();
+    final jitterLat = ((idHash % 11) - 5) * 0.003;
+    final jitterLng = (((idHash ~/ 11) % 9) - 4) * 0.003;
+
+    if (bLat != null && bLng != null && bLat != 0 && bLng != 0) {
+      final isPuneDefault = (bLat - 18.5204).abs() < 0.002 && (bLng - 73.8567).abs() < 0.002;
+      if (!isPuneDefault) {
+        return LatLng(bLat, bLng);
+      }
+    }
+
+    if (lat != null && lng != null && lat != 0 && lng != 0) {
+      final isPuneDefault = (lat - 18.5204).abs() < 0.002 && (lng - 73.8567).abs() < 0.002;
+      if (!isPuneDefault) {
+        return LatLng(lat, lng);
+      }
+    }
+
+    final locationText = [
+      p['city'],
+      p['address'],
+      p['business_address'],
+      p['village'],
+      p['taluka'],
+      p['district'],
+      p['service_area'],
+    ].where((e) => e != null && e.toString().trim().isNotEmpty).join(' ').toLowerCase();
+
+    for (final entry in _knownCityCoords.entries) {
+      if (locationText.contains(entry.key)) {
+        return LatLng(entry.value.latitude + jitterLat, entry.value.longitude + jitterLng);
+      }
+    }
+
+    if (bLat != null && bLng != null && bLat != 0 && bLng != 0) {
+      return LatLng(bLat + jitterLat, bLng + jitterLng);
+    }
+    if (lat != null && lng != null && lat != 0 && lng != 0) {
+      return LatLng(lat + jitterLat, lng + jitterLng);
+    }
+
+    return LatLng(_defaultCenter.latitude + jitterLat, _defaultCenter.longitude + jitterLng);
   }
 
   void _applyFilters() {
@@ -153,36 +231,21 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen>
           .toList();
     }
 
-    // Assign lat/lng — use real business_latitude/business_longitude if available
-    final rng = math.Random(42);
     result = result.map((p) {
-      final lat = (p['business_latitude'] ?? p['latitude']) as num?;
-      final lng = (p['business_longitude'] ?? p['longitude']) as num?;
-      if (lat == null || lng == null || lat == 0 || lng == 0) {
-        final city = p['city'] as String? ?? 'Pune';
-        final base = _cityCoords[city] ?? _defaultCenter;
-        final offsetLat = (rng.nextDouble() - 0.5) * (_radiusKm / 55.0);
-        final offsetLng = (rng.nextDouble() - 0.5) * (_radiusKm / 50.0);
-        return {
-          ...p,
-          'latitude': base.latitude + offsetLat,
-          'longitude': base.longitude + offsetLng,
-        };
-      }
-      // Compute distance if customer location is known
+      final pt = _resolveProviderLocation(p);
       double distKm = (p['distance_km'] as num?)?.toDouble() ?? 9999;
-      if (distKm == 9999 && _customerLocation != null) {
+      if (_customerLocation != null && _customerLocation!.latitude != 0) {
         distKm = LocationService.instance.calculateDistance(
           _customerLocation!.latitude,
           _customerLocation!.longitude,
-          lat.toDouble(),
-          lng.toDouble(),
+          pt.latitude,
+          pt.longitude,
         );
       }
       return {
         ...p,
-        'latitude': lat.toDouble(),
-        'longitude': lng.toDouble(),
+        'latitude': pt.latitude,
+        'longitude': pt.longitude,
         'distance_km': distKm,
       };
     }).toList();

@@ -1122,9 +1122,67 @@ class NotificationService {
             },
           )
           .subscribe();
+      _startPeriodicAlertPoll();
     } catch (e) {
       debugPrint('[NotificationService] Broadcast listener error: $e');
     }
+  }
+
+  Timer? _alertPollTimer;
+  final Set<String> _handledAlertNotificationIds = {};
+
+  void _startPeriodicAlertPoll() {
+    _alertPollTimer?.cancel();
+    _alertPollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      final user = SupabaseService.instance.currentUser;
+      if (user == null) return;
+      try {
+        final res = await SupabaseService.instance.client
+            .from('notifications')
+            .select()
+            .eq('user_id', user.id)
+            .eq('is_read', false)
+            .order('created_at', ascending: false)
+            .limit(10);
+        final list = List<Map<String, dynamic>>.from(res);
+        for (final item in list) {
+          final id = item['id']?.toString() ?? '';
+          if (_handledAlertNotificationIds.contains(id)) continue;
+          final meta = item['metadata'] as Map<String, dynamic>? ?? {};
+          final isContinuous = meta['is_continuous_alert'] == true;
+          if (isContinuous) {
+            _handledAlertNotificationIds.add(id);
+            final title = item['title'] as String? ?? '📩 New Service Request';
+            final body = item['body'] as String? ?? '';
+            final type = item['type'] as String? ?? 'enquiry';
+            final isEnquiry = type == 'enquiry';
+            final bookingId = meta['order_id']?.toString() ?? meta['booking_id']?.toString();
+            final enquiryId = meta['enquiry_id']?.toString();
+
+            startContinuousBookingAlert(
+              title: title,
+              body: body,
+              bookingId: bookingId,
+              enquiryId: enquiryId,
+              customerName: meta['customer_name'] as String?,
+              serviceName: meta['service'] as String? ?? meta['subcategory'] as String?,
+              amount: meta['amount']?.toString(),
+              isEnquiry: isEnquiry,
+            );
+
+            showLocalNotification(
+              id: (bookingId ?? enquiryId ?? id).hashCode,
+              title: title,
+              body: body,
+              channelId: 'inquiry_notifications',
+              channelName: 'Customer Enquiries & Ringing Alerts',
+              importance: Importance.max,
+              priority: Priority.high,
+            );
+          }
+        }
+      } catch (_) {}
+    });
   }
 
   IconData _getToastIcon(String type) {

@@ -185,13 +185,34 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
       final formattedDate =
           '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}';
 
+      final effectiveServiceTitle = widget.serviceTitle.trim().isNotEmpty
+          ? widget.serviceTitle.trim()
+          : (widget.subcategory.trim().isNotEmpty ? '${widget.subcategory.trim()} Service' : 'Service Requirement');
+
+      // Resolve provider's auth user_id if possible
+      String? providerUserId;
+      if (providerUuid != null) {
+        try {
+          final prov = await SupabaseService.instance.client
+              .from('service_providers')
+              .select('user_id')
+              .or('id.eq.$providerUuid,user_id.eq.$providerUuid')
+              .maybeSingle();
+          if (prov != null && prov['user_id'] != null) {
+            providerUserId = prov['user_id'] as String;
+          }
+        } catch (_) {}
+      }
+
       final insertData = <String, dynamic>{
+        'title': effectiveServiceTitle,
+        'service_title': effectiveServiceTitle,
+        'description': 'Customer Requirement: $message',
         'customer_name': name,
         'customer_phone': cleanPhone,
         'provider_name': widget.providerName,
         'category': widget.category,
         'subcategory': widget.subcategory,
-        'service_title': widget.serviceTitle,
         'preferred_date': formattedDate,
         'preferred_time': _selectedSlot,
         'message': message,
@@ -200,6 +221,7 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
 
       if (customerId != null) insertData['customer_id'] = customerId;
       if (providerUuid != null) insertData['provider_id'] = providerUuid;
+      if (providerUserId != null) insertData['provider_user_id'] = providerUserId;
 
       String generatedEnquiryId =
           'ENQ-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
@@ -219,7 +241,8 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
         // Fallback: try minimal insert if extra columns had any cache delay
         try {
           final fallbackData = <String, dynamic>{
-            'title': widget.serviceTitle,
+            'title': effectiveServiceTitle,
+            'service_title': effectiveServiceTitle,
             'description':
                 'Name: $name\nPhone: $cleanPhone\nDate: $formattedDate\nTime: $_selectedSlot\nRequirement: $message',
             'category': widget.category,
@@ -228,6 +251,7 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
           };
           if (customerId != null) fallbackData['customer_id'] = customerId;
           if (providerUuid != null) fallbackData['provider_id'] = providerUuid;
+          if (providerUserId != null) fallbackData['provider_user_id'] = providerUserId;
 
           final fallbackRes = await SupabaseService.instance.client
               .from('enquiries')
