@@ -153,6 +153,12 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
     final rawPhone = _phoneCtrl.text.trim();
     final cleanPhone = rawPhone.replaceAll(RegExp(r'\D'), '');
     final message = _messageCtrl.text.trim();
+    final formattedDate = _selectedDate != null
+        ? '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}'
+        : '';
+    final effectiveServiceTitle = widget.serviceTitle.isNotEmpty
+        ? widget.serviceTitle
+        : (widget.subcategory.isNotEmpty ? widget.subcategory : widget.category);
 
     if (name.isEmpty) {
       _showToast('Please enter your full name', isError: true);
@@ -178,28 +184,38 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
       final customerId = (user?.id != null && _isValidUuid(user!.id))
           ? user.id
           : null;
-      final providerUuid = _isValidUuid(widget.providerId)
-          ? widget.providerId
-          : null;
-
-      final formattedDate =
-          '${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}';
-
-      final effectiveServiceTitle = widget.serviceTitle.trim().isNotEmpty
-          ? widget.serviceTitle.trim()
-          : (widget.subcategory.trim().isNotEmpty ? '${widget.subcategory.trim()} Service' : 'Service Requirement');
-
-      // Resolve provider's auth user_id if possible
+      String? effectiveProviderId = _isValidUuid(widget.providerId) ? widget.providerId : null;
       String? providerUserId;
-      if (providerUuid != null) {
+
+      // 1. If we have UUID, look up provider row
+      if (effectiveProviderId != null) {
         try {
           final prov = await SupabaseService.instance.client
               .from('service_providers')
-              .select('user_id')
-              .or('id.eq.$providerUuid,user_id.eq.$providerUuid')
+              .select('id, user_id, business_name')
+              .or('id.eq.$effectiveProviderId,user_id.eq.$effectiveProviderId')
               .maybeSingle();
-          if (prov != null && prov['user_id'] != null) {
-            providerUserId = prov['user_id'] as String;
+          if (prov != null) {
+            effectiveProviderId = prov['id'] as String? ?? effectiveProviderId;
+            if (prov['user_id'] != null) {
+              providerUserId = prov['user_id'] as String;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 2. If provider_id or user_id wasn't resolved yet, lookup by business_name
+      if ((effectiveProviderId == null || providerUserId == null) && widget.providerName.trim().isNotEmpty) {
+        try {
+          final prov = await SupabaseService.instance.client
+              .from('service_providers')
+              .select('id, user_id')
+              .ilike('business_name', '%${widget.providerName.trim()}%')
+              .limit(1)
+              .maybeSingle();
+          if (prov != null) {
+            effectiveProviderId ??= prov['id'] as String?;
+            providerUserId ??= prov['user_id'] as String?;
           }
         } catch (_) {}
       }
@@ -220,7 +236,7 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
       };
 
       if (customerId != null) insertData['customer_id'] = customerId;
-      if (providerUuid != null) insertData['provider_id'] = providerUuid;
+      if (effectiveProviderId != null) insertData['provider_id'] = effectiveProviderId;
       if (providerUserId != null) insertData['provider_user_id'] = providerUserId;
 
       String generatedEnquiryId =
@@ -250,7 +266,7 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
             'status': 'pending',
           };
           if (customerId != null) fallbackData['customer_id'] = customerId;
-          if (providerUuid != null) fallbackData['provider_id'] = providerUuid;
+          if (effectiveProviderId != null) fallbackData['provider_id'] = effectiveProviderId;
           if (providerUserId != null) fallbackData['provider_user_id'] = providerUserId;
 
           final fallbackRes = await SupabaseService.instance.client
@@ -284,7 +300,8 @@ class _UniversalEnquiryDialogState extends State<UniversalEnquiryDialog> {
           customerId: customerId ?? '',
           customerName: name,
           customerPhone: cleanPhone,
-          providerId: widget.providerId,
+          providerId: effectiveProviderId ?? widget.providerId,
+          providerUserId: providerUserId,
           providerName: widget.providerName,
           message: message,
         );

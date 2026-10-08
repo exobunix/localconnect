@@ -520,38 +520,52 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           },
         )
         .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
+          event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'enquiries',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'provider_id',
-            value: providerId,
-          ),
           callback: (payload) {
             if (!mounted) return;
             final newRow = payload.newRecord;
-            final enquiryId = newRow['id']?.toString() ?? '';
-            final customerName = newRow['customer_name'] as String? ?? 'Customer';
-            final service = newRow['service_title'] as String? ?? newRow['subcategory'] as String? ?? 'Service';
-            final msg = newRow['message'] as String? ?? '';
+            final currentUserId = SupabaseService.instance.currentUser?.id;
+            final rowProvId = newRow['provider_id']?.toString();
+            final rowProvUserId = newRow['provider_user_id']?.toString();
 
-            NotificationService.instance.startContinuousBookingAlert(
-              title: '📩 New Customer Enquiry (#$enquiryId)',
-              body: '$customerName sent an enquiry for $service.',
-              enquiryId: enquiryId,
-              customerName: customerName,
-              serviceName: service,
-              isEnquiry: true,
-            );
+            final matches = rowProvId == providerId ||
+                (rowProvUserId != null && rowProvUserId == currentUserId);
 
-            NotificationService.instance.showLocalNotification(
-              id: enquiryId.hashCode,
-              title: '📩 New Customer Enquiry (#$enquiryId)',
-              body: '$customerName sent an enquiry for $service: "$msg"',
-              channelId: 'inquiry_notifications',
-              channelName: 'Customer Enquiries & Ringing Alerts',
-            );
+            if (!matches) return;
+
+            final status = (newRow['status'] as String? ?? '').toLowerCase();
+            if (status == 'pending' || status == 'dispatched') {
+              final enquiryId = newRow['id']?.toString() ?? '';
+              final customerName = newRow['customer_name'] as String? ?? 'Customer';
+              final service = newRow['service_title'] as String? ?? newRow['subcategory'] as String? ?? 'Service';
+              final msg = newRow['message'] as String? ?? '';
+              final isDispatched = status == 'dispatched';
+
+              NotificationService.instance.startContinuousBookingAlert(
+                title: isDispatched
+                    ? '🚨 Admin Dispatched Service Request (#$enquiryId)'
+                    : '📩 New Customer Enquiry (#$enquiryId)',
+                body: isDispatched
+                    ? 'Admin assigned customer $customerName for $service in your area!'
+                    : '$customerName sent an enquiry for $service.',
+                enquiryId: enquiryId,
+                customerName: customerName,
+                serviceName: service,
+                isEnquiry: true,
+              );
+
+              NotificationService.instance.showLocalNotification(
+                id: enquiryId.hashCode,
+                title: isDispatched
+                    ? '🚨 Admin Dispatched Service Request (#$enquiryId)'
+                    : '📩 New Customer Enquiry (#$enquiryId)',
+                body: '$customerName sent an enquiry for $service: "$msg"',
+                channelId: 'inquiry_notifications',
+                channelName: 'Customer Enquiries & Ringing Alerts',
+              );
+            }
 
             _loadOrders(providerId);
             _loadQuotationCounts();

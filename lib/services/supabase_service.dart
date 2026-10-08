@@ -1174,10 +1174,19 @@ class SupabaseService {
 
       if (userId != null) {
         try {
+          String orFilter = 'user_id.eq.$userId,user_id.is.null';
+          try {
+            final sp = await getMyProviderProfile();
+            final provId = sp?['id']?.toString();
+            if (provId != null && provId.isNotEmpty && provId != userId) {
+              orFilter = 'user_id.eq.$userId,user_id.eq.$provId,user_id.is.null';
+            }
+          } catch (_) {}
+
           final response = await client
               .from('notifications')
               .select()
-              .or('user_id.eq.$userId,user_id.is.null')
+              .or(orFilter)
               .order('created_at', ascending: false)
               .limit(60);
           final list = _deduplicateNotifications(response);
@@ -1342,29 +1351,223 @@ class SupabaseService {
         .eq('id', complaintId);
   }
 
-  Future<void> submitComplaint({
+  Future<String?> submitComplaint({
     required String customerId,
     required String customerName,
     String? providerId,
     String providerName = '',
     String? orderId,
+    String? enquiryId,
     required String issue,
     String severity = 'medium',
+    String raisedBy = 'customer', // 'customer' or 'partner'
   }) async {
     final now = DateTime.now();
     final num =
         'CMP${now.year}${now.millisecondsSinceEpoch.toString().substring(7)}';
-    await client.from('complaints').insert({
-      'complaint_number': num,
-      'customer_id': customerId,
-      'customer_name': customerName,
-      'provider_id': providerId,
-      'provider_name': providerName,
-      'order_id': orderId,
-      'issue': issue,
-      'severity': severity,
-      'status': 'open',
-    });
+
+    // Validate severity check constraint (allowed: 'low', 'medium', 'high')
+    String cleanSeverity = severity.toLowerCase().trim();
+    if (cleanSeverity != 'low' && cleanSeverity != 'medium' && cleanSeverity != 'high') {
+      cleanSeverity = 'medium';
+    }
+
+    // Format issue text with reference and complainant info
+    String formattedIssue = issue.trim();
+    if (enquiryId != null && enquiryId.isNotEmpty) {
+      formattedIssue = '[Ref: #$enquiryId] [By: ${raisedBy.toUpperCase()}] $formattedIssue';
+    } else {
+      formattedIssue = '[By: ${raisedBy.toUpperCase()}] $formattedIssue';
+    }
+
+    // Check orderId - only send order_id if it's a valid UUID and matches orders table
+    String? validOrderId;
+    if (orderId != null &&
+        RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+            .hasMatch(orderId.trim())) {
+      validOrderId = orderId.trim();
+    }
+
+    try {
+      final insertData = <String, dynamic>{
+        'complaint_number': num,
+        'customer_id': customerId.isNotEmpty ? customerId : null,
+        'customer_name': customerName.isNotEmpty ? customerName : 'Customer',
+        'provider_id': (providerId != null && providerId.isNotEmpty && providerId != 'null') ? providerId : null,
+        'provider_name': providerName.isNotEmpty ? providerName : 'Provider',
+        'issue': formattedIssue,
+        'severity': cleanSeverity,
+        'status': 'open',
+      };
+      if (validOrderId != null) insertData['order_id'] = validOrderId;
+
+      await client.from('complaints').insert(insertData);
+
+      // Trigger automatic notification to Admin and Complainant
+      try {
+        await NotificationService.instance.notifyComplaintRaised(
+          complaintNumber: num,
+          customerName: customerName,
+          providerName: providerName,
+          issue: issue,
+          severity: cleanSeverity,
+          raisedBy: raisedBy,
+          customerId: customerId,
+          providerId: providerId,
+          enquiryId: enquiryId,
+        );
+      } catch (_) {}
+
+      return num;
+    } catch (e) {
+      debugPrint('[SupabaseService] submitComplaint error: $e');
+      return null;
+    }
+  }
+
+  /// Admin replies to a complaint and sends notification to customer and/or provider
+  Future<bool> adminReplyToComplaint({
+    required String complaintId,
+    required String replyText,
+    String? complaintNumber,
+    String? customerId,
+    String? providerId,
+    String? providerUserId,
+    bool notifyCustomer = true,
+    bool notifyProvider = true,
+    bool markResolved = true,
+  }) async {
+    try {
+      final now = DateTime.now().toIso8601String();
+      final updateData = <String, dynamic>{
+        'admin_note': replyText,
+        'updated_at': now,
+      };
+      if (markResolved) {
+        updateData['status'] = 'resolved';
+        updateData['resolved_at'] = now;
+      }
+
+      await client.from('complaints').update(updateData).eq('id', complaintId);
+
+      // Dispatch resolution notifications
+      try {
+        await NotificationService.instance.notifyComplaintResolved(
+          complaintNumber: complaintNumber ?? complaintId,
+          adminReply: replyText,
+          customerId: customerId,
+          providerId: providerId,
+          providerUserId: providerUserId,
+          notifyCustomer: notifyCustomer,
+          notifyProvider: notifyProvider,
+        );
+      } catch (_) {}
+
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] adminReplyToComplaint error: $e');
+      return false;
+    }
+  }
+
+  /// Admin reassigns a service request / enquiry to a new provider due to complaint or non-performance
+  Future<bool> adminReassignProviderForComplaint({
+    required String complaintId,
+    required String enquiryId,
+    required Map<String, dynamic> newProvider,
+    required String reasonNote,
+    String? previousProviderId,
+    String? previousProviderUserId,
+    String? previousProviderName,
+  }) async {
+    try {
+      final newProvId = newProvider['id']?.toString() ?? '';
+      final newProvUserId = newProvider['user_id']?.toString();
+      final newProvName = newProvider['business_name']?.toString() ?? 'Provider';
+
+      // 1. Fetch current enquiry to retrieve customer info & title
+      final enquiryRes = await client
+          .from('enquiries')
+          .select('id, customer_id, customer_name, customer_phone, service_title, subcategory, message')
+          .eq('id', enquiryId)
+          .maybeSingle();
+
+      final customerId = enquiryRes?['customer_id'] as String?;
+      final customerName = enquiryRes?['customer_name'] as String? ?? 'Customer';
+      final customerPhone = enquiryRes?['customer_phone'] as String? ?? '';
+      final serviceTitle = enquiryRes?['service_title'] as String? ??
+          enquiryRes?['subcategory'] as String? ??
+          'Service Request';
+      final reqMessage = enquiryRes?['message'] as String? ?? '';
+
+      // 2. Update enquiry with new provider
+      await client.from('enquiries').update({
+        'provider_id': newProvId,
+        if (newProvUserId != null) 'provider_user_id': newProvUserId,
+        'provider_name': newProvName,
+        'status': 'dispatched',
+        'admin_dispatch_note': 'Reassigned by Admin: $reasonNote',
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', enquiryId);
+
+      // 3. Update complaint record
+      await client.from('complaints').update({
+        'admin_note': 'Reassigned to $newProvName. $reasonNote',
+        'status': 'resolved',
+        'resolved_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', complaintId);
+
+      // 4. Trigger continuous ringing alert & notification to NEW provider
+      try {
+        await NotificationService.instance.sendProviderContinuousAlert(
+          targetUserId: newProvUserId ?? newProvId,
+          targetProviderId: newProvId,
+          title: '🚨 Reassigned Customer Service Request',
+          body: 'Admin has reassigned $customerName ($serviceTitle) to you. Please respond immediately!',
+          enquiryId: enquiryId,
+          customerName: customerName,
+          customerPhone: customerPhone,
+          serviceName: serviceTitle,
+          subcategory: serviceTitle,
+          message: reqMessage,
+          isEnquiry: true,
+        );
+
+        await NotificationService.instance.notifyServiceRequestUpdated(
+          enquiryId: enquiryId,
+          updatedBy: 'admin',
+          status: 'dispatched',
+          customerId: customerId,
+          customerName: customerName,
+          newProviderName: newProvName,
+          adminNote: 'Your request has been reassigned to $newProvName. They will contact you shortly.',
+          providerId: newProvId,
+          providerUserId: newProvUserId,
+        );
+      } catch (_) {}
+
+      // 5. Notify previous provider that request was reassigned
+      final prevPid = previousProviderUserId ?? previousProviderId;
+      if (prevPid != null && prevPid.isNotEmpty) {
+        try {
+          await client.from('notifications').insert({
+            'user_id': prevPid,
+            'title': 'ℹ️ Service Request Reassigned',
+            'body': 'Customer request #$enquiryId ($serviceTitle) has been reassigned to another partner by Admin.',
+            'type': 'enquiry',
+            'metadata': {'enquiry_id': enquiryId, 'is_reassigned': true},
+            'is_read': false,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        } catch (_) {}
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] adminReassignProviderForComplaint error: $e');
+      return false;
+    }
   }
 
   // ─── ADMIN: ANALYTICS ─────────────────────────────────────────────────────
@@ -2110,6 +2313,8 @@ class SupabaseService {
     int sortOrder = 99,
   }) async {
     final now = DateTime.now().toIso8601String();
+    await AdminAuthService.instance.ensureAdminSupabaseSession();
+
     // 1. Direct upsert with full fields
     try {
       await client.from('subcategories').upsert({
@@ -2127,6 +2332,9 @@ class SupabaseService {
       return;
     } catch (e) {
       debugPrint('[SupabaseService] adminAddSubcategory full upsert note: $e');
+      if (e.toString().contains('42501') || e.toString().contains('row-level security')) {
+        await AdminAuthService.instance.ensureAdminSupabaseSession();
+      }
     }
 
     // 2. Fallback without image_url/description in case schema is older
@@ -2157,6 +2365,7 @@ class SupabaseService {
     int? sortOrder,
   }) async {
     final now = DateTime.now().toIso8601String();
+    await AdminAuthService.instance.ensureAdminSupabaseSession();
     final updates = <String, dynamic>{
       'name': name,
       'name_marathi': nameMarathi,
@@ -2170,6 +2379,9 @@ class SupabaseService {
     try {
       await client.from('subcategories').update(updates).eq('id', id);
     } catch (e) {
+      if (e.toString().contains('42501') || e.toString().contains('row-level security')) {
+        await AdminAuthService.instance.ensureAdminSupabaseSession();
+      }
       // Fallback: update core fields if optional columns fail
       await client.from('subcategories').update({
         'name': name,
@@ -2182,17 +2394,28 @@ class SupabaseService {
   }
 
   Future<void> adminDeleteSubcategory(String id) async {
+    await AdminAuthService.instance.ensureAdminSupabaseSession();
     try {
       await client.rpc('admin_delete_subcategory', params: {'p_id': id});
       return;
     } catch (_) {}
-    await client.from('subcategories').delete().eq('id', id);
+    try {
+      await client.from('subcategories').delete().eq('id', id);
+    } catch (e) {
+      if (e.toString().contains('42501') || e.toString().contains('row-level security')) {
+        await AdminAuthService.instance.ensureAdminSupabaseSession();
+        await client.from('subcategories').delete().eq('id', id);
+      } else {
+        rethrow;
+      }
+    }
   }
 
   Future<void> adminToggleSubcategory({
     required String id,
     required bool isActive,
   }) async {
+    await AdminAuthService.instance.ensureAdminSupabaseSession();
     try {
       await client.rpc('admin_toggle_subcategory', params: {
         'p_id': id,
@@ -2200,21 +2423,21 @@ class SupabaseService {
       });
       return;
     } catch (_) {}
-
     try {
-      await client
-          .from('subcategories')
-          .update({
-            'is_active': isActive,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id);
-    } catch (_) {
-      // Fallback if updated_at column is missing
-      await client
-          .from('subcategories')
-          .update({'is_active': isActive})
-          .eq('id', id);
+      await client.from('subcategories').update({
+        'is_active': isActive,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', id);
+    } catch (e) {
+      if (e.toString().contains('42501') || e.toString().contains('row-level security')) {
+        await AdminAuthService.instance.ensureAdminSupabaseSession();
+        await client.from('subcategories').update({
+          'is_active': isActive,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', id);
+      } else {
+        rethrow;
+      }
     }
   }
 
@@ -3883,10 +4106,34 @@ class SupabaseService {
         ? title
         : (subcategory.isNotEmpty ? '$subcategory Service' : 'Service Requirement');
 
+    String? resolvedProviderId = RegExp(
+            r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+        .hasMatch(providerId)
+        ? providerId
+        : null;
+    String? resolvedProviderUserId;
+    String resolvedProviderName = 'Service Provider';
+
+    if (resolvedProviderId != null) {
+      try {
+        final prov = await client
+            .from('service_providers')
+            .select('id, user_id, business_name')
+            .or('id.eq.$resolvedProviderId,user_id.eq.$resolvedProviderId')
+            .maybeSingle();
+        if (prov != null) {
+          resolvedProviderId = prov['id'] as String? ?? resolvedProviderId;
+          resolvedProviderUserId = prov['user_id'] as String?;
+          resolvedProviderName = prov['business_name'] as String? ?? resolvedProviderName;
+        }
+      } catch (_) {}
+    }
+
     final data = <String, dynamic>{
       'title': effectiveTitle,
       'service_title': effectiveTitle,
       'description': description,
+      'provider_name': resolvedProviderName,
       'category': category,
       'subcategory': subcategory,
       'status': 'pending',
@@ -3896,9 +4143,11 @@ class SupabaseService {
             .hasMatch(userId)) {
       data['customer_id'] = userId;
     }
-    if (RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
-        .hasMatch(providerId)) {
-      data['provider_id'] = providerId;
+    if (resolvedProviderId != null) {
+      data['provider_id'] = resolvedProviderId;
+    }
+    if (resolvedProviderUserId != null) {
+      data['provider_user_id'] = resolvedProviderUserId;
     }
 
     String generatedEnquiryId =
@@ -3927,8 +4176,9 @@ class SupabaseService {
         customerId: userId ?? '',
         customerName: customerName,
         customerPhone: customerPhone,
-        providerId: providerId,
-        providerName: 'Service Provider',
+        providerId: resolvedProviderId ?? providerId,
+        providerUserId: resolvedProviderUserId,
+        providerName: resolvedProviderName,
         message: description,
       );
     } catch (notifErr) {
@@ -4022,17 +4272,26 @@ class SupabaseService {
     try {
       final provider = await getMyProviderProfile();
       final providerId = provider?['id'] as String?;
+      final providerUserId = provider?['user_id'] as String? ?? currentUser?.id;
       final providerName = provider?['business_name'] as String? ??
           provider?['full_name'] as String?;
       final providerCategory = provider?['category'] as String?;
 
-      // 1. Query by provider_id
-      if (providerId != null) {
+      // 1. Query by provider_id or provider_user_id
+      if (providerId != null || providerUserId != null) {
         try {
+          String orFilter;
+          if (providerId != null && providerUserId != null) {
+            orFilter = 'provider_id.eq.$providerId,provider_user_id.eq.$providerUserId';
+          } else if (providerId != null) {
+            orFilter = 'provider_id.eq.$providerId';
+          } else {
+            orFilter = 'provider_user_id.eq.$providerUserId';
+          }
           final res = await client
               .from('enquiries')
               .select('*')
-              .eq('provider_id', providerId)
+              .or(orFilter)
               .order('created_at', ascending: false);
           final list = List<Map<String, dynamic>>.from(res);
           if (list.isNotEmpty) return list;
@@ -4080,15 +4339,28 @@ class SupabaseService {
 
   Future<List<Map<String, dynamic>>> adminGetAllEnquiries({String? areaFilter}) async {
     try {
-      var query = client.from('enquiries').select('*');
+      final response = await client
+          .from('enquiries')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(300);
+      final list = List<Map<String, dynamic>>.from(response);
+
       final currentArea = areaFilter ?? currentAdminArea;
       final role = currentAdminRole;
-      if (role != 'super_admin' && currentArea.isNotEmpty && currentArea != 'ALL') {
-        // Filter by assigned area for Area Admin
-        query = query.or('category.ilike.%$currentArea%,subcategory.ilike.%$currentArea%,message.ilike.%$currentArea%');
+      if (role != 'super_admin' && currentArea.isNotEmpty && currentArea.toUpperCase() != 'ALL') {
+        final q = currentArea.toLowerCase();
+        final filtered = list.where((e) {
+          final cat = (e['category'] ?? '').toString().toLowerCase();
+          final sub = (e['subcategory'] ?? '').toString().toLowerCase();
+          final msg = (e['message'] ?? e['description'] ?? '').toString().toLowerCase();
+          final city = (e['city'] ?? '').toString().toLowerCase();
+          return city.contains(q) || cat.contains(q) || sub.contains(q) || msg.contains(q);
+        }).toList();
+        if (filtered.isNotEmpty) return filtered;
       }
-      final response = await query.order('created_at', ascending: false).limit(300);
-      return List<Map<String, dynamic>>.from(response);
+
+      return list;
     } catch (e) {
       debugPrint('[SupabaseService] adminGetAllEnquiries error: $e');
       return [];
@@ -4107,9 +4379,12 @@ class SupabaseService {
           .select('id, user_id, business_name, owner_name, phone, whatsapp_number, category, subcategory, city, rating, is_active, is_verified')
           .eq('is_active', true);
 
-      if (category != null && category.trim().isNotEmpty) {
+      if (subcategory != null && subcategory.trim().isNotEmpty) {
+        builder = builder.ilike('subcategory', '%${subcategory.trim()}%');
+      } else if (category != null && category.trim().isNotEmpty) {
         builder = builder.ilike('category', '%${category.trim()}%');
       }
+
       if (city != null && city.trim().isNotEmpty && city.toLowerCase() != 'all') {
         builder = builder.ilike('city', '%${city.trim()}%');
       }
@@ -4118,17 +4393,40 @@ class SupabaseService {
       final list = List<Map<String, dynamic>>.from(res);
       if (list.isNotEmpty) return list;
 
-      // Fallback: match by category only (without city filter if no local provider found)
+      // Fallback 1: match by category only (without city filter if no local provider found)
       if (category != null && category.trim().isNotEmpty) {
         final catRes = await client
             .from('service_providers')
             .select('id, user_id, business_name, owner_name, phone, whatsapp_number, category, subcategory, city, rating, is_active, is_verified')
             .eq('is_active', true)
             .ilike('category', '%${category.trim()}%')
+            .order('rating', ascending: false)
             .limit(30);
-        return List<Map<String, dynamic>>.from(catRes);
+        final catList = List<Map<String, dynamic>>.from(catRes);
+        if (catList.isNotEmpty) return catList;
       }
-      return [];
+
+      // Fallback 2: return any active providers in the city
+      if (city != null && city.trim().isNotEmpty && city.toLowerCase() != 'all') {
+        final cityRes = await client
+            .from('service_providers')
+            .select('id, user_id, business_name, owner_name, phone, whatsapp_number, category, subcategory, city, rating, is_active, is_verified')
+            .eq('is_active', true)
+            .ilike('city', '%${city.trim()}%')
+            .order('rating', ascending: false)
+            .limit(30);
+        final cityList = List<Map<String, dynamic>>.from(cityRes);
+        if (cityList.isNotEmpty) return cityList;
+      }
+
+      // Fallback 3: return top rated providers overall
+      final allRes = await client
+          .from('service_providers')
+          .select('id, user_id, business_name, owner_name, phone, whatsapp_number, category, subcategory, city, rating, is_active, is_verified')
+          .eq('is_active', true)
+          .order('rating', ascending: false)
+          .limit(30);
+      return List<Map<String, dynamic>>.from(allRes);
     } catch (e) {
       debugPrint('[SupabaseService] adminGetProvidersForDispatch error: $e');
       try {
@@ -4170,26 +4468,35 @@ class SupabaseService {
       providerIds.add(pId);
       providerNames.add(bName);
 
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(pId);
+
+      final Set<String> targetIds = {pUserId};
+      if (isUuid && pId != pUserId) targetIds.add(pId);
+
       // 1. Insert push notification in DB for provider
-      try {
-        await insertOrderNotification(
-          userId: pUserId,
-          title: '🚨 Admin Dispatched Service Request (#$enquiryId)',
-          body: 'Admin assigned a customer request for $serviceTitle from $customerName ($customerPhone). Note: $dispatchNote',
-          type: 'enquiry',
-          metadata: {
-            'enquiry_id': enquiryId,
-            'customer_name': customerName,
-            'customer_phone': customerPhone,
-            'service': serviceTitle,
-            'category': category,
-            'subcategory': subcategory,
-            'is_continuous_alert': true,
-            'dispatched_by_admin': true,
-            'dispatch_note': dispatchNote,
-          },
-        );
-      } catch (_) {}
+      for (final tid in targetIds) {
+        try {
+          await insertOrderNotification(
+            userId: tid,
+            title: '🚨 Admin Dispatched Service Request (#$enquiryId)',
+            body: 'Admin assigned a customer request for $serviceTitle from $customerName ($customerPhone). Note: $dispatchNote',
+            type: 'enquiry',
+            metadata: {
+              'enquiry_id': enquiryId,
+              'customer_name': customerName,
+              'customer_phone': customerPhone,
+              'service': serviceTitle,
+              'category': category,
+              'subcategory': subcategory,
+              'is_continuous_alert': true,
+              'dispatched_by_admin': true,
+              'dispatch_note': dispatchNote,
+            },
+          );
+        } catch (_) {}
+      }
 
       // 2. Direct continuous ringing alert broadcast to provider device
       try {
@@ -4210,15 +4517,71 @@ class SupabaseService {
       } catch (_) {}
     }
 
-    // 3. Update enquiry row in database with dispatch metadata and status
+    // 3. Update primary enquiry row in database with dispatch metadata and status
     final dispatchSummary = 'Dispatched to ${targetProviders.length} providers (${providerNames.take(3).join(', ')}${providerNames.length > 3 ? '...' : ''}). Note: $dispatchNote';
     try {
       await client.from('enquiries').update({
         'status': 'dispatched',
-        'provider_name': providerNames.isNotEmpty ? providerNames.first : 'Area Providers',
+        'provider_name': providerNames.join(', '),
         'provider_id': providerIds.isNotEmpty ? providerIds.first : null,
+        'provider_user_id': targetProviders.first['user_id']?.toString(),
+        'admin_dispatch_note': dispatchSummary,
         'updated_at': now,
       }).eq('id', enquiryId);
+
+      // 4. If multiple providers selected, also insert duplicate linked enquiry entries
+      // for each subsequent provider so they each have a distinct enquiry record in their dashboard
+      if (targetProviders.length > 1) {
+        for (int i = 1; i < targetProviders.length; i++) {
+          final tp = targetProviders[i];
+          final tpId = tp['id']?.toString();
+          final tpUserId = tp['user_id']?.toString();
+          final tpName = tp['business_name']?.toString() ?? tp['owner_name']?.toString() ?? 'Partner';
+          try {
+            await client.from('enquiries').insert({
+              'title': serviceTitle,
+              'service_title': serviceTitle,
+              'description': 'Customer Requirement: ${requirementMessage ?? ''}\n(Admin Dispatched to $tpName)',
+              'customer_name': customerName,
+              'customer_phone': customerPhone,
+              'provider_name': tpName,
+              if (tpId != null) 'provider_id': tpId,
+              if (tpUserId != null) 'provider_user_id': tpUserId,
+              'category': category,
+              'subcategory': subcategory,
+              'preferred_date': preferredDate,
+              'preferred_time': preferredTime,
+              'message': requirementMessage,
+              'status': 'dispatched',
+              'admin_dispatch_note': 'Linked dispatch from primary request #$enquiryId. Note: $dispatchNote',
+              'created_at': now,
+              'updated_at': now,
+            });
+          } catch (dupErr) {
+            debugPrint('[SupabaseService] Linked dispatch insert note: $dupErr');
+          }
+        }
+      }
+
+      // 5. Notify Customer that Admin forwarded their request to area providers
+      try {
+        final enq = await client.from('enquiries').select('customer_id').eq('id', enquiryId).maybeSingle();
+        final cId = enq?['customer_id']?.toString();
+        if (cId != null && cId.isNotEmpty) {
+          await client.from('notifications').insert({
+            'user_id': cId,
+            'title': '🚀 Request Forwarded to Area Providers (#$enquiryId)',
+            'body': 'Admin dispatched your request for $serviceTitle to ${targetProviders.length} verified providers in your area. They will respond shortly!',
+            'type': 'enquiry_update',
+            'metadata': {
+              'enquiry_id': enquiryId,
+              'status': 'dispatched',
+            },
+            'is_read': false,
+            'created_at': now,
+          });
+        }
+      } catch (_) {}
     } catch (_) {}
 
     return {
@@ -4286,6 +4649,22 @@ class SupabaseService {
         } catch (_) {}
       }
 
+      // 3. Notify Admin and Customer via NotificationService
+      try {
+        final custName = enquiry?['customer_name'] as String? ?? 'Customer';
+        await NotificationService.instance.notifyServiceRequestUpdated(
+          enquiryId: enquiryId,
+          updatedBy: 'partner',
+          status: 'replied',
+          customerId: customerId,
+          customerName: custName,
+          providerId: providerId,
+          providerName: providerName,
+          serviceTitle: serviceTitle,
+          replyText: replyText,
+        );
+      } catch (_) {}
+
       return true;
     } catch (e) {
       debugPrint('[SupabaseService] replyToEnquiry error: $e');
@@ -4296,11 +4675,43 @@ class SupabaseService {
   Future<bool> updateEnquiryStatus({
     required String enquiryId,
     required String status,
+    String updatedBy = 'partner', // 'partner' or 'admin'
+    String? adminNote,
   }) async {
     try {
-      await client.from('enquiries').update({
+      final updateData = <String, dynamic>{
         'status': status,
-      }).eq('id', enquiryId);
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (adminNote != null && adminNote.trim().isNotEmpty) {
+        updateData['admin_dispatch_note'] = adminNote.trim();
+      }
+
+      await client.from('enquiries').update(updateData).eq('id', enquiryId);
+
+      // Notify relevant parties
+      try {
+        final enq = await client
+            .from('enquiries')
+            .select('customer_id, customer_name, provider_id, provider_user_id, provider_name, service_title')
+            .eq('id', enquiryId)
+            .maybeSingle();
+        if (enq != null) {
+          await NotificationService.instance.notifyServiceRequestUpdated(
+            enquiryId: enquiryId,
+            updatedBy: updatedBy,
+            status: status,
+            customerId: enq['customer_id'] as String?,
+            customerName: enq['customer_name'] as String?,
+            providerId: enq['provider_id'] as String?,
+            providerUserId: enq['provider_user_id'] as String?,
+            providerName: enq['provider_name'] as String?,
+            serviceTitle: enq['service_title'] as String?,
+            adminNote: adminNote,
+          );
+        }
+      } catch (_) {}
+
       return true;
     } catch (e) {
       debugPrint('[SupabaseService] updateEnquiryStatus error: $e');

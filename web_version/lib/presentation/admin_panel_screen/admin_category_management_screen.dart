@@ -193,8 +193,23 @@ class _AdminCategoryManagementScreenState
       await SupabaseService.instance.adminDeleteSubcategory(subId);
       CategoryService.instance.invalidateCache();
       await _loadCategories();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Subcategory deleted successfully!'),
+            backgroundColor: Color(0xFF00C853),
+          ),
+        );
+      }
     } catch (e) {
-      // ignore
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete subcategory: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

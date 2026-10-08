@@ -754,6 +754,7 @@ class NotificationService {
   }
 
   /// Notify when a customer submits an enquiry to a provider
+  /// Notify when a customer submits an enquiry to a provider
   Future<void> notifyEnquirySubmitted({
     required String enquiryId,
     required String subcategory,
@@ -761,6 +762,7 @@ class NotificationService {
     required String customerName,
     required String customerPhone,
     required String providerId,
+    String? providerUserId,
     required String providerName,
     required String message,
   }) async {
@@ -778,12 +780,12 @@ class NotificationService {
       final now = DateTime.now().toIso8601String();
 
       // Lookup provider user_id
-      String? targetProviderUserId;
+      String? targetProviderUserId = providerUserId;
       final isUuid = RegExp(
               r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
           .hasMatch(providerId.trim());
 
-      if (isUuid) {
+      if ((targetProviderUserId == null || targetProviderUserId.isEmpty) && isUuid) {
         try {
           final provRow = await SupabaseService.instance.client
               .from('service_providers')
@@ -801,7 +803,7 @@ class NotificationService {
       }
 
       // If still not resolved by UUID, search by business_name or owner_name
-      if (targetProviderUserId == null && providerName.trim().isNotEmpty) {
+      if ((targetProviderUserId == null || targetProviderUserId.isEmpty) && providerName.trim().isNotEmpty) {
         try {
           final provRow = await SupabaseService.instance.client
               .from('service_providers')
@@ -816,10 +818,18 @@ class NotificationService {
       }
 
       // 1. Notify Provider via Database Notification
+      final Set<String> targetIds = {};
       if (targetProviderUserId != null && targetProviderUserId.isNotEmpty) {
+        targetIds.add(targetProviderUserId);
+      }
+      if (isUuid && providerId.isNotEmpty && providerId != targetProviderUserId) {
+        targetIds.add(providerId);
+      }
+
+      for (final tid in targetIds) {
         try {
           await SupabaseService.instance.client.from('notifications').insert({
-            'user_id': targetProviderUserId,
+            'user_id': tid,
             'title': '📩 New Customer Enquiry (#$enquiryId)',
             'body':
                 '$customerName ($customerPhone) sent an enquiry for $subcategory: "$message"',
@@ -830,6 +840,7 @@ class NotificationService {
               'customer_name': customerName,
               'customer_phone': customerPhone,
               'provider_id': providerId,
+              'provider_user_id': targetProviderUserId,
               'provider_name': providerName,
               'subcategory': subcategory,
               'service': subcategory,
@@ -842,56 +853,328 @@ class NotificationService {
         } catch (provDbErr) {
           debugPrint('[NotificationService] Provider db notification note: $provDbErr');
         }
-
-        // Trigger instant continuous ringing broadcast to provider device
-        try {
-          await sendProviderContinuousAlert(
-            targetUserId: targetProviderUserId,
-            targetProviderId: providerId,
-            title: '📩 New Customer Enquiry (#$enquiryId)',
-            body: '$customerName sent an enquiry for $subcategory.',
-            enquiryId: enquiryId,
-            customerName: customerName,
-            customerPhone: customerPhone,
-            serviceName: subcategory,
-            subcategory: subcategory,
-            message: message,
-            isEnquiry: true,
-          );
-        } catch (bcastErr) {
-          debugPrint('[NotificationService] Provider broadcast note: $bcastErr');
-        }
       }
 
-      // 2. Notify Customer (Single chime)
+      // Trigger instant continuous ringing broadcast to provider device
+      try {
+        await sendProviderContinuousAlert(
+          targetUserId: targetProviderUserId ?? providerId,
+          targetProviderId: providerId,
+          title: '📩 New Customer Enquiry (#$enquiryId)',
+          body: '$customerName sent an enquiry for $subcategory.',
+          enquiryId: enquiryId,
+          customerName: customerName,
+          customerPhone: customerPhone,
+          serviceName: subcategory,
+          subcategory: subcategory,
+          message: message,
+          isEnquiry: true,
+        );
+      } catch (bcastErr) {
+        debugPrint('[NotificationService] Provider broadcast note: $bcastErr');
+      }
+
+      // 2. Notify Customer (Single chime & in-app local notification)
       if (customerId.isNotEmpty) {
         try {
           await SupabaseService.instance.client.from('notifications').insert({
             'user_id': customerId,
-            'title': 'Enquiry Submitted (#$enquiryId)',
-            'body': 'Your enquiry for $subcategory has reached $providerName.',
+            'title': '✅ Service Request Submitted (#$enquiryId)',
+            'body': 'Your request for $subcategory has been submitted. Provider $providerName has been notified and will contact you.',
             'type': 'enquiry',
-            'metadata': {'enquiry_id': enquiryId},
+            'metadata': {
+              'enquiry_id': enquiryId,
+              'provider_name': providerName,
+              'service': subcategory,
+            },
             'is_read': false,
             'created_at': now,
           });
+
+          // Show local confirmation notification on user device
+          showLocalNotification(
+            id: enquiryId.hashCode,
+            title: '✅ Request Sent: $subcategory',
+            body: 'Provider $providerName has been notified.',
+            channelId: 'booking_notifications',
+            channelName: 'Service Bookings & Updates',
+          );
         } catch (_) {}
       }
 
-      // 3. Notify Admin (Single chime)
+      // 3. Notify Admin (Realtime broadcast & DB record)
       try {
         await SupabaseService.instance.client.from('notifications').insert({
           'target_audience': 'admin',
-          'title': '📋 New Platform Enquiry (#$enquiryId)',
-          'body': '$customerName ➔ $providerName ($subcategory)',
+          'title': '📋 New Service Request (#$enquiryId)',
+          'body': 'Customer: $customerName ($customerPhone) ➔ Partner: $providerName ($subcategory)',
           'type': 'admin_broadcast',
-          'metadata': {'enquiry_id': enquiryId, 'audience': 'admin'},
+          'metadata': {
+            'enquiry_id': enquiryId,
+            'audience': 'admin',
+            'customer_name': customerName,
+            'provider_name': providerName,
+            'service': subcategory,
+          },
           'is_read': false,
           'created_at': now,
         });
+
+        // Broadcast to admin channel
+        try {
+          final adminChan = SupabaseService.instance.client.channel('public:global_notifications_and_broadcasts');
+          await adminChan.sendBroadcastMessage(
+            event: 'admin_push_notification',
+            payload: {
+              'title': '📋 New Service Request (#$enquiryId)',
+              'body': '$customerName in your area requested $subcategory ($providerName)',
+              'target_type': 'admin',
+              'enquiry_id': enquiryId,
+            },
+          );
+        } catch (_) {}
       } catch (_) {}
     } catch (e) {
       debugPrint('[NotificationService] notifyEnquirySubmitted error: $e');
+    }
+  }
+
+  /// Notify all relevant parties (Customer, Partner, Admin) whenever any update is made
+  Future<void> notifyServiceRequestUpdated({
+    required String enquiryId,
+    required String updatedBy, // 'partner' or 'admin'
+    required String status,
+    String? customerId,
+    String? customerName,
+    String? providerId,
+    String? providerUserId,
+    String? providerName,
+    String? serviceTitle,
+    String? replyText,
+    String? newProviderName,
+    String? adminNote,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final sTitle = serviceTitle ?? 'Service Request';
+
+    try {
+      if (updatedBy == 'partner') {
+        // 1. Notify Customer about partner update
+        if (customerId != null && customerId.isNotEmpty) {
+          final bodyText = (replyText != null && replyText.trim().isNotEmpty)
+              ? '$providerName replied: "$replyText"'
+              : '$providerName updated request status to ${status.toUpperCase()}.';
+
+          await SupabaseService.instance.client.from('notifications').insert({
+            'user_id': customerId,
+            'title': '💬 Partner Update: $providerName',
+            'body': bodyText,
+            'type': 'enquiry',
+            'metadata': {
+              'enquiry_id': enquiryId,
+              'status': status,
+              'provider_name': providerName,
+            },
+            'is_read': false,
+            'created_at': now,
+          });
+
+          showLocalNotification(
+            id: enquiryId.hashCode ^ 1,
+            title: '💬 Update from $providerName',
+            body: bodyText,
+            channelId: 'booking_notifications',
+            channelName: 'Service Updates',
+          );
+        }
+
+        // 2. Notify Admin about partner update
+        await SupabaseService.instance.client.from('notifications').insert({
+          'target_audience': 'admin',
+          'title': '📊 Partner Update (#$enquiryId)',
+          'body': '$providerName updated status to ${status.toUpperCase()} for $customerName ($sTitle).',
+          'type': 'admin_broadcast',
+          'metadata': {
+            'enquiry_id': enquiryId,
+            'status': status,
+            'audience': 'admin',
+          },
+          'is_read': false,
+          'created_at': now,
+        });
+      } else {
+        // Updated by Admin
+        // 1. Notify Customer about admin action
+        if (customerId != null && customerId.isNotEmpty) {
+          final bodyText = newProviderName != null
+              ? 'Your request has been reassigned to $newProviderName. ${adminNote ?? ""}'
+              : 'Admin updated request status to ${status.toUpperCase()}. ${adminNote ?? ""}';
+
+          await SupabaseService.instance.client.from('notifications').insert({
+            'user_id': customerId,
+            'title': '🚀 Admin Action on Request (#$enquiryId)',
+            'body': bodyText.trim(),
+            'type': 'enquiry',
+            'metadata': {
+              'enquiry_id': enquiryId,
+              'status': status,
+              'new_provider': newProviderName,
+            },
+            'is_read': false,
+            'created_at': now,
+          });
+
+          showLocalNotification(
+            id: enquiryId.hashCode ^ 2,
+            title: '🚀 Service Request Updated',
+            body: bodyText.trim(),
+            channelId: 'booking_notifications',
+            channelName: 'Service Updates',
+          );
+        }
+
+        // 2. Notify Partner(s)
+        final targetPid = providerUserId ?? providerId;
+        if (targetPid != null && targetPid.isNotEmpty) {
+          final pBody = (adminNote != null && adminNote.trim().isNotEmpty)
+              ? 'Admin note: "$adminNote"'
+              : 'Status changed to ${status.toUpperCase()} by Admin.';
+
+          await SupabaseService.instance.client.from('notifications').insert({
+            'user_id': targetPid,
+            'title': 'ℹ️ Admin Update on Request (#$enquiryId)',
+            'body': pBody,
+            'type': 'enquiry',
+            'metadata': {
+              'enquiry_id': enquiryId,
+              'status': status,
+            },
+            'is_read': false,
+            'created_at': now,
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('[NotificationService] notifyServiceRequestUpdated error: $e');
+    }
+  }
+
+  /// Notify Admin and Complainant when a complaint is raised
+  Future<void> notifyComplaintRaised({
+    required String complaintNumber,
+    required String customerName,
+    required String providerName,
+    required String issue,
+    required String severity,
+    required String raisedBy,
+    String? customerId,
+    String? providerId,
+    String? providerUserId,
+    String? enquiryId,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+
+    try {
+      // 1. Notify Admin (Immediate high-priority alert)
+      await SupabaseService.instance.client.from('notifications').insert({
+        'target_audience': 'admin',
+        'title': '⚠️ Complaint Raised ($complaintNumber)',
+        'body': '[$raisedBy.toUpperCase()] $customerName vs $providerName: "$issue" (Severity: ${severity.toUpperCase()})',
+        'type': 'admin_broadcast',
+        'metadata': {
+          'complaint_number': complaintNumber,
+          'enquiry_id': enquiryId,
+          'severity': severity,
+          'audience': 'admin',
+        },
+        'is_read': false,
+        'created_at': now,
+      });
+
+      // 2. Notify Complainant with confirmation
+      final complainantId = raisedBy == 'customer' ? customerId : (providerUserId ?? providerId);
+      if (complainantId != null && complainantId.isNotEmpty) {
+        await SupabaseService.instance.client.from('notifications').insert({
+          'user_id': complainantId,
+          'title': 'Complaint Registered ($complaintNumber)',
+          'body': 'Your complaint regarding $providerName has been registered. Our admin team will investigate and take action.',
+          'type': 'general',
+          'metadata': {
+            'complaint_number': complaintNumber,
+            'enquiry_id': enquiryId,
+          },
+          'is_read': false,
+          'created_at': now,
+        });
+
+        showLocalNotification(
+          id: complaintNumber.hashCode,
+          title: 'Complaint Registered ($complaintNumber)',
+          body: 'Admin team is investigating your report.',
+          channelId: 'booking_notifications',
+          channelName: 'Service Complaints',
+        );
+      }
+    } catch (e) {
+      debugPrint('[NotificationService] notifyComplaintRaised error: $e');
+    }
+  }
+
+  /// Notify Customer and/or Partner when Admin resolves / replies to a complaint
+  Future<void> notifyComplaintResolved({
+    required String complaintNumber,
+    required String adminReply,
+    String? customerId,
+    String? providerId,
+    String? providerUserId,
+    bool notifyCustomer = true,
+    bool notifyProvider = true,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+
+    try {
+      if (notifyCustomer && customerId != null && customerId.isNotEmpty) {
+        await SupabaseService.instance.client.from('notifications').insert({
+          'user_id': customerId,
+          'title': '📢 Admin Resolution for Complaint ($complaintNumber)',
+          'body': adminReply,
+          'type': 'general',
+          'metadata': {
+            'complaint_number': complaintNumber,
+            'is_resolution': true,
+          },
+          'is_read': false,
+          'created_at': now,
+        });
+
+        showLocalNotification(
+          id: complaintNumber.hashCode ^ 3,
+          title: 'Admin Resolution ($complaintNumber)',
+          body: adminReply,
+          channelId: 'booking_notifications',
+          channelName: 'Service Complaints',
+        );
+      }
+
+      if (notifyProvider) {
+        final pId = providerUserId ?? providerId;
+        if (pId != null && pId.isNotEmpty) {
+          await SupabaseService.instance.client.from('notifications').insert({
+            'user_id': pId,
+            'title': '📢 Admin Resolution for Complaint ($complaintNumber)',
+            'body': adminReply,
+            'type': 'general',
+            'metadata': {
+              'complaint_number': complaintNumber,
+              'is_resolution': true,
+            },
+            'is_read': false,
+            'created_at': now,
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('[NotificationService] notifyComplaintResolved error: $e');
     }
   }
 
@@ -1070,7 +1353,11 @@ class NotificationService {
               final targetAudience = newRecord['target_audience'] as String?;
 
               bool applies = false;
-              if (uid == null || (currentUserId != null && uid == currentUserId)) {
+              if (uid == null ||
+                  (currentUserId != null && uid == currentUserId) ||
+                  (_cachedProviderId != null && uid == _cachedProviderId) ||
+                  (targetAudience == 'all') ||
+                  (targetAudience == 'providers' && _cachedProviderId != null)) {
                 applies = true;
               }
 
@@ -1079,7 +1366,9 @@ class NotificationService {
               // Check if partner/provider continuous alarm applies
               final isContinuous = metadata['is_continuous_alert'] == true;
 
-              if (isContinuous && currentUserId != null && uid == currentUserId) {
+              if (isContinuous &&
+                  ((currentUserId != null && uid == currentUserId) ||
+                   (_cachedProviderId != null && uid == _cachedProviderId))) {
                 // Partner gets continuous ringing alarm!
                 final isEnquiry = type == 'enquiry';
                 final bookingId = metadata['order_id']?.toString() ?? metadata['booking_id']?.toString();
@@ -1137,10 +1426,16 @@ class NotificationService {
       final user = SupabaseService.instance.currentUser;
       if (user == null) return;
       try {
-        final res = await SupabaseService.instance.client
+        var query = SupabaseService.instance.client
             .from('notifications')
-            .select()
-            .eq('user_id', user.id)
+            .select();
+        if (_cachedProviderId != null && _cachedProviderId != user.id) {
+          query = query.or('user_id.eq.${user.id},user_id.eq.$_cachedProviderId');
+        } else {
+          query = query.eq('user_id', user.id);
+        }
+
+        final res = await query
             .eq('is_read', false)
             .order('created_at', ascending: false)
             .limit(10);

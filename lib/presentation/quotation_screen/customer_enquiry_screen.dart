@@ -593,6 +593,15 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
                         ),
                       ),
                     ),
+                    IconButton(
+                      tooltip: 'Report Issue / Raise Complaint',
+                      onPressed: () => _showRaiseComplaintDialog(item),
+                      icon: const Icon(Icons.report_problem_outlined, size: 20, color: Color(0xFFEF4444)),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFFEF2F2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
                     if (status == 'pending') ...[
                       const SizedBox(width: 8),
                       TextButton.icon(
@@ -622,6 +631,182 @@ class _CustomerEnquiryScreenState extends State<CustomerEnquiryScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showRaiseComplaintDialog(Map<String, dynamic> item) async {
+    final issueCtrl = TextEditingController();
+    String selectedSeverity = 'medium';
+    bool submitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.report_problem_rounded, color: Color(0xFFEF4444), size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Report Issue / Complaint',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Partner: ${item['provider_name'] ?? 'Assigned Partner'}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF334155),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Service: ${item['service_name'] ?? item['category_name'] ?? 'Service Request'}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Severity Level:',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF475569),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: selectedSeverity,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'low', child: Text('Low - General inquiry / minor delay')),
+                    DropdownMenuItem(value: 'medium', child: Text('Medium - Provider not responding')),
+                    DropdownMenuItem(value: 'high', child: Text('High - Poor service / request new partner')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDlgState(() => selectedSeverity = val);
+                  },
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Describe the Issue:',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF475569),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: issueCtrl,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: 'Describe any issue with this provider or booking. Admin will review and can reassign a new provider or assist you...',
+                    hintStyle: GoogleFonts.plusJakartaSans(fontSize: 12, color: Colors.grey),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: submitting ? null : () async {
+                final issue = issueCtrl.text.trim();
+                if (issue.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please describe the issue')),
+                  );
+                  return;
+                }
+                setDlgState(() => submitting = true);
+                try {
+                  final enquiryId = item['id']?.toString() ?? '';
+                  final custId = item['customer_id']?.toString() ?? SupabaseService.instance.currentUser?.id ?? '';
+                  final custName = item['customer_name']?.toString() ?? 'Customer';
+                  final provId = item['provider_id']?.toString();
+                  final provName = item['provider_name']?.toString() ?? 'Partner';
+
+                  final res = await SupabaseService.instance.submitComplaint(
+                    customerId: custId,
+                    customerName: custName,
+                    issue: issue,
+                    orderId: null,
+                    providerId: provId,
+                    providerName: provName,
+                    severity: selectedSeverity,
+                    enquiryId: enquiryId,
+                    raisedBy: 'customer',
+                  );
+
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    if (res != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Complaint submitted (Ref: $res). Admin notified!'),
+                          backgroundColor: const Color(0xFF10B981),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to submit complaint. Please try again.'),
+                          backgroundColor: Color(0xFFEF4444),
+                        ),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFEF4444)),
+                    );
+                  }
+                }
+              },
+              child: submitting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text('Submit Complaint', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
       ),
     );
   }

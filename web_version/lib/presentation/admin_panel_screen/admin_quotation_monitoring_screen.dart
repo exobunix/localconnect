@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 
@@ -69,8 +70,14 @@ class _AdminQuotationMonitoringScreenState
       _error = null;
     });
     try {
+      final currentArea = SupabaseService.instance.currentAdminArea;
+      final areaFilter = (currentArea.isNotEmpty && currentArea.toUpperCase() != 'ALL')
+          ? currentArea
+          : null;
       final quotations = await SupabaseService.instance.adminGetAllQuotations();
-      final enquiries = await SupabaseService.instance.adminGetAllEnquiries();
+      final enquiries = await SupabaseService.instance.adminGetAllEnquiries(
+        areaFilter: areaFilter,
+      );
 
       int accepted = 0, rejected = 0, pending = 0, sent = 0, negotiating = 0;
       double totalVal = 0;
@@ -139,21 +146,63 @@ class _AdminQuotationMonitoringScreenState
     }).toList();
   }
 
+  String _selectedEnquiryStatusFilter = 'all';
+  final List<String> _enquiryStatusFilters = [
+    'all',
+    'unassigned',
+    'unresponsive',
+    'pending',
+    'dispatched',
+    'quoted',
+    'accepted',
+    'completed',
+    'cancelled',
+  ];
+
   List<Map<String, dynamic>> get _filteredEnquiries {
     return _enquiries.where((e) {
-      final provider =
-          (e['provider'] as Map<String, dynamic>?)?['business_name']
-              ?.toString()
-              .toLowerCase() ??
-          '';
-      final customer =
-          (e['customer'] as Map<String, dynamic>?)?['full_name']
-              ?.toString()
-              .toLowerCase() ??
-          '';
-      return _searchQuery.isEmpty ||
+      final provider = (e['provider_name'] ??
+              (e['provider'] as Map<String, dynamic>?)?['business_name'] ??
+              '')
+          .toString()
+          .toLowerCase();
+      final customer = (e['customer_name'] ??
+              (e['customer'] as Map<String, dynamic>?)?['full_name'] ??
+              '')
+          .toString()
+          .toLowerCase();
+      final service = (e['service_title'] ??
+              e['title'] ??
+              e['subcategory'] ??
+              e['category'] ??
+              '')
+          .toString()
+          .toLowerCase();
+      final phone = (e['customer_phone'] ?? '').toString().toLowerCase();
+      final msg = (e['message'] ?? e['description'] ?? '').toString().toLowerCase();
+      final status = (e['status'] ?? 'pending').toString().toLowerCase();
+      final provId = (e['provider_id'] ?? '').toString().trim();
+      final provReply = (e['provider_reply'] ?? '').toString().trim();
+
+      final matchesSearch = _searchQuery.isEmpty ||
           provider.contains(_searchQuery) ||
-          customer.contains(_searchQuery);
+          customer.contains(_searchQuery) ||
+          service.contains(_searchQuery) ||
+          phone.contains(_searchQuery) ||
+          msg.contains(_searchQuery);
+
+      bool matchesStatus;
+      if (_selectedEnquiryStatusFilter == 'all') {
+        matchesStatus = true;
+      } else if (_selectedEnquiryStatusFilter == 'unassigned') {
+        matchesStatus = provId.isEmpty || provId == 'null' || provider.isEmpty || provider == 'provider';
+      } else if (_selectedEnquiryStatusFilter == 'unresponsive') {
+        matchesStatus = (status == 'pending' || status == 'dispatched') && provReply.isEmpty;
+      } else {
+        matchesStatus = status == _selectedEnquiryStatusFilter;
+      }
+
+      return matchesSearch && matchesStatus;
     }).toList();
   }
 
@@ -166,16 +215,24 @@ class _AdminQuotationMonitoringScreenState
         foregroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          'Quotation Monitoring',
+          'Service Requests & Quotations',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 14.sp,
+            fontSize: 13.sp,
             fontWeight: FontWeight.w700,
             color: Colors.white,
           ),
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.report_problem_rounded),
+            tooltip: 'Complaints & Reassignment',
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.adminComplaintsScreen);
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
             onPressed: _loadData,
           ),
         ],
@@ -185,13 +242,13 @@ class _AdminQuotationMonitoringScreenState
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
           labelStyle: GoogleFonts.plusJakartaSans(
-            fontSize: 10.sp,
+            fontSize: 9.5.sp,
             fontWeight: FontWeight.w600,
           ),
-          tabs: const [
-            Tab(text: 'Analytics'),
-            Tab(text: 'All Quotations'),
-            Tab(text: 'Enquiries'),
+          tabs: [
+            const Tab(text: 'Analytics'),
+            Tab(text: 'Quotations (${_quotations.length})'),
+            Tab(text: 'Service Requests (${_enquiries.length})'),
           ],
         ),
       ),
@@ -654,12 +711,91 @@ class _AdminQuotationMonitoringScreenState
             ),
           ),
         ),
+        // Status filter chips
+        Container(
+          color: Colors.white,
+          height: 38,
+          margin: const EdgeInsets.only(bottom: 6),
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: 4.w),
+            itemCount: _enquiryStatusFilters.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (ctx, i) {
+              final filter = _enquiryStatusFilters[i];
+              final isSelected = _selectedEnquiryStatusFilter == filter;
+              String labelText;
+              if (filter == 'all') {
+                labelText = 'All (${_enquiries.length})';
+              } else if (filter == 'unassigned') {
+                final count = _enquiries.where((e) {
+                  final pId = (e['provider_id'] ?? '').toString().trim();
+                  final pName = (e['provider_name'] ??
+                          (e['provider'] as Map<String, dynamic>?)?['business_name'] ??
+                          '')
+                      .toString()
+                      .trim();
+                  return pId.isEmpty || pId == 'null' || pName.isEmpty || pName.toLowerCase() == 'provider';
+                }).length;
+                labelText = '⚠️ Unassigned ($count)';
+              } else if (filter == 'unresponsive') {
+                final count = _enquiries.where((e) {
+                  final st = (e['status'] ?? 'pending').toString().toLowerCase();
+                  final rep = (e['provider_reply'] ?? '').toString().trim();
+                  return (st == 'pending' || st == 'dispatched') && rep.isEmpty;
+                }).length;
+                labelText = '⏳ Unresponsive ($count)';
+              } else {
+                final count = _enquiries
+                    .where((e) =>
+                        (e['status'] ?? 'pending').toString().toLowerCase() ==
+                        filter)
+                    .length;
+                labelText =
+                    '${filter[0].toUpperCase()}${filter.substring(1)} ($count)';
+              }
+
+              final chipColor = filter == 'unassigned'
+                  ? const Color(0xFFE11D48)
+                  : filter == 'unresponsive'
+                      ? const Color(0xFFD97706)
+                      : AppTheme.primary;
+
+              return FilterChip(
+                label: Text(
+                  labelText,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 8.5.sp,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? Colors.white : const Color(0xFF475569),
+                  ),
+                ),
+                selected: isSelected,
+                selectedColor: chipColor,
+                backgroundColor: const Color(0xFFF1F5F9),
+                checkmarkColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: isSelected ? chipColor : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                onSelected: (_) {
+                  setState(() {
+                    _selectedEnquiryStatusFilter = filter;
+                  });
+                },
+              );
+            },
+          ),
+        ),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 0.8.h),
+          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 0.6.h),
           child: Row(
             children: [
               Text(
-                '${filtered.length} enquir${filtered.length != 1 ? 'ies' : 'y'} found',
+                '${filtered.length} service request${filtered.length != 1 ? 's' : ''} found',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 9.sp,
                   color: Colors.grey[600],
@@ -1028,6 +1164,9 @@ class _AdminQuotationMonitoringScreenState
     final providerReply = e['provider_reply'] as String? ?? '';
     final repliedAt = e['replied_at'] != null ? _formatDate(e['replied_at']) : '';
     final createdAt = _formatDate(e['created_at']);
+    final pId = (e['provider_id'] ?? '').toString().trim();
+    final hasNoProvider = pId.isEmpty || pId == 'null' || providerName == 'Provider' || providerName.isEmpty;
+    final isUnresponsive = (status == 'pending' || status == 'dispatched') && providerReply.isEmpty;
 
     return Container(
       margin: EdgeInsets.only(bottom: 2.h),
@@ -1268,6 +1407,112 @@ class _AdminQuotationMonitoringScreenState
                   SizedBox(height: 1.h),
                 ],
 
+                // Admin dispatch note banner
+                if (e['admin_dispatch_note'] != null &&
+                    e['admin_dispatch_note'].toString().trim().isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    margin: EdgeInsets.only(bottom: 1.h),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF93C5FD)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.send_rounded,
+                          size: 15,
+                          color: Color(0xFF2563EB),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Admin Dispatched to Area Providers:',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 8.5.sp,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E40AF),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                e['admin_dispatch_note'].toString(),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9.sp,
+                                  color: const Color(0xFF1E3A8A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Action required alert banner for Admin
+                if (hasNoProvider) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    margin: EdgeInsets.only(bottom: 1.h),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1F2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFECDD3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFE11D48)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'No suitable provider assigned. Tap "Dispatch" below to forward to area providers.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 8.5.sp,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF9F1239),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (isUnresponsive) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    margin: EdgeInsets.only(bottom: 1.h),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.hourglass_top_rounded, size: 16, color: Color(0xFFD97706)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Awaiting partner response. If unavailable/delayed, dispatch to other area providers.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 8.5.sp,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF92400E),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 // Admin action row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1281,6 +1526,33 @@ class _AdminQuotationMonitoringScreenState
                     ),
                     Row(
                       children: [
+                        // Dispatch to Providers button
+                        ElevatedButton.icon(
+                          onPressed: () =>
+                              _showDispatchToProvidersDialog(context, e),
+                          icon: const Icon(Icons.send_rounded, size: 12),
+                          label: Text(
+                            hasNoProvider ? 'Dispatch Now' : 'Dispatch',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 8.5.sp,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: hasNoProvider ? const Color(0xFFE11D48) : const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            elevation: 0,
+                            visualDensity: VisualDensity.compact,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         PopupMenuButton<String>(
                           onSelected: (val) async {
                             await SupabaseService.instance.updateEnquiryStatus(
@@ -1290,7 +1562,10 @@ class _AdminQuotationMonitoringScreenState
                             _loadData();
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(6),
@@ -1306,39 +1581,75 @@ class _AdminQuotationMonitoringScreenState
                                     color: const Color(0xFF475569),
                                   ),
                                 ),
-                                const Icon(Icons.arrow_drop_down_rounded, size: 16, color: Color(0xFF475569)),
+                                const Icon(
+                                  Icons.arrow_drop_down_rounded,
+                                  size: 16,
+                                  color: Color(0xFF475569),
+                                ),
                               ],
                             ),
                           ),
                           itemBuilder: (_) => [
-                            const PopupMenuItem(value: 'pending', child: Text('Pending')),
-                            const PopupMenuItem(value: 'quoted', child: Text('Quoted')),
-                            const PopupMenuItem(value: 'accepted', child: Text('Accepted')),
-                            const PopupMenuItem(value: 'completed', child: Text('Completed')),
-                            const PopupMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                            const PopupMenuItem(
+                              value: 'pending',
+                              child: Text('Pending'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'dispatched',
+                              child: Text('Dispatched'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'quoted',
+                              child: Text('Quoted'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'accepted',
+                              child: Text('Accepted'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'completed',
+                              child: Text('Completed'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'cancelled',
+                              child: Text('Cancelled'),
+                            ),
                           ],
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.red,
+                            size: 18,
+                          ),
                           onPressed: () async {
                             final confirm = await showDialog<bool>(
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 title: const Text('Delete Enquiry'),
-                                content: const Text('Are you sure you want to delete this enquiry record?'),
+                                content: const Text(
+                                  'Are you sure you want to delete this enquiry record?',
+                                ),
                                 actions: [
-                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
                                   ElevatedButton(
                                     onPressed: () => Navigator.pop(ctx, true),
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                    ),
                                     child: const Text('Delete'),
                                   ),
                                 ],
                               ),
                             );
                             if (confirm == true) {
-                              await SupabaseService.instance.deleteEnquiry(enquiryId);
+                              await SupabaseService.instance.deleteEnquiry(
+                                enquiryId,
+                              );
                               _loadData();
                             }
                           },
@@ -1362,7 +1673,9 @@ class _AdminQuotationMonitoringScreenState
       decoration: BoxDecoration(
         color: _statusColor(status).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _statusColor(status).withValues(alpha: 0.4)),
+        border: Border.all(
+          color: _statusColor(status).withValues(alpha: 0.4),
+        ),
       ),
       child: Text(
         status.toUpperCase(),
@@ -1379,6 +1692,8 @@ class _AdminQuotationMonitoringScreenState
     switch (status.toLowerCase()) {
       case 'pending':
         return Colors.orange;
+      case 'dispatched':
+        return const Color(0xFF2563EB);
       case 'sent':
         return Colors.blue;
       case 'quoted':
@@ -1397,6 +1712,47 @@ class _AdminQuotationMonitoringScreenState
     }
   }
 
+  Future<void> _showDispatchToProvidersDialog(
+    BuildContext context,
+    Map<String, dynamic> enquiry,
+  ) async {
+    final enquiryId = enquiry['id']?.toString() ?? '';
+    final category = enquiry['category'] as String? ?? '';
+    final subcategory = enquiry['subcategory'] as String? ?? '';
+    final customerCity =
+        (enquiry['customer'] as Map<String, dynamic>?)?['city'] as String? ??
+            enquiry['city'] as String?;
+    final serviceTitle = enquiry['service_title'] as String? ??
+        enquiry['title'] as String? ??
+        'Service Request';
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => _DispatchDialogContent(
+        enquiryId: enquiryId,
+        category: category,
+        subcategory: subcategory,
+        city: customerCity,
+        serviceTitle: serviceTitle,
+        enquiry: enquiry,
+        onDispatched: () {
+          Navigator.of(dialogCtx).pop();
+          _loadData();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Service request successfully dispatched to selected providers!',
+                style: GoogleFonts.plusJakartaSans(),
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _launchUrl(String url) async {
     try {
       await launchUrl(Uri.parse(url));
@@ -1413,3 +1769,516 @@ class _AdminQuotationMonitoringScreenState
     }
   }
 }
+
+class _DispatchDialogContent extends StatefulWidget {
+  final String enquiryId;
+  final String category;
+  final String subcategory;
+  final String? city;
+  final String serviceTitle;
+  final Map<String, dynamic> enquiry;
+  final VoidCallback onDispatched;
+
+  const _DispatchDialogContent({
+    required this.enquiryId,
+    required this.category,
+    required this.subcategory,
+    this.city,
+    required this.serviceTitle,
+    required this.enquiry,
+    required this.onDispatched,
+  });
+
+  @override
+  State<_DispatchDialogContent> createState() => _DispatchDialogContentState();
+}
+
+class _DispatchDialogContentState extends State<_DispatchDialogContent> {
+  bool _isLoading = true;
+  bool _isSubmitting = false;
+  List<Map<String, dynamic>> _providers = [];
+  final Set<String> _selectedProviderIds = {};
+  late TextEditingController _noteController;
+  final TextEditingController _searchFilter = TextEditingController();
+  String _providerSearch = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _noteController = TextEditingController(
+      text:
+          'Urgent customer service request in your area (${widget.city ?? 'Local'}). Please check details and respond immediately.',
+    );
+    _fetchProviders();
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    _searchFilter.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchProviders({bool broadenSearch = false}) async {
+    setState(() => _isLoading = true);
+    try {
+      final providers =
+          await SupabaseService.instance.adminGetProvidersForDispatch(
+        category: broadenSearch ? null : widget.category,
+        subcategory: broadenSearch ? null : widget.subcategory,
+        city: widget.city,
+      );
+      if (mounted) {
+        setState(() {
+          _providers = providers;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredProviders {
+    if (_providerSearch.isEmpty) return _providers;
+    final q = _providerSearch.toLowerCase();
+    return _providers.where((p) {
+      final name = (p['business_name'] ?? '').toString().toLowerCase();
+      final phone = (p['phone'] ?? '').toString().toLowerCase();
+      final city = (p['city'] ?? '').toString().toLowerCase();
+      final cat = (p['category'] ?? '').toString().toLowerCase();
+      return name.contains(q) ||
+          phone.contains(q) ||
+          city.contains(q) ||
+          cat.contains(q);
+    }).toList();
+  }
+
+  Future<void> _submitDispatch() async {
+    if (_selectedProviderIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please select at least one provider to dispatch to.',
+            style: GoogleFonts.plusJakartaSans(),
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    final selectedList = _providers
+        .where((p) => _selectedProviderIds.contains(p['id'].toString()))
+        .toList();
+
+    final custName = (widget.enquiry['customer_name'] as String?) ??
+        (widget.enquiry['customer'] as Map<String, dynamic>?)?['full_name'] as String? ??
+        'Customer';
+    final custPhone = (widget.enquiry['customer_phone'] as String?) ??
+        (widget.enquiry['customer'] as Map<String, dynamic>?)?['phone'] as String? ??
+        '';
+    final pDate = widget.enquiry['preferred_date']?.toString();
+    final pTime = widget.enquiry['preferred_time']?.toString();
+    final reqMsg = (widget.enquiry['message'] ?? widget.enquiry['description'])?.toString();
+
+    final result = await SupabaseService.instance.adminDispatchEnquiryToProviders(
+      enquiryId: widget.enquiryId,
+      targetProviders: selectedList,
+      dispatchNote: _noteController.text.trim(),
+      customerName: custName,
+      customerPhone: custPhone,
+      serviceTitle: widget.serviceTitle,
+      category: widget.category,
+      subcategory: widget.subcategory,
+      preferredDate: pDate,
+      preferredTime: pTime,
+      requirementMessage: reqMsg,
+    );
+
+    final ok = result['success'] == true;
+
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      if (ok) {
+        widget.onDispatched();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to dispatch request: ${result['error'] ?? 'Please try again.'}',
+              style: GoogleFonts.plusJakartaSans(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredProviders;
+    final allSelected = filtered.isNotEmpty &&
+        filtered.every((p) => _selectedProviderIds.contains(p['id'].toString()));
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 600,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Color(0xFF2563EB),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.forward_to_inbox_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dispatch Service Request',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          widget.serviceTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9.sp,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Service summary card
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Area: ${widget.city ?? "Local"}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF2563EB),
+                                ),
+                              ),
+                              if (widget.category.isNotEmpty) ...[
+                                const Text(' • '),
+                                Text(
+                                  widget.category,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 9.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF475569),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Requirement: ${(widget.enquiry['message'] ?? widget.enquiry['description'] ?? 'Service required').toString()}',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 9.sp,
+                              color: const Color(0xFF334155),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Dispatch Note to Providers
+                    Text(
+                      'Dispatch Note / Instructions to Providers',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 9.5.sp,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1E293B),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _noteController,
+                      maxLines: 2,
+                      style: GoogleFonts.plusJakartaSans(fontSize: 9.5.sp),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.all(10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        hintText: 'Enter dispatch instructions...',
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Available Providers Section Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Available Providers (${_selectedProviderIds.length}/${filtered.length} selected)',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                        if (filtered.isNotEmpty)
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                if (allSelected) {
+                                  _selectedProviderIds.clear();
+                                } else {
+                                  for (final p in filtered) {
+                                    _selectedProviderIds
+                                        .add(p['id'].toString());
+                                  }
+                                }
+                              });
+                            },
+                            child: Text(
+                              allSelected ? 'Deselect All' : 'Select All',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 9.sp,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF2563EB),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Filter search inside dialog
+                    TextField(
+                      controller: _searchFilter,
+                      style: GoogleFonts.plusJakartaSans(fontSize: 9.5.sp),
+                      decoration: InputDecoration(
+                        hintText: 'Search provider name, phone, city...',
+                        prefixIcon: const Icon(Icons.search, size: 18),
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (val) {
+                        setState(() {
+                          _providerSearch = val.trim();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Providers List
+                    if (_isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (filtered.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        alignment: Alignment.center,
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.person_search_rounded,
+                              size: 40,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No matching providers found in this category/area.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 9.5.sp,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton(
+                              onPressed: () =>
+                                  _fetchProviders(broadenSearch: true),
+                              child: const Text('Show All Active Providers'),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        itemBuilder: (ctx, i) {
+                          final p = filtered[i];
+                          final id = p['id'].toString();
+                          final isChecked = _selectedProviderIds.contains(id);
+                          final name = p['business_name'] ?? 'Provider';
+                          final phone = p['phone'] ?? '';
+                          final cat = p['category'] ?? '';
+                          final city = p['city'] ?? '';
+
+                          return CheckboxListTile(
+                            value: isChecked,
+                            activeColor: const Color(0xFF2563EB),
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              name,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 9.5.sp,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${cat.isNotEmpty ? '$cat • ' : ''}${city.isNotEmpty ? '$city • ' : ''}$phone',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 8.5.sp,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                            onChanged: (val) {
+                              setState(() {
+                                if (val == true) {
+                                  _selectedProviderIds.add(id);
+                                } else {
+                                  _selectedProviderIds.remove(id);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Footer actions
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: const Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: _isSubmitting ? null : _submitDispatch,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.send_rounded, size: 16),
+                    label: Text(
+                      _isSubmitting
+                          ? 'Dispatching...'
+                          : 'Dispatch to ${_selectedProviderIds.length} Providers',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

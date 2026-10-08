@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 
@@ -148,6 +149,8 @@ class _AdminQuotationMonitoringScreenState
   String _selectedEnquiryStatusFilter = 'all';
   final List<String> _enquiryStatusFilters = [
     'all',
+    'unassigned',
+    'unresponsive',
     'pending',
     'dispatched',
     'quoted',
@@ -178,6 +181,8 @@ class _AdminQuotationMonitoringScreenState
       final phone = (e['customer_phone'] ?? '').toString().toLowerCase();
       final msg = (e['message'] ?? e['description'] ?? '').toString().toLowerCase();
       final status = (e['status'] ?? 'pending').toString().toLowerCase();
+      final provId = (e['provider_id'] ?? '').toString().trim();
+      final provReply = (e['provider_reply'] ?? '').toString().trim();
 
       final matchesSearch = _searchQuery.isEmpty ||
           provider.contains(_searchQuery) ||
@@ -186,8 +191,16 @@ class _AdminQuotationMonitoringScreenState
           phone.contains(_searchQuery) ||
           msg.contains(_searchQuery);
 
-      final matchesStatus = _selectedEnquiryStatusFilter == 'all' ||
-          status == _selectedEnquiryStatusFilter;
+      bool matchesStatus;
+      if (_selectedEnquiryStatusFilter == 'all') {
+        matchesStatus = true;
+      } else if (_selectedEnquiryStatusFilter == 'unassigned') {
+        matchesStatus = provId.isEmpty || provId == 'null' || provider.isEmpty || provider == 'provider';
+      } else if (_selectedEnquiryStatusFilter == 'unresponsive') {
+        matchesStatus = (status == 'pending' || status == 'dispatched') && provReply.isEmpty;
+      } else {
+        matchesStatus = status == _selectedEnquiryStatusFilter;
+      }
 
       return matchesSearch && matchesStatus;
     }).toList();
@@ -211,7 +224,15 @@ class _AdminQuotationMonitoringScreenState
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.report_problem_rounded),
+            tooltip: 'Complaints & Reassignment',
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.adminComplaintsScreen);
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
             onPressed: _loadData,
           ),
         ],
@@ -703,11 +724,46 @@ class _AdminQuotationMonitoringScreenState
             itemBuilder: (ctx, i) {
               final filter = _enquiryStatusFilters[i];
               final isSelected = _selectedEnquiryStatusFilter == filter;
+              String labelText;
+              if (filter == 'all') {
+                labelText = 'All (${_enquiries.length})';
+              } else if (filter == 'unassigned') {
+                final count = _enquiries.where((e) {
+                  final pId = (e['provider_id'] ?? '').toString().trim();
+                  final pName = (e['provider_name'] ??
+                          (e['provider'] as Map<String, dynamic>?)?['business_name'] ??
+                          '')
+                      .toString()
+                      .trim();
+                  return pId.isEmpty || pId == 'null' || pName.isEmpty || pName.toLowerCase() == 'provider';
+                }).length;
+                labelText = '⚠️ Unassigned ($count)';
+              } else if (filter == 'unresponsive') {
+                final count = _enquiries.where((e) {
+                  final st = (e['status'] ?? 'pending').toString().toLowerCase();
+                  final rep = (e['provider_reply'] ?? '').toString().trim();
+                  return (st == 'pending' || st == 'dispatched') && rep.isEmpty;
+                }).length;
+                labelText = '⏳ Unresponsive ($count)';
+              } else {
+                final count = _enquiries
+                    .where((e) =>
+                        (e['status'] ?? 'pending').toString().toLowerCase() ==
+                        filter)
+                    .length;
+                labelText =
+                    '${filter[0].toUpperCase()}${filter.substring(1)} ($count)';
+              }
+
+              final chipColor = filter == 'unassigned'
+                  ? const Color(0xFFE11D48)
+                  : filter == 'unresponsive'
+                      ? const Color(0xFFD97706)
+                      : AppTheme.primary;
+
               return FilterChip(
                 label: Text(
-                  filter == 'all'
-                      ? 'All (${_enquiries.length})'
-                      : '${filter[0].toUpperCase()}${filter.substring(1)} (${_enquiries.where((e) => (e['status'] ?? 'pending').toString().toLowerCase() == filter).length})',
+                  labelText,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 8.5.sp,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -715,14 +771,14 @@ class _AdminQuotationMonitoringScreenState
                   ),
                 ),
                 selected: isSelected,
-                selectedColor: AppTheme.primary,
+                selectedColor: chipColor,
                 backgroundColor: const Color(0xFFF1F5F9),
                 checkmarkColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                   side: BorderSide(
-                    color: isSelected ? AppTheme.primary : const Color(0xFFE2E8F0),
+                    color: isSelected ? chipColor : const Color(0xFFE2E8F0),
                   ),
                 ),
                 onSelected: (_) {
@@ -1108,6 +1164,9 @@ class _AdminQuotationMonitoringScreenState
     final providerReply = e['provider_reply'] as String? ?? '';
     final repliedAt = e['replied_at'] != null ? _formatDate(e['replied_at']) : '';
     final createdAt = _formatDate(e['created_at']);
+    final pId = (e['provider_id'] ?? '').toString().trim();
+    final hasNoProvider = pId.isEmpty || pId == 'null' || providerName == 'Provider' || providerName.isEmpty;
+    final isUnresponsive = (status == 'pending' || status == 'dispatched') && providerReply.isEmpty;
 
     return Container(
       margin: EdgeInsets.only(bottom: 2.h),
@@ -1397,6 +1456,63 @@ class _AdminQuotationMonitoringScreenState
                   ),
                 ],
 
+                // Action required alert banner for Admin
+                if (hasNoProvider) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    margin: EdgeInsets.only(bottom: 1.h),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1F2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFECDD3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFE11D48)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'No suitable provider assigned. Tap "Dispatch" below to forward to area providers.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 8.5.sp,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF9F1239),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (isUnresponsive) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    margin: EdgeInsets.only(bottom: 1.h),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.hourglass_top_rounded, size: 16, color: Color(0xFFD97706)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Awaiting partner response. If unavailable/delayed, dispatch to other area providers.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 8.5.sp,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF92400E),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 // Admin action row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1416,14 +1532,14 @@ class _AdminQuotationMonitoringScreenState
                               _showDispatchToProvidersDialog(context, e),
                           icon: const Icon(Icons.send_rounded, size: 12),
                           label: Text(
-                            'Dispatch',
+                            hasNoProvider ? 'Dispatch Now' : 'Dispatch',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 8.5.sp,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
+                            backgroundColor: hasNoProvider ? const Color(0xFFE11D48) : const Color(0xFF2563EB),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
