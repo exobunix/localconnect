@@ -280,7 +280,7 @@ class SupabaseService {
     required String fullName,
     String phone = '',
     String role = 'customer',
-    String city = 'Pune',
+    String city = '',
   }) async {
     // Merge roles[] from existing profile so we accumulate, not overwrite.
     List<String> combinedRoles = [role];
@@ -679,6 +679,12 @@ class SupabaseService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getServiceProviders({
+    String? category,
+    String? city,
+    int limit = 50,
+  }) => getProviders(category: category, city: city, limit: limit);
+
   Future<Map<String, dynamic>?> getProviderById(String providerId) async {
     try {
       final response = await client
@@ -767,23 +773,57 @@ class SupabaseService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getAdminAllOrders() async {
+  Future<List<Map<String, dynamic>>> getAdminAllOrders({
+    String? areaFilter,
+  }) async {
     try {
+      final effectiveArea = (areaFilter != null &&
+              areaFilter.isNotEmpty &&
+              areaFilter.toUpperCase() != 'ALL')
+          ? areaFilter
+          : (!isSuperAdmin &&
+                  currentAdminArea.isNotEmpty &&
+                  currentAdminArea.toUpperCase() != 'ALL')
+              ? currentAdminArea
+              : null;
+
       final response = await client
           .from('orders')
           .select(
             '*, '
             'provider:provider_id(id, business_name, owner_name, phone, rating, image_url, city, category, address), '
-            'customer:customer_id(id, full_name, email, phone)',
+            'customer:customer_id(id, full_name, email, phone, city)',
           )
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response).map((o) {
+      final mapped = List<Map<String, dynamic>>.from(response).map((o) {
         final customer = o['customer'] as Map<String, dynamic>?;
         return {
           ...o,
-          'customer_name': customer?['full_name'] ?? customer?['email'] ?? o['customer_id'] ?? 'Customer',
+          'customer_name': customer?['full_name'] ??
+              customer?['email'] ??
+              o['customer_id'] ??
+              'Customer',
         };
       }).toList();
+
+      if (effectiveArea != null) {
+        final q = effectiveArea.toLowerCase();
+        return mapped.where((o) {
+          final prov = o['provider'] as Map<String, dynamic>?;
+          final cust = o['customer'] as Map<String, dynamic>?;
+          final provCity = (prov?['city'] ?? o['provider_city'] ?? '')
+              .toString()
+              .toLowerCase();
+          final custCity =
+              (cust?['city'] ?? o['city'] ?? '').toString().toLowerCase();
+          final notes = (o['notes'] ?? '').toString().toLowerCase();
+          return provCity.contains(q) ||
+              custCity.contains(q) ||
+              notes.contains(q);
+        }).toList();
+      }
+
+      return mapped;
     } catch (e) {
       debugPrint('getAdminAllOrders error: $e');
       return [];
@@ -795,6 +835,123 @@ class SupabaseService {
     required Map<String, dynamic> updates,
   }) async {
     await client.from('orders').update(updates).eq('id', orderId);
+  }
+
+  /// Admin reassigns a direct booking/order to a new provider in the area
+  Future<bool> adminReassignOrderProvider({
+    required String orderId,
+    required Map<String, dynamic> newProvider,
+    required String reasonNote,
+    String? previousProviderId,
+  }) async {
+    try {
+      final newProvId = newProvider['id']?.toString() ?? '';
+      final newProvUserId =
+          newProvider['user_id']?.toString() ?? newProvId;
+      final newProvName = newProvider['business_name']?.toString() ??
+          newProvider['owner_name']?.toString() ??
+          'Provider';
+
+      // 1. Fetch current order
+      final orderRes = await client
+          .from('orders')
+          .select(
+              'id, order_number, customer_id, customer_name, service, category, amount')
+          .eq('id', orderId)
+          .maybeSingle();
+
+      final customerId = orderRes?['customer_id']?.toString();
+      final customerName =
+          orderRes?['customer_name']?.toString() ?? 'Customer';
+      final serviceName = orderRes?['service']?.toString() ?? 'Service';
+      final orderNum = orderRes?['order_number']?.toString() ?? orderId;
+
+      final now = DateTime.now().toIso8601String();
+      final adminLog =
+          'Reassigned by Admin to $newProvName. Note: $reasonNote ($now)';
+
+      // 2. Update order row
+      await client.from('orders').update({
+        'provider_id': newProvId,
+        'provider_name': newProvName,
+        'status': 'pending',
+        'notes': adminLog,
+        'updated_at': now,
+      }).eq('id', orderId);
+
+      // 3. Notify new provider with continuous ringing alert & DB notification
+      try {
+        await insertOrderNotification(
+          userId: newProvUserId,
+          title: '🚨 Admin Reassigned Service Request ($orderNum)',
+          body:
+              'Admin assigned booking for $serviceName from $customerName to you. Note: $reasonNote',
+          type: 'booking',
+          metadata: {
+            'order_id': orderId,
+            'booking_id': orderId,
+            'order_number': orderNum,
+            'customer_name': customerName,
+            'service': serviceName,
+            'is_continuous_alert': true,
+            'dispatched_by_admin': true,
+          },
+        );
+
+        await NotificationService.instance.sendProviderContinuousAlert(
+          targetUserId: newProvUserId,
+          targetProviderId: newProvId,
+          title: '🚨 Admin Reassigned Booking ($orderNum)',
+          body:
+              'Customer $customerName needs $serviceName in your area! Tap to respond.',
+          bookingId: orderId,
+          customerName: customerName,
+          serviceName: serviceName,
+          amount: orderRes?['amount']?.toString(),
+          message: reasonNote,
+        );
+      } catch (_) {}
+
+      // 4. Notify customer of reassignment
+      if (customerId != null && customerId.isNotEmpty) {
+        try {
+          await client.from('notifications').insert({
+            'user_id': customerId,
+            'title': '🔄 Service Provider Reassigned ($orderNum)',
+            'body':
+                'Your request for $serviceName has been reassigned to $newProvName by Admin. They have been notified to assist you immediately.',
+            'type': 'order_update',
+            'metadata': {
+              'order_id': orderId,
+              'order_number': orderNum,
+              'provider_name': newProvName,
+              'status': 'pending',
+            },
+            'is_read': false,
+            'created_at': now,
+          });
+        } catch (_) {}
+      }
+
+      // 5. Notify old provider if specified
+      if (previousProviderId != null && previousProviderId.isNotEmpty) {
+        try {
+          await insertOrderNotification(
+            userId: previousProviderId,
+            title: 'ℹ️ Booking Reassigned',
+            body:
+                'Order $orderNum for $serviceName has been reassigned to another partner by Admin.',
+            type: 'booking',
+            metadata: {'order_id': orderId, 'is_reassigned': true},
+          );
+        } catch (_) {}
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] adminReassignOrderProvider error: $e');
+      return false;
+    }
   }
 
   // ─── ORDER TRACKING ───────────────────────────────────────────────────────

@@ -489,12 +489,26 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             title: 'Admin Accounts & Area Access',
             subtitle: SupabaseService.instance.isSuperAdmin
                 ? 'Create & manage multiple admin accounts and city assignments'
-                : 'Assigned City: ${SupabaseService.instance.currentAdminArea}',
+                : 'Assigned City: ${SupabaseService.instance.currentAdminArea} (Super Admin Only)',
             color: const Color(0xFF1E88E5),
-            onTap: () => Navigator.pushNamed(
-              context,
-              AppRoutes.adminAccountsManagementScreen,
-            ),
+            onTap: () {
+              if (SupabaseService.instance.isSuperAdmin) {
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.adminAccountsManagementScreen,
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Access Restricted: Only Super Admins can manage Sub-Admin accounts and regional jurisdictions.',
+                      style: GoogleFonts.plusJakartaSans(),
+                    ),
+                    backgroundColor: const Color(0xFFD32F2F),
+                  ),
+                );
+              }
+            },
           ),
           _buildSettingsTile(
             icon: Icons.category_rounded,
@@ -987,11 +1001,56 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         child: Column(
           children: [
             const AdminAppBarWidget(),
+            _buildSubAdminAreaBanner(),
             Expanded(child: _buildTabContent()),
           ],
         ),
       ),
       bottomNavigationBar: _buildFloatingNav(),
+    );
+  }
+
+  Widget _buildSubAdminAreaBanner() {
+    if (SupabaseService.instance.isSuperAdmin) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFE3F2FD),
+        border: Border(bottom: BorderSide(color: Color(0xFF90CAF9))),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.location_city_rounded, size: 16, color: Color(0xFF0288D1)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Sub-Admin Dashboard  •  Area: ${SupabaseService.instance.currentAdminArea.isNotEmpty ? SupabaseService.instance.currentAdminArea : "Assigned Area"}',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF01579B),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0288D1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              'AREA ADMIN',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1055,6 +1114,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               child: Column(
                 children: [
                   const AdminAppBarWidget(),
+                  _buildSubAdminAreaBanner(),
                   Expanded(
                     child: _selectedNavIndex == 0
                         ? SingleChildScrollView(

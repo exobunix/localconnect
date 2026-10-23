@@ -1918,6 +1918,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
             ],
           ),
+          if (_isProfileIncomplete()) ...[
+            const SizedBox(height: 10),
+            _buildProfileIncompleteBanner(),
+          ],
           const SizedBox(height: 10),
           // ─── Provider Advertising & Promotion Banner ────────────────────
           GestureDetector(
@@ -2355,7 +2359,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'Customer Enquiries & Leads',
+                    'Customer Enquiries & Quotations',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -2391,100 +2395,146 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          // ── Virtual Shop Edit Button ──────────────────────────────────────
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const VirtualShopSetupScreen(isEditing: true),
-              ),
-            ).then((_) => _loadDashboard()),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF26C6A6), Color(0xFF00897B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+          if (_isShopProvider()) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const VirtualShopSetupScreen(isEditing: true),
                 ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.storefront_rounded,
-                    color: Colors.white,
-                    size: 15,
+              ).then((_) => _loadDashboard()),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF26C6A6), Color(0xFF00897B)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Edit Virtual Shop',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const Spacer(),
-                  const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: Colors.white,
-                    size: 12,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // ── Customer Enquiries Button ─────────────────────────────────────
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const ProviderEnquiriesScreen(),
-              ),
-            ),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF7B1FA2), Color(0xFF9C27B0)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.request_quote_rounded,
-                    color: Colors.white,
-                    size: 15,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Customer Enquiries & Quotations',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.storefront_rounded,
                       color: Colors.white,
+                      size: 15,
                     ),
-                  ),
-                  const Spacer(),
-                  const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: Colors.white,
-                    size: 12,
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Text(
+                      'Edit Virtual Shop & Inventory',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Colors.white,
+                      size: 12,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
+          if (_isTransportProvider()) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => Navigator.pushNamed(
+                context,
+                AppRoutes.transportRideProviderDashboard,
+              ),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEF6C00), Color(0xFFF57C00)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.directions_car_rounded,
+                      color: Colors.white,
+                      size: 15,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Transport & Rides Dashboard',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Colors.white,
+                      size: 12,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (_isRentalProvider()) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => Navigator.pushNamed(
+                context,
+                AppRoutes.roomProviderDashboard,
+              ),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6A1B9A), Color(0xFF8E24AA)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.home_work_rounded,
+                      color: Colors.white,
+                      size: 15,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Rental & Accommodation Dashboard',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Colors.white,
+                      size: 12,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           GestureDetector(
             onTap: () => Navigator.push(
@@ -2716,6 +2766,104 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  bool _isProfileIncomplete() {
+    if (_providerProfile == null) return false;
+    final city = (_providerProfile!['city'] as String? ?? '').trim();
+    final phone = (_providerProfile!['phone'] as String? ?? '').trim();
+    final cat = (_providerProfile!['category'] as String? ?? '').trim();
+    return city.isEmpty || phone.isEmpty || cat.isEmpty;
+  }
+
+  bool _isShopProvider() {
+    final cat = (_providerProfile?['category'] ?? '').toString().toLowerCase();
+    final sub = (_providerProfile?['subcategory'] ?? '').toString().toLowerCase();
+    return cat.contains('shop') || cat.contains('retail') || cat.contains('store') ||
+           sub.contains('shop') || sub.contains('hardware') || sub.contains('electrical');
+  }
+
+  bool _isTransportProvider() {
+    final cat = (_providerProfile?['category'] ?? '').toString().toLowerCase();
+    final sub = (_providerProfile?['subcategory'] ?? '').toString().toLowerCase();
+    return cat.contains('transport') || cat.contains('ride') || cat.contains('cab') ||
+           cat.contains('driver') || sub.contains('ride') || sub.contains('goods');
+  }
+
+  bool _isRentalProvider() {
+    final cat = (_providerProfile?['category'] ?? '').toString().toLowerCase();
+    final sub = (_providerProfile?['subcategory'] ?? '').toString().toLowerCase();
+    return cat.contains('rent') || cat.contains('room') || cat.contains('pg') ||
+           cat.contains('hostel') || sub.contains('room') || sub.contains('pg') || sub.contains('villa');
+  }
+
+  Widget _buildProfileIncompleteBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFB74D), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFFE65100), size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Action Required: Complete Profile',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFE65100),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Your operating city or service category is missing. Fill it in so customers in your area can discover and book you.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    color: const Color(0xFF5D4037),
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: _openMyProfile,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE65100),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Complete Profile Now',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -4236,14 +4384,18 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     final businessName = _providerProfile?['business_name'] as String? ??
         _providerProfile?['full_name'] as String? ??
         'Local Service Provider';
-    final category = _providerProfile?['category'] as String? ?? 'Home Maintenance';
     final city = _providerProfile?['city'] as String? ??
         _providerProfile?['business_city'] as String? ??
-        'Pune';
+        '';
+    final category = _providerProfile?['category'] as String? ?? 'Services';
     final providerId = _providerProfile?['id'] as String? ?? '';
 
     final titleCtrl = TextEditingController(text: '$businessName - Expert $category');
-    final subtitleCtrl = TextEditingController(text: 'Book verified $category services in $city. Instant confirmation!');
+    final subtitleCtrl = TextEditingController(
+      text: city.isNotEmpty
+          ? 'Book verified $category services in $city. Instant confirmation!'
+          : 'Book verified $category services. Instant confirmation!',
+    );
     final imageCtrl = TextEditingController(text: _providerProfile?['image_url'] as String? ?? '');
     int selectedDays = 15;
     bool isSubmitting = false;

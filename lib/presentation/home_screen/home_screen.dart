@@ -94,9 +94,23 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           } catch (_) {}
         }
+      } else if (_selectedCity.isEmpty && mounted) {
+        // Automatic location could not be detected — prompt user to choose location manually
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _selectedCity.isEmpty) {
+            _showCitySelector();
+          }
+        });
       }
     } catch (e) {
       debugPrint('[HomeScreen] GPS init error: $e');
+      if (_selectedCity.isEmpty && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _selectedCity.isEmpty) {
+            _showCitySelector();
+          }
+        });
+      }
     }
   }
 

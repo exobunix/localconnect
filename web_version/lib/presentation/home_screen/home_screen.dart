@@ -77,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // 2. Request GPS location dynamically
     try {
       final loc = await LocationService.instance.getGpsLocation(
-        timeout: const Duration(seconds: 6),
+        timeout: const Duration(seconds: 12),
       );
       if (loc != null && loc.displayCity.isNotEmpty && mounted) {
         setState(() {
@@ -94,9 +94,23 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           } catch (_) {}
         }
+      } else if (_selectedCity.isEmpty && mounted) {
+        // Automatic location could not be detected — prompt user to choose location manually
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _selectedCity.isEmpty) {
+            _showCitySelector();
+          }
+        });
       }
     } catch (e) {
       debugPrint('[HomeScreen] GPS init error: $e');
+      if (_selectedCity.isEmpty && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _selectedCity.isEmpty) {
+            _showCitySelector();
+          }
+        });
+      }
     }
   }
 

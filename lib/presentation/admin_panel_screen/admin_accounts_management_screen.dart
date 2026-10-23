@@ -80,7 +80,8 @@ class _AdminAccountsManagementScreenState
       text: isEditing ? '' : 'Admin@1234',
     );
     String selectedRole = admin?['role'] ?? 'area_admin';
-    String selectedArea = admin?['assigned_area'] ?? 'Pune';
+    String selectedArea = admin?['assigned_area'] ?? '';
+    final customAreaCtrl = TextEditingController(text: selectedArea);
     bool isActive = admin?['is_active'] ?? true;
     bool obscurePassword = true;
 
@@ -177,8 +178,13 @@ class _AdminAccountsManagementScreenState
                     if (val != null) {
                       setDialogState(() {
                         selectedRole = val;
-                        if (val == 'super_admin') selectedArea = 'ALL';
-                        else if (selectedArea == 'ALL') selectedArea = 'Pune';
+                        if (val == 'super_admin') {
+                          selectedArea = 'ALL';
+                          customAreaCtrl.text = 'ALL';
+                        } else if (customAreaCtrl.text == 'ALL' || customAreaCtrl.text.isEmpty) {
+                          selectedArea = '';
+                          customAreaCtrl.text = '';
+                        }
                       });
                     }
                   },
@@ -193,20 +199,39 @@ class _AdminAccountsManagementScreenState
                   ),
                 ),
                 const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  value: _commonCities.contains(selectedArea) ? selectedArea : 'Pune',
+                TextField(
+                  controller: customAreaCtrl,
+                  enabled: selectedRole != 'super_admin',
                   decoration: InputDecoration(
+                    labelText: 'Assigned City / Region',
+                    hintText: 'e.g. Pune, Mumbai, Nashik, Alibag, etc.',
+                    prefixIcon: const Icon(Icons.location_city_rounded, size: 20),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  items: _commonCities
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c == 'ALL' ? 'ALL Areas (Nationwide)' : c)))
-                      .toList(),
-                  onChanged: selectedRole == 'super_admin'
-                      ? null
-                      : (val) {
-                          if (val != null) setDialogState(() => selectedArea = val);
-                        },
+                ),
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _commonCities
+                        .where((c) => c != 'ALL')
+                        .map((c) => Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ActionChip(
+                                label: Text(c, style: const TextStyle(fontSize: 11)),
+                                onPressed: selectedRole == 'super_admin'
+                                    ? null
+                                    : () {
+                                        setDialogState(() {
+                                          customAreaCtrl.text = c;
+                                          selectedArea = c;
+                                        });
+                                      },
+                              ),
+                            ))
+                        .toList(),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -239,6 +264,9 @@ class _AdminAccountsManagementScreenState
               onPressed: () async {
                 final name = nameCtrl.text.trim();
                 final email = emailCtrl.text.trim();
+                final area = selectedRole == 'super_admin'
+                    ? 'ALL'
+                    : customAreaCtrl.text.trim();
                 if (name.isEmpty || email.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Please fill name and email')),
@@ -253,7 +281,7 @@ class _AdminAccountsManagementScreenState
                   fullName: name,
                   phone: phoneCtrl.text.trim(),
                   role: selectedRole,
-                  assignedArea: selectedArea,
+                  assignedArea: area,
                   isActive: isActive,
                 );
                 if (success) {
@@ -411,6 +439,57 @@ class _AdminAccountsManagementScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (!SupabaseService.instance.isSuperAdmin) {
+      return Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(
+          backgroundColor: AppTheme.primary,
+          title: Text(
+            'Access Restricted',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.gpp_bad_rounded, size: 64, color: Color(0xFFD32F2F)),
+                const SizedBox(height: 16),
+                Text(
+                  'Super Admin Privileges Required',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1A1C1E),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Only Super Administrators can create or manage Sub-Admin accounts and their assigned service regions.\n\nYour current account is configured as Area Admin for ${SupabaseService.instance.currentAdminArea}.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final filtered = _filteredAdmins;
     final superAdminCount = _admins.where((a) => a['role'] == 'super_admin').length;
     final areaAdminCount = _admins.where((a) => a['role'] == 'area_admin').length;

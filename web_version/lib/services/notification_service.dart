@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 import 'notification_hub_service.dart';
+import '../routes/app_routes.dart';
 
 /// Comprehensive Notification & Audio Engine for LocalConnect
 /// Supports:
@@ -502,6 +504,55 @@ class NotificationService {
 
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('[NotificationService] Notification tapped: ${response.payload}');
+    _handleNotificationPayload(response.payload);
+  }
+
+  void _handleNotificationPayload(String? rawPayload) {
+    if (rawPayload == null || rawPayload.isEmpty) return;
+    try {
+      final navState = navigatorKey.currentState;
+      if (navState == null) return;
+
+      String? enquiryId;
+      String? orderId;
+      String? bookingId;
+      String? route;
+
+      if (rawPayload.startsWith('{') && rawPayload.endsWith('}')) {
+        try {
+          final Map<String, dynamic> data = jsonDecode(rawPayload);
+          enquiryId = data['enquiry_id']?.toString();
+          orderId = data['order_id']?.toString();
+          bookingId = data['booking_id']?.toString() ?? orderId;
+          route = data['route']?.toString();
+        } catch (_) {}
+      } else if (rawPayload.startsWith('ENQ-') || rawPayload.startsWith('enquiry:')) {
+        enquiryId = rawPayload.replaceAll('enquiry:', '').trim();
+      } else if (rawPayload.startsWith('ORD-') || rawPayload.startsWith('order:')) {
+        orderId = rawPayload.replaceAll('order:', '').trim();
+      }
+
+      if (route != null && route.isNotEmpty) {
+        navState.pushNamed(route);
+        return;
+      }
+
+      if (bookingId != null || orderId != null) {
+        final id = bookingId ?? orderId!;
+        navState.pushNamed(
+          AppRoutes.bookingStatusScreen,
+          arguments: {'orderId': id},
+        );
+        return;
+      }
+
+      if (enquiryId != null) {
+        navState.pushNamed(AppRoutes.customerQuotationBookingsScreen);
+        return;
+      }
+    } catch (e) {
+      debugPrint('[NotificationService] _handleNotificationPayload error: $e');
+    }
   }
 
   // ─── LOCAL PUSH NOTIFICATIONS ─────────────────────────────────────────────
@@ -824,6 +875,43 @@ class NotificationService {
       }
       if (isUuid && providerId.isNotEmpty && providerId != targetProviderUserId) {
         targetIds.add(providerId);
+      }
+
+      // If no specific provider specified or found, broadcast to all matching area providers
+      if (targetIds.isEmpty) {
+        try {
+          var provQuery = SupabaseService.instance.client
+              .from('service_providers')
+              .select('id, user_id, business_name, city, category, subcategory')
+              .eq('is_active', true);
+          if (subcategory.isNotEmpty) {
+            provQuery = provQuery.or('subcategory.ilike.%$subcategory%,category.ilike.%$subcategory%');
+          }
+          final rows = await provQuery.limit(20);
+          for (final row in rows) {
+            final pid = row['id']?.toString();
+            final puid = row['user_id']?.toString();
+            if (puid != null && puid.isNotEmpty) targetIds.add(puid);
+            if (pid != null && pid.isNotEmpty) targetIds.add(pid);
+
+            // Also trigger continuous alert for each matching provider
+            try {
+              await sendProviderContinuousAlert(
+                targetUserId: puid ?? pid ?? '',
+                targetProviderId: pid,
+                title: '📩 New Customer Enquiry (#$enquiryId)',
+                body: '$customerName sent a service request for $subcategory in your area.',
+                enquiryId: enquiryId,
+                customerName: customerName,
+                customerPhone: customerPhone,
+                serviceName: subcategory,
+                subcategory: subcategory,
+                message: message,
+                isEnquiry: true,
+              );
+            } catch (_) {}
+          }
+        } catch (_) {}
       }
 
       for (final tid in targetIds) {

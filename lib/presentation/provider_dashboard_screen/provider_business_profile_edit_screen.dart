@@ -49,6 +49,10 @@ class _ProviderBusinessProfileEditScreenState
   final _languagesCtrl = TextEditingController();
   final _instagramCtrl = TextEditingController();
   final _youtubeCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _priceCtrl = TextEditingController();
+  final _categoryCtrl = TextEditingController();
+  final _subcategoryCtrl = TextEditingController();
 
   String? _profilePhotoUrl;
   String? _coverImageUrl;
@@ -80,6 +84,10 @@ class _ProviderBusinessProfileEditScreenState
     _languagesCtrl.dispose();
     _instagramCtrl.dispose();
     _youtubeCtrl.dispose();
+    _cityCtrl.dispose();
+    _priceCtrl.dispose();
+    _categoryCtrl.dispose();
+    _subcategoryCtrl.dispose();
     super.dispose();
   }
 
@@ -93,6 +101,14 @@ class _ProviderBusinessProfileEditScreenState
         _providerNameCtrl.text = provider['owner_name'] as String? ?? '';
         _descriptionCtrl.text =
             provider['business_description'] as String? ?? '';
+        _categoryCtrl.text = provider['category'] as String? ?? '';
+        _subcategoryCtrl.text = provider['subcategory'] as String? ?? '';
+        _priceCtrl.text = provider['price'] != null
+            ? provider['price'].toString()
+            : (provider['visiting_charge'] != null
+                ? provider['visiting_charge'].toString()
+                : '');
+        _cityCtrl.text = provider['city'] as String? ?? '';
         _yearsExpCtrl.text = (provider['years_experience'] as int? ?? 0)
             .toString();
         _workingHoursCtrl.text =
@@ -258,6 +274,11 @@ class _ProviderBusinessProfileEditScreenState
             'business_name': _businessNameCtrl.text.trim(),
             'owner_name': _providerNameCtrl.text.trim(),
             'business_description': _descriptionCtrl.text.trim(),
+            'category': _categoryCtrl.text.trim(),
+            'subcategory': _subcategoryCtrl.text.trim(),
+            'city': _cityCtrl.text.trim(),
+            'price': double.tryParse(_priceCtrl.text.trim()) ?? 0.0,
+            'visiting_charge': double.tryParse(_priceCtrl.text.trim()) ?? 0.0,
             'years_experience': int.tryParse(_yearsExpCtrl.text) ?? 0,
             'working_hours': _workingHoursCtrl.text.trim(),
             'service_area': _serviceAreaCtrl.text.trim(),
@@ -366,6 +387,24 @@ class _ProviderBusinessProfileEditScreenState
                       hint: 'Your full name',
                     ),
                     _buildField(
+                      'Category / Trade',
+                      _categoryCtrl,
+                      required: true,
+                      hint: 'e.g. Plumber, Electrician, Transport, Shop, Rent',
+                    ),
+                    _buildField(
+                      'Subcategory / Specialization',
+                      _subcategoryCtrl,
+                      hint: 'e.g. Pipe Leakage, Ride, Goods, PG, Hardware',
+                    ),
+                    _buildField(
+                      'Base Visiting / Service Charge (₹)',
+                      _priceCtrl,
+                      required: true,
+                      keyboardType: TextInputType.number,
+                      hint: 'e.g. 299 (prompted on request creation)',
+                    ),
+                    _buildField(
                       'Business Description',
                       _descriptionCtrl,
                       maxLines: 4,
@@ -422,15 +461,22 @@ class _ProviderBusinessProfileEditScreenState
                     Icons.location_on_rounded,
                     [
                       _buildField(
+                        'Operating City (Primary)',
+                        _cityCtrl,
+                        required: true,
+                        hint: 'e.g. Pune, Mumbai, Nashik, Bangalore',
+                      ),
+                      _buildField(
                         'Address',
                         _addressCtrl,
+                        required: true,
                         maxLines: 2,
                         hint: 'Full business address',
                       ),
                       _buildField(
-                        'Service Area',
+                        'Service Area / Localities',
                         _serviceAreaCtrl,
-                        hint: 'e.g. Pune, Nashik, Mumbai',
+                        hint: 'e.g. Kothrud, Baner, Wakad, or 10km radius',
                       ),
                       _buildField(
                         'Google Maps Link (Optional)',

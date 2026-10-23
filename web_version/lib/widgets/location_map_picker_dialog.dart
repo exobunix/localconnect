@@ -50,26 +50,36 @@ class _LocationMapPickerDialogState extends State<LocationMapPickerDialog> {
   bool _isGeocoding = false;
   bool _isGpsLoading = false;
 
-  static const LatLng _defaultLocation = LatLng(18.5204, 73.8567); // Pune default
+  // Initial center fallback: India center (only until GPS or selection loads)
+  static const LatLng _indiaCenter = LatLng(20.5937, 78.9629);
 
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
+    final lastKnown = LocationService.instance.lastKnownLocation;
     if (widget.initialLat != null &&
         widget.initialLng != null &&
         widget.initialLat != 0 &&
         widget.initialLng != 0) {
       _selectedPoint = LatLng(widget.initialLat!, widget.initialLng!);
       _resolvedAddress = widget.initialAddress ?? '';
+    } else if (lastKnown != null && lastKnown.latitude != 0 && lastKnown.longitude != 0) {
+      _selectedPoint = LatLng(lastKnown.latitude, lastKnown.longitude);
+      _resolvedAddress = lastKnown.fullAddress;
+      _resolvedCity = lastKnown.city;
+      _resolvedDistrict = lastKnown.district;
     } else {
-      _selectedPoint = _defaultLocation;
+      _selectedPoint = _indiaCenter;
       if (widget.initialAddress != null) {
         _resolvedAddress = widget.initialAddress!;
       }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _useCurrentGps();
+      });
     }
 
-    if (_resolvedAddress.isEmpty) {
+    if (_resolvedAddress.isEmpty && _selectedPoint != _indiaCenter) {
       _reverseGeocodePoint(_selectedPoint);
     }
   }
@@ -311,7 +321,7 @@ class _LocationMapPickerDialogState extends State<LocationMapPickerDialog> {
                     child: Column(
                       children: [
                         FloatingActionButton.small(
-                          heroTag: 'zoomInWeb',
+                          heroTag: 'zoomIn',
                           backgroundColor: Colors.white,
                           onPressed: () {
                             final zoom = _mapController.camera.zoom;
@@ -321,7 +331,7 @@ class _LocationMapPickerDialogState extends State<LocationMapPickerDialog> {
                         ),
                         const SizedBox(height: 8),
                         FloatingActionButton.small(
-                          heroTag: 'zoomOutWeb',
+                          heroTag: 'zoomOut',
                           backgroundColor: Colors.white,
                           onPressed: () {
                             final zoom = _mapController.camera.zoom;

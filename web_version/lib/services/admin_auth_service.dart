@@ -219,7 +219,7 @@ class AdminAuthService {
       final savedPass = await getAdminPassword(email) ?? (matchingAdmin['password'] as String? ?? '');
       if (savedPass == pwd || pwd == primaryAdminDefaultPassword || pwd == primaryAdminFallbackPassword || isMasterPasscode(pwd)) {
         final role = matchingAdmin['role'] as String? ?? 'area_admin';
-        final area = matchingAdmin['assigned_area'] as String? ?? 'Pune';
+        final area = matchingAdmin['assigned_area'] as String? ?? (role == 'super_admin' ? 'ALL' : '');
         setAdminSessionActive(true);
         SupabaseService.instance.currentAdminEmail = email;
         SupabaseService.instance.currentAdminRole = role;
@@ -242,7 +242,7 @@ class AdminAuthService {
       if (authResponse.user != null) {
         final profile = await SupabaseService.instance.getUserProfile(authResponse.user!.id);
         final role = profile?['role'] as String? ?? 'admin';
-        final area = profile?['city'] as String? ?? 'Pune';
+        final area = profile?['assigned_area'] as String? ?? profile?['city'] as String? ?? (role == 'super_admin' ? 'ALL' : '');
 
         setAdminSessionActive(true);
         SupabaseService.instance.currentAdminEmail = email;
@@ -399,7 +399,7 @@ class AdminAuthService {
             'full_name': profile['full_name'] ?? 'Admin',
             'phone': profile['phone'] ?? '',
             'role': profile['role'] == 'super_admin' ? 'super_admin' : 'area_admin',
-            'assigned_area': profile['city'] ?? 'Pune',
+            'assigned_area': profile['assigned_area'] ?? profile['city'] ?? (profile['role'] == 'super_admin' ? 'ALL' : ''),
             'is_active': profile['is_active'] ?? true,
             'created_at': profile['created_at'] ?? DateTime.now().toIso8601String(),
             'updated_at': profile['updated_at'] ?? DateTime.now().toIso8601String(),
