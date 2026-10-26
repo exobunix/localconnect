@@ -15,12 +15,18 @@ class SupabaseService {
 
   // Admin Role & Area Access Control
   String currentAdminEmail = 'admin@localconnect.com';
-  String currentAdminRole = 'super_admin'; // 'super_admin' or 'area_admin'
+  String currentAdminRole = 'super_admin'; // 'super_admin', 'area_manager', or 'area_admin'
   String currentAdminArea = 'ALL'; // City name or 'ALL'
   bool get isSuperAdmin =>
       currentAdminRole == 'super_admin' ||
-      currentAdminArea == 'ALL' ||
-      currentAdminArea.isEmpty;
+      currentAdminEmail.trim().toLowerCase() == 'admin@localconnect.com' ||
+      (currentAdminArea == 'ALL' &&
+          currentAdminRole != 'area_manager' &&
+          currentAdminRole != 'area_admin');
+
+  bool get isAreaManager =>
+      !isSuperAdmin &&
+      (currentAdminRole == 'area_manager' || currentAdminRole == 'area_admin');
 
   SupabaseService._();
 
@@ -5202,20 +5208,27 @@ class SupabaseService {
   Future<Map<String, dynamic>?> loadAdminProfile() async {
     try {
       final user = currentUser;
-      final email = (user?.email?.isNotEmpty ?? false) ? user!.email! : currentAdminEmail;
-      if (email.isEmpty) {
-        currentAdminRole = 'super_admin';
-        currentAdminArea = 'ALL';
-        return null;
-      }
+      // Prioritize currentAdminEmail that was set upon admin authentication
+      final email = currentAdminEmail.isNotEmpty
+          ? currentAdminEmail
+          : (user?.email?.isNotEmpty ?? false ? user!.email! : 'admin@localconnect.com');
+      
       currentAdminEmail = email;
 
-      if (email.toLowerCase() == 'admin@localconnect.com') {
+      if (email.toLowerCase() == 'admin@localconnect.com' || currentAdminRole == 'super_admin') {
         currentAdminRole = 'super_admin';
         currentAdminArea = 'ALL';
+        return {
+          'id': 'super-admin-primary',
+          'email': 'admin@localconnect.com',
+          'full_name': 'Super Administrator',
+          'role': 'super_admin',
+          'assigned_area': 'ALL',
+          'is_active': true,
+        };
       }
 
-      // Check stored admins in AdminAuthService
+      // Check stored & cloud admins in AdminAuthService
       try {
         final admins = await AdminAuthService.instance.getAllAdmins();
         final match = admins.firstWhere(
@@ -5236,7 +5249,7 @@ class SupabaseService {
             .eq('email', email)
             .maybeSingle();
         if (res != null) {
-          currentAdminRole = res['role'] as String? ?? 'area_admin';
+          currentAdminRole = res['role'] as String? ?? 'area_manager';
           currentAdminArea = res['assigned_area'] as String? ?? 'Pune';
           return res;
         }

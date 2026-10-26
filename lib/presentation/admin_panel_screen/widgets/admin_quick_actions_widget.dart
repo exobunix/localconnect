@@ -10,6 +10,12 @@ class AdminQuickActionsWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       (
+        Icons.admin_panel_settings_rounded,
+        'Area Mgr',
+        const Color(0xFF1E88E5),
+        AppRoutes.adminAccountsManagementScreen,
+      ),
+      (
         Icons.manage_accounts_rounded,
         'User Mgmt',
         AppTheme.primary,

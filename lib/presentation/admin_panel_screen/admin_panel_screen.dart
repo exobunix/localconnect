@@ -486,28 +486,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           const SizedBox(height: 16),
           _buildSettingsTile(
             icon: Icons.admin_panel_settings_rounded,
-            title: 'Admin Accounts & Area Access',
+            title: 'Area Manager / Admin Management & Control',
             subtitle: SupabaseService.instance.isSuperAdmin
-                ? 'Create & manage multiple admin accounts and city assignments'
-                : 'Assigned City: ${SupabaseService.instance.currentAdminArea} (Super Admin Only)',
+                ? 'Create & manage Area Managers, regional admins, and city assignments'
+                : 'Jurisdiction: ${SupabaseService.instance.currentAdminArea} (Super Admin Controlled)',
             color: const Color(0xFF1E88E5),
             onTap: () {
-              if (SupabaseService.instance.isSuperAdmin) {
-                Navigator.pushNamed(
-                  context,
-                  AppRoutes.adminAccountsManagementScreen,
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Access Restricted: Only Super Admins can manage Sub-Admin accounts and regional jurisdictions.',
-                      style: GoogleFonts.plusJakartaSans(),
-                    ),
-                    backgroundColor: const Color(0xFFD32F2F),
-                  ),
-                );
-              }
+              Navigator.pushNamed(
+                context,
+                AppRoutes.adminAccountsManagementScreen,
+              );
             },
           ),
           _buildSettingsTile(
@@ -1025,7 +1013,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Sub-Admin Dashboard  •  Area: ${SupabaseService.instance.currentAdminArea.isNotEmpty ? SupabaseService.instance.currentAdminArea : "Assigned Area"}',
+              'Area Manager Dashboard  •  Jurisdiction: ${SupabaseService.instance.currentAdminArea.isNotEmpty ? SupabaseService.instance.currentAdminArea : "Assigned Area"}',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -1041,7 +1029,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              'AREA ADMIN',
+              'AREA MANAGER',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 9,
                 fontWeight: FontWeight.w800,

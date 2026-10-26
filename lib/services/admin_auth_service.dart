@@ -201,12 +201,21 @@ class AdminAuthService {
       }
     }
 
-    // 3. Check registered admin accounts from storage
-    final registeredAdmins = await getStoredAdminAccounts();
-    final matchingAdmin = registeredAdmins.firstWhere(
+    // 3. Check registered admin accounts from storage or cloud
+    var registeredAdmins = await getStoredAdminAccounts();
+    var matchingAdmin = registeredAdmins.firstWhere(
       (a) => (a['email'] as String? ?? '').toLowerCase() == email,
       orElse: () => <String, dynamic>{},
     );
+
+    // If not found in local cache, fetch fresh from cloud registry
+    if (matchingAdmin.isEmpty) {
+      registeredAdmins = await getAllAdmins();
+      matchingAdmin = registeredAdmins.firstWhere(
+        (a) => (a['email'] as String? ?? '').toLowerCase() == email,
+        orElse: () => <String, dynamic>{},
+      );
+    }
 
     if (matchingAdmin.isNotEmpty) {
       final isActive = matchingAdmin['is_active'] ?? true;
@@ -217,8 +226,8 @@ class AdminAuthService {
         );
       }
       final savedPass = await getAdminPassword(email) ?? (matchingAdmin['password'] as String? ?? '');
-      if (savedPass == pwd || pwd == primaryAdminDefaultPassword || pwd == primaryAdminFallbackPassword || isMasterPasscode(pwd)) {
-        final role = matchingAdmin['role'] as String? ?? 'area_admin';
+      if (savedPass == pwd || (matchingAdmin['password'] as String? ?? '') == pwd || pwd == primaryAdminDefaultPassword || pwd == primaryAdminFallbackPassword || isMasterPasscode(pwd)) {
+        final role = matchingAdmin['role'] as String? ?? 'area_manager';
         final area = matchingAdmin['assigned_area'] as String? ?? (role == 'super_admin' ? 'ALL' : '');
         setAdminSessionActive(true);
         SupabaseService.instance.currentAdminEmail = email;
@@ -322,6 +331,47 @@ class AdminAuthService {
     return true;
   }
 
+  static const String _registryKey = 'admin_accounts_registry';
+
+  /// Syncs admin accounts to Supabase cloud table (admin_location_settings)
+  Future<void> _syncAccountsToCloud(List<Map<String, dynamic>> accounts) async {
+    try {
+      await ensureAdminSupabaseSession();
+      await SupabaseService.instance.client
+          .from('admin_location_settings')
+          .upsert({
+            'setting_key': _registryKey,
+            'setting_value': jsonEncode(accounts),
+            'description': 'Master and Area Manager accounts registry',
+            'updated_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'setting_key');
+      debugPrint('[AdminAuthService] Cloud sync SUCCESS: ${accounts.length} admin accounts');
+    } catch (e) {
+      debugPrint('[AdminAuthService] _syncAccountsToCloud error: $e');
+    }
+  }
+
+  /// Fetches admin accounts registry from Supabase cloud table
+  Future<List<Map<String, dynamic>>> _fetchAccountsFromCloud() async {
+    try {
+      final row = await SupabaseService.instance.client
+          .from('admin_location_settings')
+          .select('setting_value')
+          .eq('setting_key', _registryKey)
+          .maybeSingle();
+      if (row != null && row['setting_value'] != null) {
+        final val = row['setting_value'] as String;
+        if (val.isNotEmpty) {
+          final decoded = jsonDecode(val) as List<dynamic>;
+          return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('[AdminAuthService] _fetchAccountsFromCloud error: $e');
+    }
+    return [];
+  }
+
   /// Reset admin password (used by Super Admin in Admin Accounts Management).
   Future<bool> resetAdminPassword(String email, String newPassword) async {
     final cleanEmail = email.trim().toLowerCase();
@@ -330,8 +380,8 @@ class AdminAuthService {
 
     await saveAdminPassword(cleanEmail, cleanNew);
 
-    // Update password in accounts registry if present
-    final accounts = await getStoredAdminAccounts();
+    // Update password in accounts registry
+    final accounts = await getAllAdmins();
     bool updated = false;
     for (final acc in accounts) {
       if ((acc['email'] as String? ?? '').toLowerCase() == cleanEmail) {
@@ -342,22 +392,33 @@ class AdminAuthService {
     }
     if (updated) {
       await _saveStoredAdminAccounts(accounts);
+      await _syncAccountsToCloud(accounts);
     }
-
-    // Try updating user_profiles updated_at in Supabase
-    try {
-      await Supabase.instance.client
-          .from('user_profiles')
-          .update({'updated_at': DateTime.now().toIso8601String()})
-          .eq('email', cleanEmail);
-    } catch (_) {}
 
     return true;
   }
 
   /// Fetch all admins (Super Admin + any created area admins).
   Future<List<Map<String, dynamic>>> getAllAdmins() async {
-    final accounts = await getStoredAdminAccounts();
+    final localAccounts = await getStoredAdminAccounts();
+    final cloudAccounts = await _fetchAccountsFromCloud();
+
+    final mergedMap = <String, Map<String, dynamic>>{};
+    for (final a in localAccounts) {
+      final email = (a['email'] as String? ?? '').toLowerCase();
+      if (email.isNotEmpty) mergedMap[email] = a;
+    }
+    for (final a in cloudAccounts) {
+      final email = (a['email'] as String? ?? '').toLowerCase();
+      if (email.isNotEmpty) {
+        if (!mergedMap.containsKey(email) ||
+            (a['updated_at'] ?? '').toString().compareTo(mergedMap[email]?['updated_at'] ?? '') >= 0) {
+          mergedMap[email] = a;
+        }
+      }
+    }
+
+    final accounts = mergedMap.values.toList();
 
     // Ensure Super Admin is always first in the list
     final hasSuperAdmin = accounts.any(
@@ -376,38 +437,9 @@ class AdminAuthService {
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       });
-      await _saveStoredAdminAccounts(accounts);
     }
 
-    // Also check Supabase user_profiles where role='admin' to merge any admins created in DB
-    try {
-      final dbAdmins = await Supabase.instance.client
-          .from('user_profiles')
-          .select()
-          .eq('role', 'admin');
-
-      for (final profile in List<Map<String, dynamic>>.from(dbAdmins)) {
-        final email = (profile['email'] as String? ?? '').toLowerCase();
-        if (email.isEmpty) continue;
-        final existingIndex = accounts.indexWhere(
-          (a) => (a['email'] as String? ?? '').toLowerCase() == email,
-        );
-        if (existingIndex < 0) {
-          accounts.add({
-            'id': profile['id'] ?? 'admin-${accounts.length + 1}',
-            'email': email,
-            'full_name': profile['full_name'] ?? 'Admin',
-            'phone': profile['phone'] ?? '',
-            'role': profile['role'] == 'super_admin' ? 'super_admin' : 'area_admin',
-            'assigned_area': profile['assigned_area'] ?? profile['city'] ?? (profile['role'] == 'super_admin' ? 'ALL' : ''),
-            'is_active': profile['is_active'] ?? true,
-            'created_at': profile['created_at'] ?? DateTime.now().toIso8601String(),
-            'updated_at': profile['updated_at'] ?? DateTime.now().toIso8601String(),
-          });
-        }
-      }
-    } catch (_) {}
-
+    await _saveStoredAdminAccounts(accounts);
     return accounts;
   }
 
@@ -427,7 +459,7 @@ class AdminAuthService {
     final cleanName = fullName.trim();
     final cleanPhone = phone.trim();
 
-    final accounts = await getStoredAdminAccounts();
+    final accounts = await getAllAdmins();
     final existingIndex = accounts.indexWhere(
       (a) => (a['email'] as String? ?? '').toLowerCase() == cleanEmail ||
              (id != null && id.isNotEmpty && a['id'] == id),
@@ -455,26 +487,7 @@ class AdminAuthService {
 
     await _saveStoredAdminAccounts(accounts);
     await saveAdminPassword(cleanEmail, cleanPass);
-
-    // Try provisioning the user in Supabase Auth & user_profiles
-    try {
-      final signUpRes = await SupabaseService.instance.signUpWithEmail(
-        email: cleanEmail,
-        password: cleanPass,
-        fullName: cleanName,
-        phone: cleanPhone,
-        role: 'customer', // Avoid security clamp, will update role to admin below
-      );
-      final userId = signUpRes.user?.id;
-      if (userId != null) {
-        await Supabase.instance.client.from('user_profiles').update({
-          'role': 'admin',
-          'city': assignedArea.trim(),
-          'full_name': cleanName,
-          'phone': cleanPhone,
-        }).eq('id', userId);
-      }
-    } catch (_) {}
+    await _syncAccountsToCloud(accounts);
 
     return true;
   }
@@ -484,9 +497,10 @@ class AdminAuthService {
     final cleanEmail = email.trim().toLowerCase();
     if (cleanEmail == primaryAdminEmail) return false;
 
-    final accounts = await getStoredAdminAccounts();
+    final accounts = await getAllAdmins();
     accounts.removeWhere((a) => (a['email'] as String? ?? '').toLowerCase() == cleanEmail);
     await _saveStoredAdminAccounts(accounts);
+    await _syncAccountsToCloud(accounts);
 
     try {
       final prefs = await SharedPreferences.getInstance();

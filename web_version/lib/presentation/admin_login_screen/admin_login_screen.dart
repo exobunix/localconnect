@@ -296,14 +296,14 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                         child: _buildTabButton(
                                           index: 0,
                                           title: 'Master Passcode',
-                                          icon: Icons.key_rounded,
+                                          icon: Icons.security_rounded,
                                         ),
                                       ),
                                       Expanded(
                                         child: _buildTabButton(
                                           index: 1,
-                                          title: 'Admin Email',
-                                          icon: Icons.email_rounded,
+                                          title: 'Area Manager / Admin',
+                                          icon: Icons.badge_rounded,
                                         ),
                                       ),
                                     ],
@@ -334,29 +334,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                                   ),
                                 ],
 
-                                SizedBox(height: 2.5.h),
-
-                                // Quick Master Access Button
-                                Center(
-                                  child: TextButton.icon(
-                                    onPressed: _isLoading ? null : _onSuccessNavigate,
-                                    icon: const Icon(
-                                      Icons.flash_on_rounded,
-                                      color: Color(0xFFFFD54F),
-                                      size: 18,
-                                    ),
-                                    label: Text(
-                                      'Quick Access (Master Admin Mode)',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 10.sp,
-                                        fontWeight: FontWeight.w700,
-                                        color: const Color(0xFFFFD54F),
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                ],
                             ),
                           ),
 
@@ -545,7 +523,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Administrator Email',
+          'Area Manager / Admin Email',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 10.sp,
             fontWeight: FontWeight.w600,
@@ -558,15 +536,15 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
           keyboardType: TextInputType.emailAddress,
           style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 11.sp),
           decoration: InputDecoration(
-            hintText: 'admin@localconnect.com',
+            hintText: 'e.g. pune.manager@localconnect.com or admin@localconnect.com',
             hintStyle: GoogleFonts.plusJakartaSans(
               color: Colors.white.withValues(alpha: 0.3),
-              fontSize: 10.sp,
+              fontSize: 9.5.sp,
             ),
             filled: true,
             fillColor: const Color(0xFF0A0E21),
             prefixIcon: const Icon(
-              Icons.alternate_email_rounded,
+              Icons.badge_rounded,
               color: Color(0xFFB388FF),
               size: 20,
             ),
@@ -663,7 +641,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                       const Icon(Icons.login_rounded, size: 20),
                       SizedBox(width: 2.w),
                       Text(
-                        'Sign In as Admin',
+                        'Sign In to Admin Panel',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 11.5.sp,
                           fontWeight: FontWeight.w700,

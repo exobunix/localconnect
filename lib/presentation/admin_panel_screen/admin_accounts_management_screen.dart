@@ -79,7 +79,7 @@ class _AdminAccountsManagementScreenState
     final passwordCtrl = TextEditingController(
       text: isEditing ? '' : 'Admin@1234',
     );
-    String selectedRole = admin?['role'] ?? 'area_admin';
+    String selectedRole = (admin?['role'] == 'super_admin') ? 'super_admin' : 'area_manager';
     String selectedArea = admin?['assigned_area'] ?? '';
     final customAreaCtrl = TextEditingController(text: selectedArea);
     bool isActive = admin?['is_active'] ?? true;
@@ -170,8 +170,8 @@ class _AdminAccountsManagementScreenState
                       child: Text('Super Admin (Full Access)'),
                     ),
                     DropdownMenuItem(
-                      value: 'area_admin',
-                      child: Text('Area Admin (Designated Area Only)'),
+                      value: 'area_manager',
+                      child: Text('Area Manager (Designated Area Jurisdiction)'),
                     ),
                   ],
                   onChanged: (val) {
@@ -439,67 +439,17 @@ class _AdminAccountsManagementScreenState
 
   @override
   Widget build(BuildContext context) {
-    if (!SupabaseService.instance.isSuperAdmin) {
-      return Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(
-          backgroundColor: AppTheme.primary,
-          title: Text(
-            'Access Restricted',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.gpp_bad_rounded, size: 64, color: Color(0xFFD32F2F)),
-                const SizedBox(height: 16),
-                Text(
-                  'Super Admin Privileges Required',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1A1C1E),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Only Super Administrators can create or manage Sub-Admin accounts and their assigned service regions.\n\nYour current account is configured as Area Admin for ${SupabaseService.instance.currentAdminArea}.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
+    final isSuper = SupabaseService.instance.isSuperAdmin;
     final filtered = _filteredAdmins;
     final superAdminCount = _admins.where((a) => a['role'] == 'super_admin').length;
-    final areaAdminCount = _admins.where((a) => a['role'] == 'area_admin').length;
+    final areaManagerCount = _admins.where((a) => a['role'] == 'area_manager' || a['role'] == 'area_admin').length;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: AppTheme.primary,
         title: Text(
-          'Admin Access & Management',
+          isSuper ? 'Area Manager / Admin Control' : 'Area Manager Jurisdiction',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -517,18 +467,20 @@ class _AdminAccountsManagementScreenState
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTheme.primary,
-        onPressed: () => _showAddEditAdminDialog(),
-        icon: const Icon(Icons.person_add_rounded, color: Colors.white),
-        label: Text(
-          'Add Admin',
-          style: GoogleFonts.plusJakartaSans(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+      floatingActionButton: isSuper
+          ? FloatingActionButton.extended(
+              backgroundColor: AppTheme.primary,
+              onPressed: () => _showAddEditAdminDialog(),
+              icon: const Icon(Icons.person_add_rounded, color: Colors.white),
+              label: Text(
+                'Add Admin / Area Mgr',
+                style: GoogleFonts.plusJakartaSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : Column(
@@ -549,11 +501,11 @@ class _AdminAccountsManagementScreenState
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _kpiItem('Total Admins', '${_admins.length}', Icons.security_rounded),
+                      _kpiItem('Total Accounts', '${_admins.length}', Icons.security_rounded),
                       Container(width: 1, height: 40, color: Colors.white24),
                       _kpiItem('Super Admins', '$superAdminCount', Icons.admin_panel_settings_rounded),
                       Container(width: 1, height: 40, color: Colors.white24),
-                      _kpiItem('Area Admins', '$areaAdminCount', Icons.location_city_rounded),
+                      _kpiItem('Area Managers', '$areaManagerCount', Icons.location_city_rounded),
                     ],
                   ),
                 ),
@@ -713,7 +665,7 @@ class _AdminAccountsManagementScreenState
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
-                                          isSuper ? '👑 Super Admin' : '📍 Area Admin',
+                                          isSuper ? '👑 Super Admin' : '📍 Area Manager',
                                           style: GoogleFonts.plusJakartaSans(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
@@ -735,7 +687,7 @@ class _AdminAccountsManagementScreenState
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
-                                          isSuper ? 'Nationwide (ALL)' : 'Area: $area',
+                                          isSuper ? 'Nationwide (ALL)' : 'Jurisdiction: $area',
                                           style: GoogleFonts.plusJakartaSans(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
@@ -744,26 +696,27 @@ class _AdminAccountsManagementScreenState
                                         ),
                                       ),
                                       const Spacer(),
-                                      // Actions
-                                      IconButton(
-                                        icon: const Icon(Icons.lock_reset_rounded, size: 18),
-                                        tooltip: 'Reset Password',
-                                        onPressed: () => _showResetPasswordDialog(admin),
-                                        color: AppTheme.primary,
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.edit_rounded, size: 18),
-                                        tooltip: 'Edit Admin',
-                                        onPressed: () => _showAddEditAdminDialog(admin: admin),
-                                        color: Colors.grey[700],
-                                      ),
-                                      if (admin['email'] != 'admin@localconnect.com')
+                                      if (isSuper) ...[
                                         IconButton(
-                                          icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                                          tooltip: 'Delete Admin',
-                                          onPressed: () => _showDeleteAdminConfirm(admin),
-                                          color: Colors.red,
+                                          icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                                          tooltip: 'Reset Password',
+                                          onPressed: () => _showResetPasswordDialog(admin),
+                                          color: AppTheme.primary,
                                         ),
+                                        IconButton(
+                                          icon: const Icon(Icons.edit_rounded, size: 18),
+                                          tooltip: 'Edit Admin / Area Mgr',
+                                          onPressed: () => _showAddEditAdminDialog(admin: admin),
+                                          color: Colors.grey[700],
+                                        ),
+                                        if (admin['email'] != 'admin@localconnect.com')
+                                          IconButton(
+                                            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                                            tooltip: 'Delete Admin',
+                                            onPressed: () => _showDeleteAdminConfirm(admin),
+                                            color: Colors.red,
+                                          ),
+                                      ],
                                     ],
                                   ),
                                 ],
