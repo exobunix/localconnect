@@ -2,6 +2,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import './post_home_for_rent_screen.dart';
 import './rent_listing_detail_screen.dart';
 import './rent_subscription_screen.dart';
 
@@ -15,7 +16,7 @@ class RentCustomerScreen extends StatefulWidget {
 class _RentCustomerScreenState extends State<RentCustomerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String _activeSubcategory = 'room';
+  String _activeSubcategory = 'home_rent';
   String _sortBy = 'nearest';
   double _maxPrice = 50000;
   bool _showAvailableOnly = true;
@@ -26,6 +27,13 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
   final Set<String> _selectedAmenities = {};
 
   static const _subcategories = [
+    {
+      'id': 'home_rent',
+      'label': 'Home for Rent',
+      'icon': Icons.home_work_rounded,
+      'color': Color(0xFF0288D1),
+      'hint': 'Direct from Homeowners • No Provider Account Needed',
+    },
     {
       'id': 'room',
       'label': 'Room',
@@ -121,6 +129,45 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
         };
         grouped.putIfAbsent(subKey, () => []).add(mapped);
       }
+
+      // Load Home for Rent listings directly posted by homeowners
+      try {
+        final homeRentRows = await SupabaseService.instance.getHomeRentListings(onlyAvailable: true);
+        grouped['home_rent'] = homeRentRows.map((r) {
+          final rent = (r['monthly_rent'] as num?)?.toInt() ?? 10000;
+          final deposit = (r['deposit'] as num?)?.toInt() ?? (rent * 2);
+          final locality = (r['area_locality'] ?? '').toString();
+          final city = (r['city'] ?? 'Pune').toString();
+          final loc = locality.isNotEmpty ? '$locality, $city' : city;
+          final img = (r['primary_photo'] ?? '').toString();
+
+          return {
+            'id': r['id'],
+            'title': '${r['bedrooms'] ?? '2 BHK'} ${r['property_type'] ?? 'Flat'}',
+            'location': loc,
+            'price': rent,
+            'priceUnit': '/month',
+            'rating': 4.9,
+            'reviews': 8,
+            'distance': 1.2,
+            'available': r['is_available'] == true,
+            'furnished': r['furnishing_status'] ?? 'Semi-Furnished',
+            'image': img.isNotEmpty ? img : 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600&auto=format&fit=crop&q=80',
+            'amenities': [
+              'Direct Homeowner',
+              'No Brokerage',
+              r['furnishing_status'] ?? 'Semi-Furnished',
+            ],
+            'deposit': deposit,
+            'provider': r['owner_name'] ?? 'Homeowner',
+            'phone': r['owner_phone'] ?? '',
+            'isFeatured': true,
+            'isVerified': true,
+            'is_home_rent': true,
+            'description': r['description'] ?? '',
+          };
+        }).toList();
+      } catch (_) {}
       if (mounted) {
         setState(() {
           _liveListings = grouped;
@@ -696,6 +743,21 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: AppTheme.background,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: const Color(0xFF0288D1),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.home_work_rounded),
+        label: Text(
+          'Post Home for Rent',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PostHomeForRentScreen()),
+          ).then((_) => _fetchListingsFromDb());
+        },
+      ),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
@@ -1957,34 +2019,49 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          final name = nameCtrl.text.trim();
+                          final phone = phoneCtrl.text.trim();
+                          final msg = msgCtrl.text.trim();
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.check_circle_rounded,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Inquiry sent! Provider will contact you soon.',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
+                          if (listing['is_home_rent'] == true) {
+                            await SupabaseService.instance.submitHomeRentEnquiry(
+                              listingId: listing['id'].toString(),
+                              customerName: name.isNotEmpty ? name : 'Interested Tenant',
+                              customerPhone: phone.isNotEmpty ? phone : '',
+                              message: msg,
+                            );
+                          }
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: Colors.white,
+                                      size: 18,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      listing['is_home_rent'] == true
+                                          ? 'Inquiry sent to homeowner!'
+                                          : 'Inquiry sent! Provider will contact you soon.',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                backgroundColor: Colors.green.shade700,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
-                              backgroundColor: Colors.green.shade700,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          );
+                            );
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: color,

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../services/supabase_service.dart';
+import 'widgets/admin_user_detail_sheet.dart';
 
 class AdminUserManagementScreen extends StatefulWidget {
   const AdminUserManagementScreen({super.key});
@@ -110,7 +112,13 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, AppRoutes.adminPanelScreen);
+            }
+          },
         ),
         actions: [
           IconButton(
@@ -258,6 +266,11 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                       itemCount: _filteredUsers.length,
                       itemBuilder: (_, i) => _UserCard(
                         user: _filteredUsers[i],
+                        onTap: () => AdminUserDetailSheet.show(
+                          context,
+                          _filteredUsers[i],
+                          onStatusChanged: _loadUsers,
+                        ),
                         onToggleStatus: () =>
                             _toggleUserStatus(_filteredUsers[i]),
                       ),
@@ -309,9 +322,14 @@ class _FilterChip extends StatelessWidget {
 
 class _UserCard extends StatelessWidget {
   final Map<String, dynamic> user;
+  final VoidCallback onTap;
   final VoidCallback onToggleStatus;
 
-  const _UserCard({required this.user, required this.onToggleStatus});
+  const _UserCard({
+    required this.user,
+    required this.onTap,
+    required this.onToggleStatus,
+  });
 
   Color get _roleColor {
     switch (user['role'] ?? 'customer') {
@@ -336,132 +354,136 @@ class _UserCard extends StatelessWidget {
         ? DateTime.tryParse(user['created_at'].toString())
         : null;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: AppTheme.cardShadow,
-        border: Border.all(
-          color: isActive
-              ? AppTheme.outlineVariant
-              : AppTheme.error.withValues(alpha: 0.3),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: AppTheme.cardShadow,
+          border: Border.all(
+            color: isActive
+                ? AppTheme.outlineVariant
+                : AppTheme.error.withValues(alpha: 0.3),
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          // Avatar
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _roleColor.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: _roleColor,
+        child: Row(
+          children: [
+            // Avatar
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: _roleColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: _roleColor,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF1A1C1E),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _roleColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        role.toUpperCase(),
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: _roleColor,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1A1C1E),
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  email,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    color: const Color(0xFF74777F),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _roleColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          role.toUpperCase(),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: _roleColor,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (phone.isNotEmpty || city.isNotEmpty)
+                  const SizedBox(height: 2),
                   Text(
-                    [
-                      if (phone.isNotEmpty) phone,
-                      if (city.isNotEmpty) city,
-                    ].join(' • '),
+                    email,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 11,
-                      color: const Color(0xFF90A4AE),
+                      color: const Color(0xFF74777F),
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                if (createdAt != null)
-                  Text(
-                    'Joined ${createdAt.day}/${createdAt.month}/${createdAt.year}',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
-                      color: const Color(0xFF90A4AE),
+                  if (phone.isNotEmpty || city.isNotEmpty)
+                    Text(
+                      [
+                        if (phone.isNotEmpty) phone,
+                        if (city.isNotEmpty) city,
+                      ].join(' • '),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        color: const Color(0xFF90A4AE),
+                      ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Status toggle
-          GestureDetector(
-            onTap: onToggleStatus,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? AppTheme.successContainer
-                    : AppTheme.errorContainer,
-                borderRadius: BorderRadius.circular(8),
+                  if (createdAt != null)
+                    Text(
+                      'Joined ${createdAt.day}/${createdAt.month}/${createdAt.year}',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10,
+                        color: const Color(0xFF90A4AE),
+                      ),
+                    ),
+                ],
               ),
-              child: Text(
-                isActive ? 'Active' : 'Inactive',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: isActive ? AppTheme.success : AppTheme.error,
+            ),
+            const SizedBox(width: 8),
+            // Status toggle
+            GestureDetector(
+              onTap: onToggleStatus,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppTheme.successContainer
+                      : AppTheme.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  isActive ? 'Active' : 'Inactive',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: isActive ? AppTheme.success : AppTheme.error,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -32,8 +32,12 @@ class AdminAuthService {
   static const String primaryAdminDefaultPassword = 'Admin@1234';
   static const String primaryAdminFallbackPassword = 'admin123';
 
-  // Master Security Passcodes supported out-of-the-box
-  static const Set<String> validMasterPasscodes = {
+  static const String _superAdminPasscodeKey = 'localconnect_super_admin_passcode_v3';
+  static const String _superAdminPasscodeCustomizedKey = 'localconnect_super_admin_passcode_customized_v3';
+  static const String defaultMasterPasscode = '920920';
+
+  // Master Security Passcodes supported initially before customization
+  static const Set<String> _initialMasterPasscodes = {
     '920920',
     'admin2026',
     '9209205923',
@@ -45,18 +49,130 @@ class AdminAuthService {
     'localconnect',
   };
 
-  /// Returns true if [code] is any recognized master passcode.
-  bool isMasterPasscode(String code) {
-    final clean = code.trim().toLowerCase();
-    return validMasterPasscodes.contains(clean) ||
-        clean == 'admin' ||
-        clean == 'localconnect';
+  /// Returns the current active Super Admin passcode.
+  Future<String> getActiveSuperAdminPasscode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString(_superAdminPasscodeKey);
+      if (stored != null && stored.trim().isNotEmpty) {
+        return stored.trim();
+      }
+      final pwdMap = await _getStoredPasswordsMap();
+      final adminPass = pwdMap[primaryAdminEmail];
+      if (adminPass != null && adminPass.trim().isNotEmpty) {
+        return adminPass.trim();
+      }
+      // Check cloud setting
+      final cloudPass = await _fetchCloudSuperAdminPasscode();
+      if (cloudPass != null && cloudPass.isNotEmpty) {
+        await prefs.setString(_superAdminPasscodeKey, cloudPass);
+        return cloudPass;
+      }
+    } catch (_) {}
+    return defaultMasterPasscode;
   }
 
-  /// Verifies Master Passcode (e.g. 920920), instantly authorizes admin access,
+  Future<String?> _fetchCloudSuperAdminPasscode() async {
+    try {
+      final row = await SupabaseService.instance.client
+          .from('admin_location_settings')
+          .select('setting_value')
+          .eq('setting_key', 'super_admin_passcode')
+          .maybeSingle();
+      if (row != null && row['setting_value'] != null) {
+        final val = row['setting_value'].toString().trim();
+        if (val.isNotEmpty) return val;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Returns whether Super Admin has changed or customized the default passcode.
+  Future<bool> isSuperAdminPasscodeCustomized() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isCustom = prefs.getBool(_superAdminPasscodeCustomizedKey);
+      if (isCustom == true) return true;
+
+      final active = await getActiveSuperAdminPasscode();
+      if (active != defaultMasterPasscode && active != primaryAdminDefaultPassword) {
+        await prefs.setBool(_superAdminPasscodeCustomizedKey, true);
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Sets and persists the Super Admin passcode, immediately invalidating old default passcodes.
+  Future<void> setSuperAdminPasscode(String newPasscode) async {
+    final clean = newPasscode.trim();
+    if (clean.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_superAdminPasscodeKey, clean);
+    await prefs.setBool(_superAdminPasscodeCustomizedKey, true);
+    await saveAdminPassword(primaryAdminEmail, clean);
+
+    // Sync to Supabase cloud setting so other devices / re-installs reflect the new password
+    try {
+      await ensureAdminSupabaseSession();
+      await SupabaseService.instance.client
+          .from('admin_location_settings')
+          .upsert({
+            'setting_key': 'super_admin_passcode',
+            'setting_value': clean,
+            'description': 'Active Super Admin passcode',
+            'updated_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'setting_key');
+    } catch (e) {
+      debugPrint('[AdminAuthService] cloud passcode sync error: $e');
+    }
+  }
+
+  /// Checks if [code] matches the active master passcode.
+  /// If the admin has customized their password, default '920920' is INVALID and rejected.
+  Future<bool> checkMasterPasscode(String code) async {
+    final clean = code.trim();
+    if (clean.isEmpty) return false;
+
+    final activePass = await getActiveSuperAdminPasscode();
+    final isCustomized = await isSuperAdminPasscodeCustomized();
+
+    if (clean == activePass) {
+      return true;
+    }
+
+    final adminSavedPass = await getAdminPassword(primaryAdminEmail);
+    if (adminSavedPass != null && clean == adminSavedPass) {
+      return true;
+    }
+
+    // Only allow fallback defaults IF the admin has NOT customized their password yet
+    if (!isCustomized) {
+      final lower = clean.toLowerCase();
+      if (_initialMasterPasscodes.contains(lower) ||
+          lower == 'admin' ||
+          lower == 'localconnect' ||
+          clean == primaryAdminDefaultPassword ||
+          clean == primaryAdminFallbackPassword) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// Synchronous compatibility check for legacy calls
+  bool isMasterPasscode(String code) {
+    final clean = code.trim().toLowerCase();
+    return _initialMasterPasscodes.contains(clean);
+  }
+
+  /// Verifies Master Passcode, instantly authorizes admin access,
   /// and silently tries background Supabase session sync.
   Future<bool> verifyMasterPasscode(String pin) async {
-    if (!isMasterPasscode(pin)) return false;
+    final isValid = await checkMasterPasscode(pin);
+    if (!isValid) return false;
 
     // Immediately grant admin session
     setAdminSessionActive(true);
@@ -165,13 +281,13 @@ class AdminAuthService {
       );
     }
 
-    // 1. Check if password is a Master Passcode (instant bypass for Super Admin)
-    if (isMasterPasscode(pwd)) {
+    // 1. Check if password is a Master Passcode (for Super Admin)
+    if (await checkMasterPasscode(pwd)) {
       setAdminSessionActive(true);
-      SupabaseService.instance.currentAdminEmail = email;
+      SupabaseService.instance.currentAdminEmail = email.isNotEmpty ? email : primaryAdminEmail;
       SupabaseService.instance.currentAdminRole = 'super_admin';
       SupabaseService.instance.currentAdminArea = 'ALL';
-      _attemptSilentSupabaseSignIn(email, pwd);
+      _attemptSilentSupabaseSignIn(primaryAdminEmail, pwd);
       return const AdminLoginResult(
         success: true,
         role: 'super_admin',
@@ -181,11 +297,16 @@ class AdminAuthService {
 
     // 2. Check primary admin: admin@localconnect.com
     if (email == primaryAdminEmail) {
+      final activePass = await getActiveSuperAdminPasscode();
       final savedPass = await getAdminPassword(email);
-      final isMatch = (savedPass != null && savedPass == pwd) ||
-          pwd == primaryAdminDefaultPassword ||
-          pwd == primaryAdminFallbackPassword ||
-          isMasterPasscode(pwd);
+      final isCustomized = await isSuperAdminPasscodeCustomized();
+
+      bool isMatch = (pwd == activePass) || (savedPass != null && pwd == savedPass);
+      if (!isMatch && !isCustomized) {
+        isMatch = (pwd == primaryAdminDefaultPassword ||
+            pwd == primaryAdminFallbackPassword ||
+            pwd == defaultMasterPasscode);
+      }
 
       if (isMatch) {
         setAdminSessionActive(true);
@@ -226,7 +347,7 @@ class AdminAuthService {
         );
       }
       final savedPass = await getAdminPassword(email) ?? (matchingAdmin['password'] as String? ?? '');
-      if (savedPass == pwd || (matchingAdmin['password'] as String? ?? '') == pwd || pwd == primaryAdminDefaultPassword || pwd == primaryAdminFallbackPassword || isMasterPasscode(pwd)) {
+      if (savedPass == pwd || (matchingAdmin['password'] as String? ?? '') == pwd) {
         final role = matchingAdmin['role'] as String? ?? 'area_manager';
         final area = matchingAdmin['assigned_area'] as String? ?? (role == 'super_admin' ? 'ALL' : '');
         setAdminSessionActive(true);
@@ -287,12 +408,29 @@ class AdminAuthService {
 
     if (cleanNew.length < 6) return false;
 
+    final isSuper = cleanEmail == primaryAdminEmail ||
+        SupabaseService.instance.currentAdminRole == 'super_admin';
+
     // Verify current password
     final savedPass = await getAdminPassword(cleanEmail);
-    final isVerified = (savedPass != null && savedPass == cleanCurrent) ||
-        cleanCurrent == primaryAdminDefaultPassword ||
-        cleanCurrent == primaryAdminFallbackPassword ||
-        isMasterPasscode(cleanCurrent);
+    final activeSuperPass = await getActiveSuperAdminPasscode();
+    final isCustomized = await isSuperAdminPasscodeCustomized();
+
+    bool isVerified = false;
+    if (isSuper) {
+      if (cleanCurrent == activeSuperPass || (savedPass != null && cleanCurrent == savedPass)) {
+        isVerified = true;
+      } else if (!isCustomized &&
+          (cleanCurrent == defaultMasterPasscode ||
+              cleanCurrent == primaryAdminDefaultPassword ||
+              cleanCurrent == primaryAdminFallbackPassword ||
+              isMasterPasscode(cleanCurrent))) {
+        isVerified = true;
+      }
+    } else {
+      isVerified = (savedPass != null && savedPass == cleanCurrent) ||
+          cleanCurrent == primaryAdminDefaultPassword;
+    }
 
     if (!isVerified) {
       // Try verifying via Supabase sign-in
@@ -301,14 +439,18 @@ class AdminAuthService {
           email: cleanEmail,
           password: cleanCurrent,
         );
-        if (authRes.user == null) return false;
-      } catch (_) {
-        return false;
-      }
+        if (authRes.user != null) isVerified = true;
+      } catch (_) {}
     }
+
+    if (!isVerified) return false;
 
     // Save new password to persistent storage
     await saveAdminPassword(cleanEmail, cleanNew);
+
+    if (isSuper) {
+      await setSuperAdminPasscode(cleanNew);
+    }
 
     // If Supabase user session is present, update user password in Supabase Auth
     try {
@@ -327,6 +469,21 @@ class AdminAuthService {
           .update({'updated_at': DateTime.now().toIso8601String()})
           .eq('email', cleanEmail);
     } catch (_) {}
+
+    // Update password in accounts registry
+    final accounts = await getAllAdmins();
+    bool updated = false;
+    for (final acc in accounts) {
+      if ((acc['email'] as String? ?? '').toLowerCase() == cleanEmail) {
+        acc['password'] = cleanNew;
+        acc['updated_at'] = DateTime.now().toIso8601String();
+        updated = true;
+      }
+    }
+    if (updated) {
+      await _saveStoredAdminAccounts(accounts);
+      await _syncAccountsToCloud(accounts);
+    }
 
     return true;
   }
@@ -379,6 +536,10 @@ class AdminAuthService {
     if (cleanNew.length < 6) return false;
 
     await saveAdminPassword(cleanEmail, cleanNew);
+
+    if (cleanEmail == primaryAdminEmail) {
+      await setSuperAdminPasscode(cleanNew);
+    }
 
     // Update password in accounts registry
     final accounts = await getAllAdmins();
@@ -492,21 +653,40 @@ class AdminAuthService {
     return true;
   }
 
-  /// Delete an admin account.
-  Future<bool> deleteAdminAccount(String email) async {
-    final cleanEmail = email.trim().toLowerCase();
-    if (cleanEmail == primaryAdminEmail) return false;
+  /// Delete an admin account by id or email.
+  Future<bool> deleteAdminAccount(String idOrEmail) async {
+    final clean = idOrEmail.trim().toLowerCase();
+    if (clean == primaryAdminEmail || clean == 'admin@localconnect.com') return false;
 
     final accounts = await getAllAdmins();
-    accounts.removeWhere((a) => (a['email'] as String? ?? '').toLowerCase() == cleanEmail);
+    String? matchedEmail;
+    accounts.removeWhere((a) {
+      final email = (a['email'] as String? ?? '').toLowerCase();
+      final id = (a['id'] as String? ?? '').toLowerCase();
+      if (email == clean || id == clean) {
+        matchedEmail = email;
+        return true;
+      }
+      return false;
+    });
+
     await _saveStoredAdminAccounts(accounts);
     await _syncAccountsToCloud(accounts);
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final pwdMap = await _getStoredPasswordsMap();
-      pwdMap.remove(cleanEmail);
+      pwdMap.remove(clean);
+      if (matchedEmail != null) pwdMap.remove(matchedEmail);
       await prefs.setString(_passwordsKey, jsonEncode(pwdMap));
+    } catch (_) {}
+
+    // Also delete from Supabase admin_users table if present
+    try {
+      await SupabaseService.instance.client
+          .from('admin_users')
+          .delete()
+          .or('email.eq.$clean,id.eq.$clean${matchedEmail != null ? ',email.eq.$matchedEmail' : ''}');
     } catch (_) {}
 
     return true;

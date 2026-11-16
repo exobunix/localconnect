@@ -106,10 +106,12 @@ import '../presentation/razorpay_transaction_history_screen/razorpay_transaction
 import '../presentation/referral_hub_screen/referral_hub_screen.dart';
 import '../presentation/rent_screen/hostel_provider_dashboard.dart';
 import '../presentation/rent_screen/pg_provider_dashboard.dart';
+import '../presentation/rent_screen/post_home_for_rent_screen.dart';
 import '../presentation/rent_screen/rent_booking_confirmation_screen.dart';
 import '../presentation/rent_screen/rent_customer_screen.dart';
 import '../presentation/rent_screen/rent_ratings_screen.dart';
 import '../presentation/rent_screen/rent_subscription_screen.dart';
+import '../presentation/admin_panel_screen/admin_home_rent_management_screen.dart';
 import '../presentation/rent_screen/room_provider_dashboard.dart';
 import '../presentation/rent_screen/tools_provider_dashboard.dart';
 import '../presentation/rent_screen/villa_provider_dashboard.dart';
@@ -303,6 +305,8 @@ class AppRoutes {
   static const String adminRentAnalyticsScreen = '/admin-rent-analytics-screen';
   static const String rentListingDetailScreen = '/rent-listing-detail-screen';
   static const String rentSubscriptionScreen = '/rent-subscription-screen';
+  static const String postHomeForRentScreen = '/post-home-for-rent-screen';
+  static const String adminHomeRentManagementScreen = '/admin-home-rent-management-screen';
 
   // ── Home Maintenance Module Routes ────────────────────────────────────────
   static const String homeMaintenanceCustomerScreen =
@@ -708,6 +712,11 @@ class AppRoutes {
       adminRentAnalyticsScreen: (context) => const RoleGuard(
         requiredRole: 'admin',
         child: AdminRentAnalyticsScreen(),
+      ),
+      postHomeForRentScreen: (context) => const PostHomeForRentScreen(),
+      adminHomeRentManagementScreen: (context) => const RoleGuard(
+        requiredRole: 'admin',
+        child: AdminHomeRentManagementScreen(),
       ),
       adminProviderManagementScreen: (context) => const RoleGuard(
         requiredRole: 'admin',

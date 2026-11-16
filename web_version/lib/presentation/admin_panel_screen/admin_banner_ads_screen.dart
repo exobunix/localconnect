@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../services/supabase_service.dart';
 
@@ -217,6 +218,105 @@ class _AdminBannerAdsScreenState extends State<AdminBannerAdsScreen>
     }
   }
 
+  void _showEditAdRequestDialog(Map<String, dynamic> req) {
+    final titleCtrl = TextEditingController(text: req['title'] ?? '');
+    final subtitleCtrl = TextEditingController(text: req['subtitle'] ?? '');
+    final durationCtrl = TextEditingController(text: (req['duration_days'] ?? 15).toString());
+    final cityCtrl = TextEditingController(text: req['city'] ?? '');
+    String selectedStatus = (req['status'] ?? 'pending').toString().toLowerCase();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Edit Advertisement Request',
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildField(titleCtrl, 'Ad Title / Headline'),
+                const SizedBox(height: 10),
+                _buildField(subtitleCtrl, 'Subtitle / Offer Details'),
+                const SizedBox(height: 10),
+                _buildField(cityCtrl, 'Service City / Target Area'),
+                const SizedBox(height: 10),
+                _buildField(durationCtrl, 'Display Duration (Days)'),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: selectedStatus,
+                  decoration: InputDecoration(
+                    labelText: 'Status',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'pending', child: Text('Pending Review')),
+                    DropdownMenuItem(value: 'approved', child: Text('Approved / Active')),
+                    DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedStatus = val);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final days = int.tryParse(durationCtrl.text.trim()) ?? 15;
+                await SupabaseService.instance.adminUpdateAdRequest(
+                  requestId: req['id'].toString(),
+                  title: titleCtrl.text.trim(),
+                  subtitle: subtitleCtrl.text.trim(),
+                  city: cityCtrl.text.trim(),
+                  durationDays: days,
+                  status: selectedStatus,
+                );
+                _loadAll();
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteAdRequest(String id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Advertisement Request?'),
+        content: const Text('Are you sure you want to permanently delete this ad request?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await SupabaseService.instance.adminDeleteAdRequest(id);
+      _loadAll();
+    }
+  }
+
   void _showAddEditDialog({Map<String, dynamic>? banner}) {
     final titleCtrl = TextEditingController(text: banner?['title'] ?? '');
     final subtitleCtrl = TextEditingController(text: banner?['subtitle'] ?? '');
@@ -283,6 +383,97 @@ class _AdminBannerAdsScreenState extends State<AdminBannerAdsScreen>
     );
   }
 
+  void _showCreateProviderAdDialog() {
+    final titleCtrl = TextEditingController();
+    final subtitleCtrl = TextEditingController();
+    final providerNameCtrl = TextEditingController();
+    final businessNameCtrl = TextEditingController();
+    final cityCtrl = TextEditingController(
+      text: SupabaseService.instance.currentAdminArea != 'ALL' &&
+              SupabaseService.instance.currentAdminArea.isNotEmpty
+          ? SupabaseService.instance.currentAdminArea
+          : 'Pune',
+    );
+    final categoryCtrl = TextEditingController(text: 'General Services');
+    final durationCtrl = TextEditingController(text: '30');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Post Provider Advertisement',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildField(businessNameCtrl, 'Business / Shop Name *'),
+              const SizedBox(height: 10),
+              _buildField(providerNameCtrl, 'Provider / Owner Name'),
+              const SizedBox(height: 10),
+              _buildField(titleCtrl, 'Advertisement Title / Headline *'),
+              const SizedBox(height: 10),
+              _buildField(subtitleCtrl, 'Offer Details / Tagline'),
+              const SizedBox(height: 10),
+              _buildField(categoryCtrl, 'Service Category'),
+              const SizedBox(height: 10),
+              _buildField(cityCtrl, 'City / Operating Area'),
+              const SizedBox(height: 10),
+              _buildField(durationCtrl, 'Duration (Days)'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              if (businessNameCtrl.text.trim().isEmpty || titleCtrl.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please fill Business Name and Ad Title')),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              final success = await SupabaseService.instance.submitProviderAdRequest(
+                providerId: 'admin-created-${DateTime.now().millisecondsSinceEpoch}',
+                providerName: providerNameCtrl.text.trim().isNotEmpty
+                    ? providerNameCtrl.text.trim()
+                    : businessNameCtrl.text.trim(),
+                businessName: businessNameCtrl.text.trim(),
+                category: categoryCtrl.text.trim(),
+                city: cityCtrl.text.trim(),
+                title: titleCtrl.text.trim(),
+                subtitle: subtitleCtrl.text.trim(),
+                durationDays: int.tryParse(durationCtrl.text.trim()) ?? 30,
+              );
+              if (success) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Provider advertisement posted successfully!'),
+                      backgroundColor: Color(0xFF00C853),
+                    ),
+                  );
+                }
+                await _loadAdRequests();
+              }
+            },
+            child: const Text('Post Advertisement'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildField(TextEditingController ctrl, String label) {
     return TextField(
       controller: ctrl,
@@ -317,7 +508,13 @@ class _AdminBannerAdsScreenState extends State<AdminBannerAdsScreen>
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, AppRoutes.adminPanelScreen);
+            }
+          },
         ),
         actions: [
           IconButton(
@@ -379,20 +576,24 @@ class _AdminBannerAdsScreenState extends State<AdminBannerAdsScreen>
           ],
         ),
       ),
-      floatingActionButton: _tabController.index == 0
-          ? FloatingActionButton.extended(
-              onPressed: () => _showAddEditDialog(),
-              backgroundColor: AppTheme.primary,
-              icon: const Icon(Icons.add_rounded, color: Colors.white),
-              label: Text(
-                'Add Banner',
-                style: GoogleFonts.plusJakartaSans(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          if (_tabController.index == 0) {
+            _showAddEditDialog();
+          } else {
+            _showCreateProviderAdDialog();
+          }
+        },
+        backgroundColor: AppTheme.primary,
+        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        label: Text(
+          _tabController.index == 0 ? 'Add Banner' : 'Post Provider Ad',
+          style: GoogleFonts.plusJakartaSans(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : TabBarView(
@@ -534,21 +735,44 @@ class _AdminBannerAdsScreenState extends State<AdminBannerAdsScreen>
   Widget _buildProviderRequestsTab() {
     if (_adRequests.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.storefront_outlined, size: 48, color: AppTheme.outline),
-            const SizedBox(height: 12),
-            Text(
-              'No provider ad requests yet',
-              style: GoogleFonts.plusJakartaSans(fontSize: 14, color: AppTheme.outline),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Service providers can submit banner requests from their dashboard',
-              style: GoogleFonts.plusJakartaSans(fontSize: 12, color: AppTheme.outline),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.storefront_outlined, size: 54, color: AppTheme.outline),
+              const SizedBox(height: 14),
+              Text(
+                'No provider ad requests yet',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1A1C1E),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Service providers can submit banner requests from their dashboard, or you can publish an advertisement directly.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(fontSize: 12, color: AppTheme.outline),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.add_business_rounded, size: 18),
+                label: Text(
+                  'Post Provider Advertisement',
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+                onPressed: _showCreateProviderAdDialog,
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -685,13 +909,24 @@ class _AdminBannerAdsScreenState extends State<AdminBannerAdsScreen>
                     ),
                   ],
                 ),
-                if (isPending) ...[
-                  const SizedBox(height: 14),
-                  const Divider(height: 1),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF1565C0)),
+                      tooltip: 'Edit Ad Details & Duration',
+                      onPressed: () => _showEditAdRequestDialog(req),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppTheme.error),
+                      tooltip: 'Delete Ad Request',
+                      onPressed: () => _deleteAdRequest(req['id'].toString()),
+                    ),
+                    if (isPending) ...[
+                      const SizedBox(width: 8),
                       OutlinedButton.icon(
                         onPressed: () => _rejectAdRequest(req),
                         icon: const Icon(Icons.close_rounded, size: 16),
@@ -701,19 +936,19 @@ class _AdminBannerAdsScreenState extends State<AdminBannerAdsScreen>
                           side: const BorderSide(color: AppTheme.error),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: () => _approveAdRequest(req),
                         icon: const Icon(Icons.check_rounded, size: 16),
-                        label: const Text('Approve & Publish Live'),
+                        label: const Text('Approve & Publish'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2E7D32),
                           foregroundColor: Colors.white,
                         ),
                       ),
                     ],
-                  ),
-                ],
+                  ],
+                ),
               ],
             ),
           );

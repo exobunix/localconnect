@@ -530,6 +530,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             ),
           ),
           _buildSettingsTile(
+            icon: Icons.holiday_village_rounded,
+            title: 'Home for Rent Management',
+            subtitle: 'Manage homeowner listings & tenant enquiries without provider account',
+            color: const Color(0xFF0288D1),
+            onTap: () => Navigator.pushNamed(
+              context,
+              AppRoutes.adminHomeRentManagementScreen,
+            ),
+          ),
+          _buildSettingsTile(
             icon: Icons.celebration_rounded,
             title: 'Event Management',
             subtitle: 'Manage event providers, bookings & revenue',
@@ -977,24 +987,78 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
     final isTablet = MediaQuery.of(context).size.width >= 600;
 
-    if (isTablet) {
-      return _buildTabletLayout();
-    }
-
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      extendBody: true,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            const AdminAppBarWidget(),
-            _buildSubAdminAreaBanner(),
-            Expanded(child: _buildTabContent()),
+    Future<bool> handleAdminBack() async {
+      final shouldExit = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Exit Admin Panel?',
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+          ),
+          content: Text(
+            'Do you want to exit the Admin Panel and return to the main app?',
+            style: GoogleFonts.plusJakartaSans(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Stay'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Return to Home'),
+            ),
           ],
         ),
+      );
+      if (shouldExit == true && mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.homeScreen,
+          (route) => false,
+        );
+        return true;
+      }
+      return false;
+    }
+
+    if (isTablet) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop) return;
+          await handleAdminBack();
+        },
+        child: _buildTabletLayout(),
+      );
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await handleAdminBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        extendBody: true,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              const AdminAppBarWidget(),
+              _buildSubAdminAreaBanner(),
+              Expanded(child: _buildTabContent()),
+            ],
+          ),
+        ),
+        bottomNavigationBar: _buildFloatingNav(),
       ),
-      bottomNavigationBar: _buildFloatingNav(),
     );
   }
 

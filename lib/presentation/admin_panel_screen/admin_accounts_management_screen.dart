@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../../services/admin_auth_service.dart';
 import '../../theme/app_theme.dart';
@@ -19,7 +20,7 @@ class _AdminAccountsManagementScreenState
   String _searchQuery = '';
   String _areaFilter = 'ALL';
 
-  static const List<String> _commonCities = [
+  List<String> _operatingAreas = [
     'ALL',
     'Pune',
     'Mumbai',
@@ -45,9 +46,13 @@ class _AdminAccountsManagementScreenState
     setState(() => _isLoading = true);
     try {
       final list = await SupabaseService.instance.getAllAdmins();
+      final areas = await SupabaseService.instance.getManagedAreas();
       if (mounted) {
         setState(() {
           _admins = list;
+          if (areas.isNotEmpty) {
+            _operatingAreas = ['ALL', ...areas];
+          }
           _isLoading = false;
         });
       }
@@ -76,9 +81,7 @@ class _AdminAccountsManagementScreenState
     final nameCtrl = TextEditingController(text: admin?['full_name'] ?? '');
     final emailCtrl = TextEditingController(text: admin?['email'] ?? '');
     final phoneCtrl = TextEditingController(text: admin?['phone'] ?? '');
-    final passwordCtrl = TextEditingController(
-      text: isEditing ? '' : 'Admin@1234',
-    );
+    final passwordCtrl = TextEditingController();
     String selectedRole = (admin?['role'] == 'super_admin') ? 'super_admin' : 'area_manager';
     String selectedArea = admin?['assigned_area'] ?? '';
     final customAreaCtrl = TextEditingController(text: selectedArea);
@@ -214,7 +217,7 @@ class _AdminAccountsManagementScreenState
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: _commonCities
+                    children: _operatingAreas
                         .where((c) => c != 'ALL')
                         .map((c) => Padding(
                               padding: const EdgeInsets.only(right: 6),
@@ -273,6 +276,16 @@ class _AdminAccountsManagementScreenState
                   );
                   return;
                 }
+                final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                if (!emailRegex.hasMatch(email)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a valid email address (e.g. name@domain.com)'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
                 Navigator.pop(ctx);
                 final success = await SupabaseService.instance.adminUpsertAdminAccount(
                   id: admin?['id'] as String?,
@@ -314,7 +327,7 @@ class _AdminAccountsManagementScreenState
   }
 
   void _showResetPasswordDialog(Map<String, dynamic> admin) {
-    final newPasswordCtrl = TextEditingController(text: 'Admin@1234');
+    final newPasswordCtrl = TextEditingController();
     bool obscure = true;
 
     showDialog(
@@ -340,6 +353,7 @@ class _AdminAccountsManagementScreenState
                 obscureText: obscure,
                 decoration: InputDecoration(
                   labelText: 'New Password',
+                  hintText: 'Enter new password',
                   prefixIcon: const Icon(Icons.lock_reset_rounded),
                   suffixIcon: IconButton(
                     icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
@@ -404,8 +418,112 @@ class _AdminAccountsManagementScreenState
     );
   }
 
+  void _showManageOperatingAreasDialog() {
+    final newAreaCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.location_city_rounded, color: AppTheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Operating Areas Management',
+                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Super Admin control over serviceable operating areas across LocalConnect.',
+                    style: GoogleFonts.plusJakartaSans(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: newAreaCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'Add city / region (e.g. Thane)',
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () async {
+                          final text = newAreaCtrl.text.trim();
+                          if (text.isEmpty) return;
+                          newAreaCtrl.clear();
+                          await SupabaseService.instance.addManagedArea(text);
+                          final updated = await SupabaseService.instance.getManagedAreas();
+                          setDialogState(() {
+                            _operatingAreas = ['ALL', ...updated];
+                          });
+                          setState(() {});
+                        },
+                        child: const Text('Add'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Active Operating Areas (${_operatingAreas.where((a) => a != 'ALL').length}):',
+                    style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _operatingAreas
+                        .where((a) => a != 'ALL')
+                        .map((area) => Chip(
+                              label: Text(area, style: const TextStyle(fontSize: 12)),
+                              deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                              onDeleted: () async {
+                                await SupabaseService.instance.deleteManagedArea(area);
+                                final updated = await SupabaseService.instance.getManagedAreas();
+                                setDialogState(() {
+                                  _operatingAreas = ['ALL', ...updated];
+                                });
+                                setState(() {});
+                              },
+                            ))
+                        .toList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showDeleteAdminConfirm(Map<String, dynamic> admin) {
-    if (admin['email'] == 'admin@localconnect.com') {
+    final email = (admin['email'] ?? '').toString().trim().toLowerCase();
+    if (email == 'admin@localconnect.com' || email == AdminAuthService.primaryAdminEmail) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cannot delete main Super Administrator account.')),
       );
@@ -414,19 +532,25 @@ class _AdminAccountsManagementScreenState
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Admin Account'),
-        content: Text('Are you sure you want to remove ${admin['full_name']} as administrator?'),
+        content: Text('Are you sure you want to remove ${admin['full_name']} ($email) as administrator?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(ctx);
-              final ok = await SupabaseService.instance.adminDeleteAdminAccount(admin['id'] as String);
+              final target = (admin['id'] != null && (admin['id'] as String).isNotEmpty)
+                  ? (admin['id'] as String)
+                  : email;
+              final ok = await SupabaseService.instance.adminDeleteAdminAccount(target);
               if (ok) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Admin removed'), backgroundColor: Colors.red),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Admin removed successfully'), backgroundColor: Colors.red),
+                  );
+                }
                 _loadAdmins();
               }
             },
@@ -458,9 +582,21 @@ class _AdminAccountsManagementScreenState
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, AppRoutes.adminPanelScreen);
+            }
+          },
         ),
         actions: [
+          if (isSuper)
+            IconButton(
+              icon: const Icon(Icons.location_city_rounded, color: Colors.white),
+              tooltip: 'Operating Areas',
+              onPressed: _showManageOperatingAreasDialog,
+            ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             onPressed: _loadAdmins,
@@ -541,7 +677,7 @@ class _AdminAccountsManagementScreenState
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             value: _areaFilter,
-                            items: _commonCities
+                            items: _operatingAreas
                                 .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12))))
                                 .toList(),
                             onChanged: (val) {
@@ -568,7 +704,7 @@ class _AdminAccountsManagementScreenState
                           itemCount: filtered.length,
                           itemBuilder: (ctx, i) {
                             final admin = filtered[i];
-                            final isSuper = admin['role'] == 'super_admin';
+                            final isAdminItemSuper = admin['role'] == 'super_admin';
                             final isActive = admin['is_active'] == true;
                             final area = admin['assigned_area'] ?? 'ALL';
 
@@ -580,7 +716,7 @@ class _AdminAccountsManagementScreenState
                                 borderRadius: BorderRadius.circular(14),
                                 boxShadow: AppTheme.cardShadow,
                                 border: Border.all(
-                                  color: isSuper
+                                  color: isAdminItemSuper
                                       ? const Color(0xFF6A1B9A).withValues(alpha: 0.3)
                                       : const Color(0xFF00796B).withValues(alpha: 0.2),
                                 ),
@@ -591,14 +727,14 @@ class _AdminAccountsManagementScreenState
                                   Row(
                                     children: [
                                       CircleAvatar(
-                                        backgroundColor: isSuper
+                                        backgroundColor: isAdminItemSuper
                                             ? const Color(0xFF6A1B9A).withValues(alpha: 0.1)
                                             : const Color(0xFF00796B).withValues(alpha: 0.1),
                                         child: Icon(
-                                          isSuper
+                                          isAdminItemSuper
                                               ? Icons.admin_panel_settings_rounded
                                               : Icons.location_city_rounded,
-                                          color: isSuper
+                                          color: isAdminItemSuper
                                               ? const Color(0xFF6A1B9A)
                                               : const Color(0xFF00796B),
                                         ),
@@ -659,17 +795,17 @@ class _AdminAccountsManagementScreenState
                                           vertical: 3,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: isSuper
+                                          color: isAdminItemSuper
                                               ? const Color(0xFFEDE7F6)
                                               : const Color(0xFFE0F2F1),
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
-                                          isSuper ? '👑 Super Admin' : '📍 Area Manager',
+                                          isAdminItemSuper ? '👑 Super Admin' : '📍 Area Manager',
                                           style: GoogleFonts.plusJakartaSans(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
-                                            color: isSuper
+                                            color: isAdminItemSuper
                                                 ? const Color(0xFF512DA8)
                                                 : const Color(0xFF00796B),
                                           ),
@@ -687,7 +823,7 @@ class _AdminAccountsManagementScreenState
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
-                                          isSuper ? 'Nationwide (ALL)' : 'Jurisdiction: $area',
+                                          isAdminItemSuper ? 'Nationwide (ALL)' : 'Jurisdiction: $area',
                                           style: GoogleFonts.plusJakartaSans(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
@@ -696,7 +832,7 @@ class _AdminAccountsManagementScreenState
                                         ),
                                       ),
                                       const Spacer(),
-                                      if (isSuper) ...[
+                                      if (SupabaseService.instance.isSuperAdmin) ...[
                                         IconButton(
                                           icon: const Icon(Icons.lock_reset_rounded, size: 18),
                                           tooltip: 'Reset Password',
@@ -709,7 +845,8 @@ class _AdminAccountsManagementScreenState
                                           onPressed: () => _showAddEditAdminDialog(admin: admin),
                                           color: Colors.grey[700],
                                         ),
-                                        if (admin['email'] != 'admin@localconnect.com')
+                                        if (admin['email'] != 'admin@localconnect.com' &&
+                                            admin['email'] != AdminAuthService.primaryAdminEmail)
                                           IconButton(
                                             icon: const Icon(Icons.delete_outline_rounded, size: 18),
                                             tooltip: 'Delete Admin',

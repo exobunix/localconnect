@@ -69,44 +69,59 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primary),
-            )
-          : CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                _buildSliverAppBar(),
-                SliverToBoxAdapter(child: _buildQuickBookingsCard()),
-                SliverToBoxAdapter(
-                  child: _buildSectionHeader(
-                    'Past Orders',
-                    'माझे ऑर्डर',
-                    Icons.receipt_long_rounded,
-                    onSeeAll: () => Navigator.pushNamed(
-                      context,
-                      AppRoutes.orderManagementScreen,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        } else {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.homeScreen,
+            (route) => false,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppTheme.primary),
+              )
+            : CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  _buildSliverAppBar(),
+                  SliverToBoxAdapter(child: _buildQuickBookingsCard()),
+                  SliverToBoxAdapter(
+                    child: _buildSectionHeader(
+                      'Past Orders',
+                      'माझे ऑर्डर',
+                      Icons.receipt_long_rounded,
+                      onSeeAll: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.orderManagementScreen,
+                      ),
                     ),
                   ),
-                ),
-                SliverToBoxAdapter(child: _buildPastOrdersList()),
-                SliverToBoxAdapter(
-                  child: _buildSectionHeader(
-                    'Saved Addresses',
-                    'पत्ते',
-                    Icons.location_on_rounded,
-                    onSeeAll: () => Navigator.pushNamed(
-                      context,
-                      AppRoutes.customerProfileScreen,
+                  SliverToBoxAdapter(child: _buildPastOrdersList()),
+                  SliverToBoxAdapter(
+                    child: _buildSectionHeader(
+                      'Saved Addresses',
+                      'पत्ते',
+                      Icons.location_on_rounded,
+                      onSeeAll: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.customerProfileScreen,
+                      ),
                     ),
                   ),
-                ),
-                SliverToBoxAdapter(child: _buildSavedAddresses()),
-                const SliverToBoxAdapter(child: SizedBox(height: 32)),
-              ],
-            ),
+                  SliverToBoxAdapter(child: _buildSavedAddresses()),
+                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                ],
+              ),
+      ),
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/app_export.dart';
+import '../presentation/not_found_screen/not_found_screen.dart';
 import '../widgets/custom_error_widget.dart';
 import './core/role_guard.dart';
 import './core/theme_provider.dart';
@@ -104,10 +105,19 @@ class _MyAppState extends State<MyApp> {
           builder: (context, child) {
             return MediaQuery(
               data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.0)),
-              child: child!,
+              child: ColoredBox(
+                color: Colors.white,
+                child: child ?? const NotFoundScreen(),
+              ),
             );
           },
           // 🚨 END CRITICAL SECTION
+          onUnknownRoute: (RouteSettings settings) {
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (context) => NotFoundScreen(routeName: settings.name),
+            );
+          },
           debugShowCheckedModeBanner: false,
           routes: AppRoutes.routes,
           initialRoute: AppRoutes.initial,

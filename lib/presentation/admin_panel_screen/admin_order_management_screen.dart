@@ -23,12 +23,14 @@ class _AdminOrderManagementScreenState
   String _searchQuery = '';
   final TextEditingController _searchCtrl = TextEditingController();
 
-  // Valid enum values for order_status in DB
+  // Valid lifecycle statuses
   final List<String> _statuses = [
     'all',
+    'new',
     'pending',
+    'assigned',
     'active',
-    'upcoming',
+    'in_progress',
     'completed',
     'cancelled',
   ];
@@ -109,15 +111,25 @@ class _AdminOrderManagementScreenState
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'completed':
-        return const Color(0xFF1DB954);
-      case 'active':
-        return const Color(0xFF2196F3);
-      case 'upcoming':
-        return const Color(0xFF9C27B0);
+      case 'new':
+      case 'new request':
+        return const Color(0xFF0288D1);
       case 'pending':
         return const Color(0xFFFF9800);
+      case 'assigned':
+      case 'assigned to provider':
+        return const Color(0xFF7B1FA2);
+      case 'active':
+      case 'accepted':
+        return const Color(0xFF2196F3);
+      case 'in_progress':
+      case 'upcoming':
+        return const Color(0xFF3F51B5);
+      case 'completed':
+        return const Color(0xFF1DB954);
       case 'cancelled':
+      case 'rejected':
+      case 'rejected / cancelled':
         return const Color(0xFFF44336);
       default:
         return const Color(0xFF9E9E9E);
@@ -126,18 +138,50 @@ class _AdminOrderManagementScreenState
 
   IconData _statusIcon(String status) {
     switch (status.toLowerCase()) {
-      case 'completed':
-        return Icons.check_circle_rounded;
-      case 'active':
-        return Icons.play_circle_rounded;
-      case 'upcoming':
-        return Icons.event_rounded;
+      case 'new':
+      case 'new request':
+        return Icons.fiber_new_rounded;
       case 'pending':
         return Icons.hourglass_top_rounded;
+      case 'assigned':
+      case 'assigned to provider':
+        return Icons.person_pin_rounded;
+      case 'active':
+      case 'accepted':
+        return Icons.thumb_up_rounded;
+      case 'in_progress':
+      case 'upcoming':
+        return Icons.play_circle_rounded;
+      case 'completed':
+        return Icons.check_circle_rounded;
       case 'cancelled':
+      case 'rejected':
+      case 'rejected / cancelled':
         return Icons.cancel_rounded;
       default:
         return Icons.receipt_rounded;
+    }
+  }
+
+  String _statusDisplay(String status) {
+    switch (status.toLowerCase()) {
+      case 'new':
+        return 'New Request';
+      case 'pending':
+        return 'Pending';
+      case 'assigned':
+        return 'Assigned to Provider';
+      case 'active':
+        return 'Accepted';
+      case 'in_progress':
+      case 'upcoming':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Rejected / Cancelled';
+      default:
+        return status.isNotEmpty ? status[0].toUpperCase() + status.substring(1) : 'Unknown';
     }
   }
 
@@ -477,7 +521,7 @@ class _AdminOrderManagementScreenState
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    status[0].toUpperCase() + status.substring(1),
+                    _statusDisplay(status),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -584,6 +628,25 @@ class _AdminOrderManagementScreenState
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showUpdateStatusDialog(order),
+                    icon: const Icon(Icons.edit_note_rounded, size: 16),
+                    label: Text(
+                      'Status',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primary,
+                      side: const BorderSide(color: AppTheme.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -673,6 +736,124 @@ class _AdminOrderManagementScreenState
         );
       }
     }
+  }
+
+  void _showUpdateStatusDialog(Map<String, dynamic> order) {
+    String currentStatus = (order['status'] ?? 'pending').toString().toLowerCase();
+    if (currentStatus == 'active') currentStatus = 'accepted';
+    String selectedStatus = currentStatus;
+    final remarksCtrl = TextEditingController();
+
+    final statusOptions = [
+      {'val': 'new', 'label': 'New Request'},
+      {'val': 'pending', 'label': 'Pending'},
+      {'val': 'assigned', 'label': 'Assigned to Provider'},
+      {'val': 'active', 'label': 'Accepted'},
+      {'val': 'in_progress', 'label': 'In Progress'},
+      {'val': 'completed', 'label': 'Completed'},
+      {'val': 'cancelled', 'label': 'Rejected / Cancelled'},
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.edit_note_rounded, color: AppTheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Update Request Status',
+                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Order #${order['order_number'] ?? order['id'].toString().substring(0, 8)}',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 14),
+                Text('Select Status', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: statusOptions.any((o) => o['val'] == selectedStatus) ? selectedStatus : 'pending',
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  items: statusOptions
+                      .map((o) => DropdownMenuItem(value: o['val'], child: Text(o['label']!)))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedStatus = val);
+                  },
+                ),
+                const SizedBox(height: 14),
+                Text('Admin Remarks / Audit History', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: remarksCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Assigned to area technician or follow-up note',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final remarks = remarksCtrl.text.trim();
+                final existingNotes = (order['notes'] ?? '').toString();
+                final timeStamp = DateTime.now().toLocal().toString().substring(0, 16);
+                final updatedNotes = remarks.isNotEmpty
+                    ? (existingNotes.isNotEmpty
+                        ? '$existingNotes\n[$timeStamp Admin]: $remarks'
+                        : '[$timeStamp Admin]: $remarks')
+                    : existingNotes;
+
+                await SupabaseService.instance.adminUpdateOrder(
+                  orderId: order['id'].toString(),
+                  updates: {
+                    'status': selectedStatus,
+                    'notes': updatedNotes,
+                    'updated_at': DateTime.now().toIso8601String(),
+                  },
+                );
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Request status updated to ${_statusDisplay(selectedStatus)}'),
+                      backgroundColor: const Color(0xFF2E7D32),
+                    ),
+                  );
+                  _loadOrders();
+                }
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

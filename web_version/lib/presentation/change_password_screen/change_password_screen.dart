@@ -109,7 +109,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           setState(() {
             _isLoading = false;
             _errorMessage =
-                'Current password is incorrect. (Tip: You can also use your Master Admin PIN 920920 or admin2026)';
+                'Current password is incorrect. Please verify and try again.';
           });
         }
       }

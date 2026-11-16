@@ -1,4 +1,5 @@
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedCity = '';
   String _userName = '';
   int _unreadMessageCount = 0;
+  DateTime? _lastBackPressTime;
   String _userRole = 'customer';
   RealtimeChannel? _msgSubscription;
   bool _isOnline = true;
@@ -223,7 +225,32 @@ class _HomeScreenState extends State<HomeScreen> {
     final isTablet = MediaQuery.of(context).size.width >= 600;
     final unreadNotifCount = NotificationHubService.instance.unreadCount;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Press back again to exit LocalConnect',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                ),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            );
+          }
+          return;
+        }
+        await SystemNavigator.pop();
+      },
+      child: Scaffold(
       backgroundColor: AppTheme.background,
       extendBody: true,
       body: SafeArea(
@@ -326,7 +353,8 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         },
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildProviderDashboardBanner() {

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
@@ -839,8 +840,57 @@ class SupabaseService {
   Future<void> adminUpdateOrder({
     required String orderId,
     required Map<String, dynamic> updates,
+    String? note,
   }) async {
     await client.from('orders').update(updates).eq('id', orderId);
+
+    final status = updates['status'] as String?;
+    if (status != null && status.isNotEmpty) {
+      try {
+        final order = await client
+            .from('orders')
+            .select('customer_id, customer_name, provider_id, provider_name, service, order_number')
+            .eq('id', orderId)
+            .maybeSingle();
+
+        if (order != null) {
+          final customerId = order['customer_id'] as String?;
+          final customerName = order['customer_name'] as String? ?? 'Customer';
+          final providerId = order['provider_id'] as String?;
+          final providerName = order['provider_name'] as String? ?? 'Provider';
+          final service = order['service'] as String? ?? 'Service';
+          final orderNum = order['order_number'] as String? ?? orderId;
+
+          String? providerUserId;
+          if (providerId != null && providerId.isNotEmpty) {
+            try {
+              final pRow = await client
+                  .from('service_providers')
+                  .select('user_id')
+                  .or('id.eq.$providerId,user_id.eq.$providerId')
+                  .maybeSingle();
+              providerUserId = pRow?['user_id'] as String? ?? providerId;
+            } catch (_) {
+              providerUserId = providerId;
+            }
+          }
+
+          await NotificationService.instance.notifyBookingUpdated(
+            orderId: orderId,
+            orderNumber: orderNum,
+            status: status,
+            updatedBy: 'admin',
+            customerId: customerId,
+            customerName: customerName,
+            providerId: providerId,
+            providerUserId: providerUserId,
+            providerName: providerName,
+            service: service,
+            note: note,
+          );
+        }
+      } catch (_) {}
+    }
   }
 
   /// Admin reassigns a direct booking/order to a new provider in the area
@@ -1163,69 +1213,57 @@ class SupabaseService {
         }
       }
 
-      // Notify provider of new order request
-      if (safeProviderId != null && safeProviderId.isNotEmpty) {
-        // Look up the provider's user_id & details
+      // Fetch customer phone & area to enrich booking notification
+      String customerPhone = '';
+      String bookingArea = '';
+      try {
+        final profile = await client
+            .from('user_profiles')
+            .select('full_name, phone, city, address')
+            .eq('id', userId)
+            .maybeSingle();
+        if (profile != null) {
+          final pName = (profile['full_name'] as String?)?.trim();
+          if (pName != null && pName.isNotEmpty) customerName = pName;
+          customerPhone = (profile['phone'] as String? ?? '').trim();
+          bookingArea = (profile['city'] as String? ?? profile['address'] as String? ?? '').trim();
+        }
+      } catch (_) {}
+
+      // If area still empty, check provider's city
+      if (bookingArea.isEmpty && safeProviderId != null) {
         try {
-          final providerRow = await client
+          final provRow = await client
               .from('service_providers')
-              .select('id, user_id, business_name')
+              .select('city')
               .or('id.eq.$safeProviderId,user_id.eq.$safeProviderId')
               .maybeSingle();
-          final providerUserId = (providerRow?['user_id'] as String?) ?? safeProviderId;
-          final resolvedProviderId = (providerRow?['id'] as String?) ?? safeProviderId;
-
-          if (providerUserId.isNotEmpty) {
-            await insertOrderNotification(
-              userId: providerUserId,
-              title: '🔔 New Booking Request',
-              body: '$customerName booked $service ($orderNumber).',
-              type: 'booking',
-              metadata: {
-                'order_id': response['id'],
-                'order_number': orderNumber,
-                'customer_name': customerName,
-                'service': service,
-                'amount': numericAmount.toString(),
-                'is_continuous_alert': true,
-              },
-            );
-
-            // Instant continuous ringing broadcast to provider device
-            try {
-              await NotificationService.instance.sendProviderContinuousAlert(
-                targetUserId: providerUserId,
-                targetProviderId: resolvedProviderId,
-                title: '🔔 New Booking Request',
-                body: '$customerName booked $service ($orderNumber).',
-                bookingId: response['id']?.toString() ?? orderNumber,
-                customerName: customerName,
-                serviceName: service,
-                amount: numericAmount.toString(),
-              );
-            } catch (_) {}
+          if (provRow != null && provRow['city'] != null) {
+            bookingArea = (provRow['city'] as String).trim();
           }
         } catch (_) {}
       }
 
-      // Notify customer of order placement confirmation
+      // Dispatch comprehensive booking creation notification (Customer, Provider, Super Admin, Area Manager)
       try {
-        await insertOrderNotification(
-          userId: userId,
-          title: '📅 Booking Placed (#$orderNumber)',
-          body: 'Your booking for $service has been placed successfully.',
-          type: 'booking',
-          metadata: {
-            'order_id': response['id'],
-            'order_number': orderNumber,
-          },
+        await NotificationService.instance.notifyBookingCreated(
+          orderId: response['id']?.toString() ?? '',
+          orderNumber: orderNumber,
+          customerId: userId,
+          customerName: customerName.isNotEmpty ? customerName : 'Valued Customer',
+          customerPhone: customerPhone,
+          service: service,
+          category: category,
+          amount: numericAmount.toString(),
+          providerId: safeProviderId,
+          providerName: providerName,
+          area: bookingArea.isNotEmpty ? bookingArea : 'Pune',
+          scheduledDate: scheduledDate,
+          scheduledTime: scheduledTime,
         );
-      } catch (_) {}
-
-      // Play sound chime for user
-      try {
-        NotificationService.instance.playNotificationSound();
-      } catch (_) {}
+      } catch (notifErr) {
+        debugPrint('[createOrder] Notification dispatch note: $notifErr');
+      }
 
       return response;
     } catch (e) {
@@ -1239,46 +1277,64 @@ class SupabaseService {
     required String orderId,
     required String status,
     int? rating,
+    String updatedBy = 'provider', // 'provider', 'admin', or 'customer'
+    String? note,
   }) async {
-    final updates = <String, dynamic>{'status': status};
+    final updates = <String, dynamic>{
+      'status': status,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
     if (rating != null) updates['rating'] = rating;
 
     await client.from('orders').update(updates).eq('id', orderId);
 
-    // Look up order info to send real-time notification
+    // Look up order info to dispatch real-time notifications to Customer, Provider, and Admin
     try {
       final order = await client
           .from('orders')
-          .select('customer_id, provider_id, service, order_number')
+          .select('customer_id, customer_name, provider_id, provider_name, service, order_number, category, amount')
           .eq('id', orderId)
           .maybeSingle();
 
       if (order != null) {
         final customerId = order['customer_id'] as String?;
+        final customerName = order['customer_name'] as String? ?? 'Customer';
+        final providerId = order['provider_id'] as String?;
+        final providerName = order['provider_name'] as String? ?? 'Provider';
         final service = order['service'] as String? ?? 'Service';
-        final orderNum = order['order_number'] as String? ?? '';
+        final orderNum = order['order_number'] as String? ?? orderId;
 
-        if (customerId != null && customerId.isNotEmpty) {
-          final statusLabel = status == 'confirmed'
-              ? 'Confirmed'
-              : status == 'in_progress'
-                  ? 'In Progress'
-                  : status == 'completed'
-                      ? 'Completed'
-                      : status == 'cancelled'
-                          ? 'Cancelled'
-                          : status;
-
-          await insertOrderNotification(
-            userId: customerId,
-            title: 'Booking $statusLabel ($orderNum)',
-            body: 'Your service $service is now $statusLabel.',
-            type: 'booking_status',
-            metadata: {'order_id': orderId, 'status': status},
-          );
+        String? providerUserId;
+        if (providerId != null && providerId.isNotEmpty) {
+          try {
+            final pRow = await client
+                .from('service_providers')
+                .select('user_id')
+                .or('id.eq.$providerId,user_id.eq.$providerId')
+                .maybeSingle();
+            providerUserId = pRow?['user_id'] as String? ?? providerId;
+          } catch (_) {
+            providerUserId = providerId;
+          }
         }
+
+        await NotificationService.instance.notifyBookingUpdated(
+          orderId: orderId,
+          orderNumber: orderNum,
+          status: status,
+          updatedBy: updatedBy,
+          customerId: customerId,
+          customerName: customerName,
+          providerId: providerId,
+          providerUserId: providerUserId,
+          providerName: providerName,
+          service: service,
+          note: note,
+        );
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[updateOrderStatus] Notification dispatch error: $e');
+    }
   }
 
   /// Insert a notification row for a user (used to notify customers/providers of order events).
@@ -1410,6 +1466,31 @@ class SupabaseService {
 
   Future<Map<String, dynamic>> getAdminStats() async {
     try {
+      final effectiveArea = (!isSuperAdmin &&
+              currentAdminArea.isNotEmpty &&
+              currentAdminArea.toUpperCase() != 'ALL')
+          ? currentAdminArea
+          : null;
+
+      if (effectiveArea != null) {
+        final allOrders = await getAdminAllOrders(areaFilter: effectiveArea);
+        final provResp = await getAdminAllProviders(areaFilter: effectiveArea);
+        final usersResp = await getAdminAllUsers(areaFilter: effectiveArea);
+
+        final pendingCount = allOrders.where((o) => (o['status'] ?? '').toString().toLowerCase() == 'pending').length;
+        final completedCount = allOrders.where((o) => (o['status'] ?? '').toString().toLowerCase() == 'completed').length;
+        final pendingApprovals = provResp.where((p) => p['is_verified'] != true || p['status'] == 'pending' || p['registration_status'] == 'pending_approval').length;
+
+        return {
+          'totalProviders': provResp.length,
+          'totalOrders': allOrders.length,
+          'totalUsers': usersResp.length,
+          'pendingOrders': pendingCount,
+          'completedOrders': completedCount,
+          'pendingApprovals': pendingApprovals,
+        };
+      }
+
       final providersResp = await client.from('service_providers').select('id');
       final ordersResp = await client.from('orders').select('id');
       final usersResp = await client.from('user_profiles').select('id');
@@ -2046,13 +2127,30 @@ class SupabaseService {
 
   // ─── ADMIN: USERS ─────────────────────────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> getAdminAllUsers() async {
+  Future<List<Map<String, dynamic>>> getAdminAllUsers({String? areaFilter}) async {
     try {
+      final effectiveArea = (areaFilter != null && areaFilter.isNotEmpty && areaFilter.toUpperCase() != 'ALL')
+          ? areaFilter
+          : (!isSuperAdmin && currentAdminArea.isNotEmpty && currentAdminArea.toUpperCase() != 'ALL')
+              ? currentAdminArea
+              : null;
+
       final response = await client
           .from('user_profiles')
           .select()
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response);
+
+      final list = List<Map<String, dynamic>>.from(response);
+      if (effectiveArea != null) {
+        final q = effectiveArea.toLowerCase();
+        return list.where((u) {
+          final city = (u['city'] ?? '').toString().toLowerCase();
+          final area = (u['assigned_area'] ?? '').toString().toLowerCase();
+          final fullAddress = (u['address'] ?? u['full_address'] ?? '').toString().toLowerCase();
+          return city.contains(q) || area.contains(q) || fullAddress.contains(q);
+        }).toList();
+      }
+      return list;
     } catch (e) {
       return [];
     }
@@ -2070,13 +2168,19 @@ class SupabaseService {
 
   // ─── ADMIN: PROVIDERS ─────────────────────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> getAdminAllProviders() async {
+  Future<List<Map<String, dynamic>>> getAdminAllProviders({String? areaFilter}) async {
+    final effectiveArea = (areaFilter != null && areaFilter.isNotEmpty && areaFilter.toUpperCase() != 'ALL')
+        ? areaFilter
+        : (!isSuperAdmin && currentAdminArea.isNotEmpty && currentAdminArea.toUpperCase() != 'ALL')
+            ? currentAdminArea
+            : null;
+
     try {
       final response = await client
           .from('service_providers')
           .select('*, user:user_id(email, full_name)')
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response).map((p) {
+      final mapped = List<Map<String, dynamic>>.from(response).map((p) {
         final user = p['user'] as Map<String, dynamic>?;
         return {
           ...p,
@@ -2088,13 +2192,24 @@ class SupabaseService {
           'joined': p['member_since'] ?? p['created_at'] ?? '',
         };
       }).toList();
+
+      if (effectiveArea != null) {
+        final q = effectiveArea.toLowerCase();
+        return mapped.where((p) {
+          final city = (p['city'] ?? '').toString().toLowerCase();
+          final addr = (p['address'] ?? '').toString().toLowerCase();
+          final serviceAreas = (p['service_areas'] ?? '').toString().toLowerCase();
+          return city.contains(q) || addr.contains(q) || serviceAreas.contains(q);
+        }).toList();
+      }
+      return mapped;
     } catch (e) {
       try {
         final response = await client
             .from('service_providers')
             .select()
             .order('created_at', ascending: false);
-        return List<Map<String, dynamic>>.from(response).map((p) {
+        final mapped = List<Map<String, dynamic>>.from(response).map((p) {
           return {
             ...p,
             'full_name': p['owner_name'] ?? p['business_name'] ?? 'Provider',
@@ -2104,6 +2219,17 @@ class SupabaseService {
             'joined': p['member_since'] ?? p['created_at'] ?? '',
           };
         }).toList();
+
+        if (effectiveArea != null) {
+          final q = effectiveArea.toLowerCase();
+          return mapped.where((p) {
+            final city = (p['city'] ?? '').toString().toLowerCase();
+            final addr = (p['address'] ?? '').toString().toLowerCase();
+            final serviceAreas = (p['service_areas'] ?? '').toString().toLowerCase();
+            return city.contains(q) || addr.contains(q) || serviceAreas.contains(q);
+          }).toList();
+        }
+        return mapped;
       } catch (err) {
         print('getAdminAllProviders error: $err');
         return [];
@@ -5117,6 +5243,23 @@ class SupabaseService {
           .select()
           .single();
 
+      // Dispatch real-time booking notifications to Customer, Provider, Super Admin, and Area Managers
+      try {
+        await NotificationService.instance.notifyBookingCreated(
+          orderId: response['id']?.toString() ?? '',
+          orderNumber: orderNumber,
+          customerId: userId,
+          customerName: 'Valued Customer',
+          service: service,
+          category: category,
+          amount: amountStr,
+          providerId: providerId,
+          providerName: providerName,
+          scheduledDate: scheduledDate,
+          scheduledTime: '10:00 AM',
+        );
+      } catch (_) {}
+
       return response;
     } catch (e) {
       return null;
@@ -5208,6 +5351,7 @@ class SupabaseService {
   Future<Map<String, dynamic>?> loadAdminProfile() async {
     try {
       final user = currentUser;
+      // Prioritize currentAdminEmail that was set upon admin authentication
       final email = currentAdminEmail.isNotEmpty
           ? currentAdminEmail
           : (user?.email?.isNotEmpty ?? false ? user!.email! : 'admin@localconnect.com');
@@ -5400,6 +5544,313 @@ class SupabaseService {
       return true;
     } catch (e) {
       return false;
+    }
+  }
+
+  Future<bool> adminUpdateAdRequest({
+    required String requestId,
+    String? title,
+    String? subtitle,
+    String? city,
+    String? category,
+    int? durationDays,
+    String? status,
+  }) async {
+    try {
+      final updates = <String, dynamic>{
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (title != null) updates['title'] = title;
+      if (subtitle != null) updates['subtitle'] = subtitle;
+      if (city != null) updates['city'] = city;
+      if (category != null) updates['category'] = category;
+      if (durationDays != null) updates['duration_days'] = durationDays;
+      if (status != null) updates['status'] = status;
+
+      await client.from('provider_ad_requests').update(updates).eq('id', requestId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> adminDeleteAdRequest(String requestId) async {
+    try {
+      await client.from('provider_ad_requests').delete().eq('id', requestId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ─── MANAGED OPERATING AREAS ───────────────────────────────────────────────
+
+  static const String _managedAreasKey = 'managed_operating_areas';
+  static const List<String> defaultAreas = [
+    'Pune',
+    'Mumbai',
+    'Nashik',
+    'Aurangabad',
+    'Nagpur',
+    'Kolhapur',
+    'Alibag',
+    'Roha',
+    'Pen',
+    'Panvel',
+    'Khopoli',
+    'Karjat',
+  ];
+
+  Future<List<String>> getManagedAreas() async {
+    try {
+      // First try dedicated table
+      final res = await client
+          .from('managed_operating_areas')
+          .select('area_name')
+          .eq('is_active', true)
+          .order('area_name', ascending: true);
+      final list = List<Map<String, dynamic>>.from(res)
+          .map((r) => (r['area_name'] ?? '').toString())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      if (list.isNotEmpty) return list;
+    } catch (_) {}
+
+    try {
+      // Fallback to admin_location_settings cloud storage
+      final setting = await client
+          .from('admin_location_settings')
+          .select('setting_value')
+          .eq('setting_key', _managedAreasKey)
+          .maybeSingle();
+      if (setting != null && setting['setting_value'] != null) {
+        final decoded = jsonDecode(setting['setting_value'] as String);
+        if (decoded is List) {
+          final list = decoded.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+          if (list.isNotEmpty) return list;
+        }
+      }
+    } catch (_) {}
+
+    return List<String>.from(defaultAreas);
+  }
+
+  Future<bool> addManagedArea(String areaName) async {
+    final clean = areaName.trim();
+    if (clean.isEmpty) return false;
+
+    try {
+      await client.from('managed_operating_areas').upsert({
+        'area_name': clean,
+        'state': 'Maharashtra',
+        'is_active': true,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'area_name');
+    } catch (_) {}
+
+    try {
+      final current = await getManagedAreas();
+      if (!current.contains(clean)) {
+        current.add(clean);
+        current.sort();
+        await client.from('admin_location_settings').upsert({
+          'setting_key': _managedAreasKey,
+          'setting_value': jsonEncode(current),
+          'description': 'Managed operating cities & regional areas',
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'setting_key');
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> updateManagedArea(String oldName, String newName) async {
+    final cleanOld = oldName.trim();
+    final cleanNew = newName.trim();
+    if (cleanOld.isEmpty || cleanNew.isEmpty) return false;
+
+    try {
+      await client
+          .from('managed_operating_areas')
+          .update({'area_name': cleanNew, 'updated_at': DateTime.now().toIso8601String()})
+          .eq('area_name', cleanOld);
+    } catch (_) {}
+
+    try {
+      final current = await getManagedAreas();
+      final index = current.indexOf(cleanOld);
+      if (index != -1) {
+        current[index] = cleanNew;
+        current.sort();
+        await client.from('admin_location_settings').upsert({
+          'setting_key': _managedAreasKey,
+          'setting_value': jsonEncode(current),
+          'description': 'Managed operating cities & regional areas',
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'setting_key');
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteManagedArea(String areaName) async {
+    final clean = areaName.trim();
+    if (clean.isEmpty) return false;
+
+    try {
+      await client.from('managed_operating_areas').delete().eq('area_name', clean);
+    } catch (_) {}
+
+    try {
+      final current = await getManagedAreas();
+      current.remove(clean);
+      await client.from('admin_location_settings').upsert({
+        'setting_key': _managedAreasKey,
+        'setting_value': jsonEncode(current),
+        'description': 'Managed operating cities & regional areas',
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'setting_key');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ─── HOME FOR RENT (NO PROVIDER REGISTRATION REQUIRED) ─────────────────────
+
+  Future<List<Map<String, dynamic>>> getHomeRentListings({
+    String? city,
+    String? status,
+    bool onlyAvailable = false,
+  }) async {
+    try {
+      var builder = client.from('home_rent_listings').select();
+      if (city != null && city.isNotEmpty && city.toUpperCase() != 'ALL') {
+        builder = builder.ilike('city', '%$city%');
+      }
+      if (status != null && status.isNotEmpty && status.toUpperCase() != 'ALL') {
+        builder = builder.eq('status', status.toLowerCase());
+      }
+      if (onlyAvailable) {
+        builder = builder.eq('is_available', true);
+      }
+      final res = await builder.order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      // Fallback demo/mock storage if table pending migration
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> submitHomeRentListing({
+    required String ownerName,
+    required String ownerPhone,
+    String ownerEmail = '',
+    required String city,
+    String areaLocality = '',
+    required String propertyType,
+    required String bedrooms,
+    required double monthlyRent,
+    double deposit = 0.0,
+    String furnishingStatus = 'Semi-Furnished',
+    String description = '',
+    String primaryPhoto = '',
+    List<String> photos = const [],
+  }) async {
+    try {
+      final row = {
+        'owner_name': ownerName.trim(),
+        'owner_phone': ownerPhone.trim(),
+        'owner_email': ownerEmail.trim(),
+        'city': city.trim(),
+        'area_locality': areaLocality.trim(),
+        'property_type': propertyType.trim(),
+        'bedrooms': bedrooms.trim(),
+        'monthly_rent': monthlyRent,
+        'deposit': deposit,
+        'furnishing_status': furnishingStatus.trim(),
+        'description': description.trim(),
+        'primary_photo': primaryPhoto.trim(),
+        'photos': photos,
+        'status': 'approved', // instantly approved or ready for admin moderation
+        'is_available': true,
+        'user_id': currentUser?.id,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      final inserted = await client.from('home_rent_listings').insert(row).select().single();
+      return Map<String, dynamic>.from(inserted);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> updateHomeRentListingStatus({
+    required String listingId,
+    required String status,
+    bool? isAvailable,
+    String? adminNotes,
+  }) async {
+    try {
+      final updates = <String, dynamic>{
+        'status': status,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (isAvailable != null) updates['is_available'] = isAvailable;
+      if (adminNotes != null) updates['admin_notes'] = adminNotes;
+      await client.from('home_rent_listings').update(updates).eq('id', listingId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteHomeRentListing(String listingId) async {
+    try {
+      await client.from('home_rent_listings').delete().eq('id', listingId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> submitHomeRentEnquiry({
+    required String listingId,
+    required String customerName,
+    required String customerPhone,
+    String customerEmail = '',
+    String message = '',
+  }) async {
+    try {
+      await client.from('home_rent_enquiries').insert({
+        'listing_id': listingId,
+        'customer_name': customerName.trim(),
+        'customer_phone': customerPhone.trim(),
+        'customer_email': customerEmail.trim(),
+        'message': message.trim(),
+        'status': 'new',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getHomeRentEnquiries({String? listingId}) async {
+    try {
+      var builder = client.from('home_rent_enquiries').select('*, listing:listing_id(*)');
+      if (listingId != null && listingId.isNotEmpty) {
+        builder = builder.eq('listing_id', listingId);
+      }
+      final res = await builder.order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      return [];
     }
   }
 

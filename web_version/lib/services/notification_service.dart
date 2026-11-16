@@ -7,6 +7,7 @@ import 'package:universal_html/html.dart' as html;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
+import 'admin_auth_service.dart';
 import 'notification_hub_service.dart';
 import '../routes/app_routes.dart';
 
@@ -66,9 +67,9 @@ class NotificationService {
     } catch (_) {}
   }
 
-  /// Plays a single pleasant notification chime sound
-  /// Web: Synthesized dual-tone sine chime via Web Audio API
-  /// Mobile: System alert sound with haptics
+  /// Plays a clear bell chime notification sound
+  /// Web: Synthesized multi-harmonic bell chime (880 Hz, 1108.7 Hz, 1318.5 Hz, 1760 Hz)
+  /// Mobile: System alert sound with medium haptic pulse
   void playNotificationSound() {
     try {
       if (kIsWeb) {
@@ -82,29 +83,24 @@ class NotificationService {
                   var ctx = window._lcAudioCtx || new AudioContext();
                   if (ctx.state === 'suspended') ctx.resume();
                   
-                  // Primary chime tone (880 Hz - A5)
-                  var osc1 = ctx.createOscillator();
-                  var gain1 = ctx.createGain();
-                  osc1.type = 'sine';
-                  osc1.frequency.setValueAtTime(880, ctx.currentTime);
-                  gain1.gain.setValueAtTime(0.40, ctx.currentTime);
-                  gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-                  osc1.connect(gain1);
-                  gain1.connect(ctx.destination);
-                  osc1.start(ctx.currentTime);
-                  osc1.stop(ctx.currentTime + 0.35);
+                  // Authentic Bell Chime - 4 harmonic frequencies (A5=880, C#6=1108.7, E6=1318.5, A6=1760)
+                  var now = ctx.currentTime;
+                  var freqs = [880, 1108.73, 1318.51, 1760];
+                  var gains = [0.45, 0.28, 0.35, 0.20];
+                  var decays = [0.55, 0.45, 0.60, 0.40];
 
-                  // Secondary harmonic chime (1318.5 Hz - E6)
-                  var osc2 = ctx.createOscillator();
-                  var gain2 = ctx.createGain();
-                  osc2.type = 'sine';
-                  osc2.frequency.setValueAtTime(1318.5, ctx.currentTime + 0.10);
-                  gain2.gain.setValueAtTime(0.45, ctx.currentTime + 0.10);
-                  gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
-                  osc2.connect(gain2);
-                  gain2.connect(ctx.destination);
-                  osc2.start(ctx.currentTime + 0.10);
-                  osc2.stop(ctx.currentTime + 0.45);
+                  freqs.forEach(function(f, idx) {
+                    var osc = ctx.createOscillator();
+                    var gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(f, now);
+                    gain.gain.setValueAtTime(gains[idx], now);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + decays[idx]);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + decays[idx]);
+                  });
                 } catch(e) {}
               })();
             ''';
@@ -113,10 +109,13 @@ class NotificationService {
         } catch (_) {}
       } else {
         SystemSound.play(SystemSoundType.alert);
-        HapticFeedback.lightImpact();
+        HapticFeedback.mediumImpact();
       }
     } catch (_) {}
   }
+
+  /// Explicit alias for playing the bell chime sound
+  void playBellChimeSound() => playNotificationSound();
 
   /// Plays a distinct repeating alarm pulse (used internally by continuous ringing loop)
   void _playAlarmPulse() {
@@ -448,56 +447,104 @@ class NotificationService {
 
     unlockWebAudioContext();
 
-    if (!kIsWeb) {
-      const androidSettings =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
-      const iosSettings = DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
-      );
-
-      const initSettings = InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-      );
-
+    if (kIsWeb) {
       try {
-        await _plugin.initialize(
-          settings: initSettings,
-          onDidReceiveNotificationResponse: _onNotificationTapped,
-        );
-
-        final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-        if (androidPlugin != null) {
-          await androidPlugin.createNotificationChannel(
-            const AndroidNotificationChannel(
-              'inquiry_notifications',
-              'Customer Enquiries & Ringing Alerts',
-              description: 'Continuous ring and notifications for customer enquiries and orders',
-              importance: Importance.max,
-              playSound: true,
-              enableVibration: true,
-            ),
-          );
-          await androidPlugin.createNotificationChannel(
-            const AndroidNotificationChannel(
-              'general_notifications',
-              'General App Notifications',
-              description: 'Standard notifications and status updates',
-              importance: Importance.high,
-              playSound: true,
-              enableVibration: true,
-            ),
-          );
+        if (html.Notification.supported && html.Notification.permission == 'default') {
+          html.Notification.requestPermission();
         }
-        _initialized = true;
-      } catch (e) {
-        debugPrint('[NotificationService] Local notifications init note: $e');
-        _initialized = true;
+      } catch (_) {}
+      _initialized = true;
+      return;
+    }
+
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
+    try {
+      await _plugin.initialize(
+        settings: initSettings,
+        onDidReceiveNotificationResponse: _onNotificationTapped,
+      );
+
+      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin != null) {
+        // Request runtime permission on Android 13+ (API 33+)
+        try {
+          await androidPlugin.requestNotificationsPermission();
+        } catch (_) {}
+
+        // Pre-create all notification channels with high priority, sound, and vibration
+        final channels = [
+          const AndroidNotificationChannel(
+            'booking_notifications',
+            'Service Bookings & Updates',
+            description: 'Notifications when bookings are placed, confirmed, updated, or completed',
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+          ),
+          const AndroidNotificationChannel(
+            'booking_alerts',
+            'Incoming Booking Alerts',
+            description: 'Loud ringing and alerts for providers when a customer books a service',
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+          ),
+          const AndroidNotificationChannel(
+            'inquiry_notifications',
+            'Customer Enquiries & Ringing Alerts',
+            description: 'Continuous ring and notifications for customer enquiries and service requests',
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+          ),
+          const AndroidNotificationChannel(
+            'order_updates',
+            'Order & Status Updates',
+            description: 'Status updates and progress alerts for bookings and orders',
+            importance: Importance.high,
+            playSound: true,
+            enableVibration: true,
+          ),
+          const AndroidNotificationChannel(
+            'admin_notifications',
+            'Admin & Area Manager Alerts',
+            description: 'Real-time booking and service request alerts for Admin and Area Managers',
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+          ),
+          const AndroidNotificationChannel(
+            'general_notifications',
+            'General App Notifications',
+            description: 'Standard notifications and announcements',
+            importance: Importance.high,
+            playSound: true,
+            enableVibration: true,
+          ),
+        ];
+
+        for (final chan in channels) {
+          try {
+            await androidPlugin.createNotificationChannel(chan);
+          } catch (_) {}
+        }
       }
-    } else {
+      _initialized = true;
+    } catch (e) {
+      debugPrint('[NotificationService] Local notifications init note: $e');
       _initialized = true;
     }
   }
@@ -555,7 +602,7 @@ class NotificationService {
     }
   }
 
-  // ─── LOCAL PUSH NOTIFICATIONS ─────────────────────────────────────────────
+  // ─── LOCAL PUSH & WEB BROWSER NOTIFICATIONS ───────────────────────────────
 
   Future<void> showLocalNotification({
     int id = 0,
@@ -568,11 +615,48 @@ class NotificationService {
     Importance importance = Importance.high,
     Priority priority = Priority.high,
   }) async {
+    // 1. Play audible bell beep sound
     playNotificationSound();
 
     if (!_initialized) await initialize();
-    if (kIsWeb) return;
 
+    // 2. Web browser desktop notification
+    if (kIsWeb) {
+      try {
+        if (html.Notification.supported) {
+          void dispatchWebNotif() {
+            try {
+              final notif = html.Notification(
+                title,
+                body: body,
+                icon: 'favicon.png',
+                tag: '${channelId}_$id',
+              );
+              notif.onClick.listen((_) {
+                _handleNotificationPayload(payload);
+              });
+            } catch (err) {
+              debugPrint('[NotificationService] Web notification trigger error: $err');
+            }
+          }
+
+          if (html.Notification.permission == 'granted') {
+            dispatchWebNotif();
+          } else if (html.Notification.permission == 'default') {
+            html.Notification.requestPermission().then((perm) {
+              if (perm == 'granted') {
+                dispatchWebNotif();
+              }
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('[NotificationService] Web notification note: $e');
+      }
+      return;
+    }
+
+    // 3. Android notification drawer & shade
     final androidDetails = AndroidNotificationDetails(
       channelId,
       channelName,
@@ -582,6 +666,10 @@ class NotificationService {
       showWhen: true,
       enableVibration: true,
       playSound: true,
+      icon: '@mipmap/ic_launcher',
+      channelShowBadge: true,
+      visibility: NotificationVisibility.public,
+      ticker: title,
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -606,6 +694,464 @@ class NotificationService {
     } catch (e) {
       debugPrint('[NotificationService] showLocalNotification note: $e');
     }
+  }
+
+  /// Checks if an admin notification for a specific area applies to the current user (Super Admin or matching Area Manager)
+  bool doesAdminNotificationApply({String? area}) {
+    if (SupabaseService.instance.isSuperAdmin) return true;
+
+    if (SupabaseService.instance.isAreaManager) {
+      final assignedArea = SupabaseService.instance.currentAdminArea.trim();
+      if (assignedArea.isEmpty || assignedArea.toUpperCase() == 'ALL') return true;
+      if (area == null || area.trim().isEmpty) return true;
+      final target = area.trim().toLowerCase();
+      final mine = assignedArea.toLowerCase();
+      return target == mine || target.contains(mine) || mine.contains(target);
+    }
+
+    return false;
+  }
+
+  /// Dispatches complete booking creation notifications to Customer, Provider, Super Admin, and Area Managers
+  Future<void> notifyBookingCreated({
+    required String orderId,
+    required String orderNumber,
+    required String customerId,
+    required String customerName,
+    String? customerPhone,
+    required String service,
+    required String category,
+    required String amount,
+    String? providerId,
+    String? providerUserId,
+    String? providerName,
+    String? area,
+    String? scheduledDate,
+    String? scheduledTime,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final cleanArea = (area != null && area.trim().isNotEmpty) ? area.trim() : 'Local Area';
+    final cleanProvName = (providerName != null && providerName.trim().isNotEmpty) ? providerName.trim() : 'LocalConnect Partner';
+
+    // 1. Play audible bell chime sound on this device
+    playNotificationSound();
+
+    // 2. Notify Customer (Drawer notification + Toast + DB record)
+    final custTitle = '🔔 Booking Confirmed (#$orderNumber)';
+    final custBody = 'Your booking for $service has been placed. Provider has been alerted!';
+
+    showInAppToast(
+      title: custTitle,
+      subtitle: custBody,
+      icon: Icons.check_circle_rounded,
+      iconColor: const Color(0xFF16A34A),
+      bgColor: const Color(0xFFF0FDF4),
+    );
+
+    // Show App Drawer / Web Notification on customer device
+    showLocalNotification(
+      id: orderNumber.hashCode,
+      title: custTitle,
+      body: custBody,
+      payload: jsonEncode({'order_id': orderId, 'order_number': orderNumber, 'route': AppRoutes.customerBookingsScreen}),
+      channelId: 'booking_notifications',
+      channelName: 'Service Bookings & Updates',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    // Insert customer DB notification
+    try {
+      await SupabaseService.instance.client.from('notifications').insert({
+        'user_id': customerId,
+        'title': custTitle,
+        'body': custBody,
+        'type': 'booking',
+        'metadata': {
+          'order_id': orderId,
+          'order_number': orderNumber,
+          'service': service,
+          'category': category,
+          'amount': amount,
+          'provider_name': cleanProvName,
+          'area': cleanArea,
+        },
+        'is_read': false,
+        'created_at': now,
+      });
+    } catch (_) {}
+
+    // 3. Notify Relevant Provider / Partner
+    String? targetProvUserId = providerUserId;
+    if ((targetProvUserId == null || targetProvUserId.isEmpty) && providerId != null && providerId.isNotEmpty) {
+      try {
+        final provRow = await SupabaseService.instance.client
+            .from('service_providers')
+            .select('user_id, business_name')
+            .or('id.eq.$providerId,user_id.eq.$providerId')
+            .maybeSingle();
+        targetProvUserId = provRow?['user_id'] as String? ?? providerId;
+      } catch (_) {
+        targetProvUserId = providerId;
+      }
+    }
+
+    final provTitle = '🔔 New Booking Request (#$orderNumber)';
+    final provBody = '$customerName booked $service in $cleanArea (₹$amount). Tap to respond!';
+
+    final Set<String> targetProviderIds = {};
+    if (targetProvUserId != null && targetProvUserId.isNotEmpty) {
+      targetProviderIds.add(targetProvUserId);
+    }
+    if (providerId != null && providerId.isNotEmpty && providerId != targetProvUserId) {
+      targetProviderIds.add(providerId);
+    }
+
+    // If no specific provider assigned, query matching active providers in area/category
+    if (targetProviderIds.isEmpty) {
+      try {
+        var query = SupabaseService.instance.client
+            .from('service_providers')
+            .select('id, user_id')
+            .eq('is_active', true);
+        if (cleanArea != 'Local Area' && cleanArea != 'ALL') {
+          query = query.ilike('city', '%$cleanArea%');
+        }
+        if (category.isNotEmpty) {
+          query = query.or('category.ilike.%$category%,subcategory.ilike.%$service%');
+        }
+        final list = await query.limit(15);
+        for (final row in list) {
+          final pid = row['id']?.toString();
+          final puid = row['user_id']?.toString();
+          if (puid != null && puid.isNotEmpty) targetProviderIds.add(puid);
+          if (pid != null && pid.isNotEmpty) targetProviderIds.add(pid);
+        }
+      } catch (_) {}
+    }
+
+    // Insert DB notification for all target providers
+    for (final tid in targetProviderIds) {
+      try {
+        await SupabaseService.instance.client.from('notifications').insert({
+          'user_id': tid,
+          'title': provTitle,
+          'body': provBody,
+          'type': 'booking',
+          'metadata': {
+            'order_id': orderId,
+            'booking_id': orderId,
+            'order_number': orderNumber,
+            'customer_name': customerName,
+            'customer_phone': customerPhone,
+            'service': service,
+            'category': category,
+            'amount': amount,
+            'area': cleanArea,
+            'scheduled_date': scheduledDate,
+            'scheduled_time': scheduledTime,
+            'is_continuous_alert': true,
+          },
+          'is_read': false,
+          'created_at': now,
+        });
+      } catch (_) {}
+    }
+
+    // Broadcast instant continuous ringing alert to provider device
+    try {
+      await sendProviderContinuousAlert(
+        targetUserId: targetProvUserId ?? (targetProviderIds.isNotEmpty ? targetProviderIds.first : ''),
+        targetProviderId: providerId,
+        title: provTitle,
+        body: provBody,
+        bookingId: orderId,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        serviceName: service,
+        amount: amount,
+      );
+    } catch (_) {}
+
+    // 4. Notify Super Admin & Relevant Area Managers
+    final adminTitle = '📋 New Booking in $cleanArea (#$orderNumber)';
+    final adminBody = '$customerName ($cleanArea) booked $service with $cleanProvName (₹$amount).';
+
+    try {
+      await SupabaseService.instance.client.from('notifications').insert({
+        'target_audience': 'admin',
+        'title': adminTitle,
+        'body': adminBody,
+        'type': 'admin_broadcast',
+        'metadata': {
+          'order_id': orderId,
+          'order_number': orderNumber,
+          'customer_name': customerName,
+          'customer_phone': customerPhone,
+          'service': service,
+          'category': category,
+          'amount': amount,
+          'provider_name': cleanProvName,
+          'area': cleanArea,
+          'audience': 'admin',
+        },
+        'is_read': false,
+        'created_at': now,
+      });
+
+      // Target area managers specifically
+      try {
+        final allAdmins = await AdminAuthService.instance.getAllAdmins();
+        for (final adm in allAdmins) {
+          final role = (adm['role'] ?? '').toString();
+          final assignedArea = (adm['assigned_area'] ?? '').toString();
+          final admId = adm['id']?.toString() ?? '';
+          final admEmail = adm['email']?.toString() ?? '';
+
+          bool isRelevant = false;
+          if (role == 'super_admin') {
+            isRelevant = true;
+          } else if (role == 'area_manager' || role == 'area_admin') {
+            if (assignedArea == 'ALL' ||
+                assignedArea.toLowerCase() == cleanArea.toLowerCase() ||
+                cleanArea.toLowerCase().contains(assignedArea.toLowerCase())) {
+              isRelevant = true;
+            }
+          }
+
+          if (isRelevant && admId.isNotEmpty) {
+            try {
+              await SupabaseService.instance.client.from('notifications').insert({
+                'user_id': admId,
+                'title': adminTitle,
+                'body': adminBody,
+                'type': 'admin_broadcast',
+                'metadata': {
+                  'order_id': orderId,
+                  'order_number': orderNumber,
+                  'area': cleanArea,
+                  'admin_email': admEmail,
+                  'target_audience': 'admin',
+                },
+                'is_read': false,
+                'created_at': now,
+              });
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
+
+      // Broadcast to admin channel
+      final adminChan = SupabaseService.instance.client
+          .channel('public:global_notifications_and_broadcasts');
+      await adminChan.sendBroadcastMessage(
+        event: 'admin_booking_notification',
+        payload: {
+          'title': adminTitle,
+          'body': adminBody,
+          'order_id': orderId,
+          'order_number': orderNumber,
+          'area': cleanArea,
+          'service': service,
+          'customer_name': customerName,
+          'provider_name': cleanProvName,
+          'amount': amount,
+          'target_type': 'admin',
+          'timestamp': now,
+        },
+      );
+    } catch (_) {}
+  }
+
+  /// Dispatches booking update notifications to Customer, Provider, Super Admin, and Area Managers
+  Future<void> notifyBookingUpdated({
+    required String orderId,
+    required String orderNumber,
+    required String status,
+    required String updatedBy, // 'customer', 'provider', or 'admin'
+    String? customerId,
+    String? customerName,
+    String? providerId,
+    String? providerUserId,
+    String? providerName,
+    String? service,
+    String? area,
+    String? note,
+    String? newProviderName,
+    String? newProviderId,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final statusLabel = _formatOrderStatus(status);
+    final sName = service ?? 'Service';
+    final pName = providerName ?? 'Provider';
+    final cName = customerName ?? 'Customer';
+    final cleanArea = (area != null && area.trim().isNotEmpty) ? area.trim() : 'Local Area';
+
+    // 1. Play audible bell sound on current device
+    playNotificationSound();
+
+    // 2. Notify Customer
+    if (customerId != null && customerId.isNotEmpty) {
+      String custTitle;
+      String custBody;
+      if (updatedBy == 'admin' && newProviderName != null) {
+        custTitle = '🔄 Booking Reassigned (#$orderNumber)';
+        custBody = 'Your $sName booking has been reassigned to $newProviderName. ${note ?? ""}';
+      } else if (status == 'active' || status == 'confirmed') {
+        custTitle = '✅ Booking Confirmed (#$orderNumber)';
+        custBody = '$pName accepted your booking for $sName.';
+      } else if (status == 'in_progress') {
+        custTitle = '🚀 Service In Progress (#$orderNumber)';
+        custBody = '$pName has started working on your $sName request.';
+      } else if (status == 'completed') {
+        custTitle = '🎉 Service Completed (#$orderNumber)';
+        custBody = 'Your $sName service with $pName is completed. Thank you!';
+      } else if (status == 'cancelled') {
+        custTitle = '❌ Booking Cancelled (#$orderNumber)';
+        custBody = 'Booking #$orderNumber was cancelled by ${updatedBy.toUpperCase()}. ${note ?? ""}';
+      } else {
+        custTitle = '📋 Booking Status: $statusLabel (#$orderNumber)';
+        custBody = 'Your $sName booking is now $statusLabel. ${note ?? ""}';
+      }
+
+      // If current device is the customer, display toast & local drawer notification
+      final currentUserId = SupabaseService.instance.currentUser?.id;
+      if (currentUserId == customerId) {
+        showInAppToast(
+          title: custTitle,
+          subtitle: custBody,
+          icon: status == 'completed'
+              ? Icons.celebration_rounded
+              : status == 'cancelled'
+                  ? Icons.cancel_rounded
+                  : Icons.notifications_active_rounded,
+          iconColor: status == 'completed'
+              ? const Color(0xFF16A34A)
+              : status == 'cancelled'
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFF2563EB),
+        );
+        showLocalNotification(
+          id: orderNumber.hashCode ^ 1,
+          title: custTitle,
+          body: custBody,
+          payload: jsonEncode({'order_id': orderId, 'order_number': orderNumber, 'route': AppRoutes.customerBookingsScreen}),
+          channelId: 'order_updates',
+          channelName: 'Order & Status Updates',
+        );
+      }
+
+      // Insert customer DB notification
+      try {
+        await SupabaseService.instance.client.from('notifications').insert({
+          'user_id': customerId,
+          'title': custTitle,
+          'body': custBody,
+          'type': 'booking_status',
+          'metadata': {
+            'order_id': orderId,
+            'order_number': orderNumber,
+            'status': status,
+            'service': sName,
+            'provider_name': pName,
+            'updated_by': updatedBy,
+            'note': note,
+          },
+          'is_read': false,
+          'created_at': now,
+        });
+      } catch (_) {}
+    }
+
+    // 3. Notify Provider(s)
+    final targetPid = providerUserId ?? providerId;
+    if (targetPid != null && targetPid.isNotEmpty) {
+      final provTitle = 'Booking Update: $statusLabel (#$orderNumber)';
+      final provBody = 'Booking for $sName ($cName) updated to $statusLabel by ${updatedBy.toUpperCase()}.';
+
+      final currentUserId = SupabaseService.instance.currentUser?.id;
+      if (currentUserId == targetPid || _cachedProviderId == targetPid) {
+        showInAppToast(
+          title: provTitle,
+          subtitle: provBody,
+          icon: Icons.event_note_rounded,
+          iconColor: const Color(0xFF1E3A8A),
+        );
+        showLocalNotification(
+          id: orderNumber.hashCode ^ 2,
+          title: provTitle,
+          body: provBody,
+          payload: jsonEncode({'order_id': orderId, 'order_number': orderNumber}),
+          channelId: 'order_updates',
+          channelName: 'Order & Status Updates',
+        );
+      }
+
+      try {
+        await SupabaseService.instance.client.from('notifications').insert({
+          'user_id': targetPid,
+          'title': provTitle,
+          'body': provBody,
+          'type': 'booking_status',
+          'metadata': {
+            'order_id': orderId,
+            'order_number': orderNumber,
+            'status': status,
+            'service': sName,
+            'customer_name': cName,
+            'updated_by': updatedBy,
+            'note': note,
+          },
+          'is_read': false,
+          'created_at': now,
+        });
+      } catch (_) {}
+    }
+
+    // 4. Notify Super Admin & Relevant Area Managers
+    final adminTitle = '📊 Booking #$orderNumber: $statusLabel';
+    final adminBody = 'Updated by ${updatedBy.toUpperCase()}: $sName ($cName ➔ $pName) is now $statusLabel. ${note ?? ""}';
+
+    try {
+      await SupabaseService.instance.client.from('notifications').insert({
+        'target_audience': 'admin',
+        'title': adminTitle,
+        'body': adminBody.trim(),
+        'type': 'admin_broadcast',
+        'metadata': {
+          'order_id': orderId,
+          'order_number': orderNumber,
+          'status': status,
+          'service': sName,
+          'customer_name': cName,
+          'provider_name': pName,
+          'updated_by': updatedBy,
+          'area': cleanArea,
+          'audience': 'admin',
+        },
+        'is_read': false,
+        'created_at': now,
+      });
+
+      // Broadcast to global realtime channel
+      final chan = SupabaseService.instance.client
+          .channel('public:global_notifications_and_broadcasts');
+      await chan.sendBroadcastMessage(
+        event: 'booking_status_update',
+        payload: {
+          'order_id': orderId,
+          'order_number': orderNumber,
+          'status': status,
+          'updated_by': updatedBy,
+          'customer_id': customerId,
+          'provider_id': providerId,
+          'provider_user_id': providerUserId,
+          'area': cleanArea,
+          'title': adminTitle,
+          'body': adminBody,
+        },
+      );
+    } catch (_) {}
   }
 
   // ─── REALTIME NOTIFICATION DISPATCH METHODS ───────────────────────────────
@@ -1379,17 +1925,93 @@ class NotificationService {
                   isEnquiry: isEnquiry,
                 );
 
-                // 2. High priority Android local notification in notification shade
+                // 2. High priority Android local notification in notification shade / Web notification
                 showLocalNotification(
                   id: (bookingId ?? enquiryId ?? DateTime.now().millisecondsSinceEpoch.toString()).hashCode,
                   title: title,
                   body: body,
+                  payload: jsonEncode({'order_id': bookingId, 'enquiry_id': enquiryId}),
                   channelId: 'inquiry_notifications',
                   channelName: 'Customer Enquiries & Ringing Alerts',
                   importance: Importance.max,
                   priority: Priority.high,
                 );
               }
+            },
+          )
+          .onBroadcast(
+            event: 'booking_status_update',
+            callback: (payload) {
+              final currentUserId = SupabaseService.instance.currentUser?.id;
+              final custId = payload['customer_id'] as String?;
+              final provId = payload['provider_id'] as String?;
+              final provUid = payload['provider_user_id'] as String?;
+              final area = payload['area'] as String? ?? '';
+              final title = payload['title'] as String? ?? '📋 Booking Status Update';
+              final body = payload['body'] as String? ?? 'Your booking has been updated.';
+              final orderId = payload['order_id']?.toString() ?? '';
+              final orderNumber = payload['order_number']?.toString() ?? '';
+
+              bool applies = false;
+              if (currentUserId != null && custId == currentUserId) {
+                applies = true;
+              } else if (currentUserId != null &&
+                  (provUid == currentUserId || provId == currentUserId || _cachedProviderId == provId)) {
+                applies = true;
+              } else if (doesAdminNotificationApply(area: area)) {
+                applies = true;
+              }
+
+              if (applies) {
+                playNotificationSound();
+                showInAppToast(
+                  title: title,
+                  subtitle: body,
+                  icon: Icons.notifications_active_rounded,
+                  iconColor: const Color(0xFF1E3A8A),
+                );
+                showLocalNotification(
+                  id: (orderId.isNotEmpty ? orderId : orderNumber).hashCode ^ 3,
+                  title: title,
+                  body: body,
+                  payload: jsonEncode({'order_id': orderId, 'order_number': orderNumber}),
+                  channelId: 'order_updates',
+                  channelName: 'Order & Status Updates',
+                  importance: Importance.high,
+                  priority: Priority.high,
+                );
+              }
+            },
+          )
+          .onBroadcast(
+            event: 'admin_booking_notification',
+            callback: (payload) {
+              final area = payload['area'] as String? ?? '';
+              if (!doesAdminNotificationApply(area: area)) return;
+
+              final title = payload['title'] as String? ?? '📋 New Booking';
+              final body = payload['body'] as String? ?? '';
+              final orderId = payload['order_id']?.toString() ?? '';
+              final orderNumber = payload['order_number']?.toString() ?? '';
+
+              playNotificationSound();
+              showInAppToast(
+                title: title,
+                subtitle: body,
+                icon: Icons.assignment_turned_in_rounded,
+                iconColor: const Color(0xFF0284C7),
+                bgColor: const Color(0xFFF0F9FF),
+              );
+              showLocalNotification(
+                id: (orderId.isNotEmpty ? orderId : orderNumber).hashCode ^ 4,
+                title: title,
+                body: body,
+                payload: jsonEncode({'order_id': orderId, 'order_number': orderNumber, 'route': AppRoutes.adminOrderManagementScreen}),
+                channelId: 'admin_notifications',
+                channelName: 'Admin & Area Manager Alerts',
+                importance: Importance.max,
+                priority: Priority.high,
+              );
             },
           )
           .onBroadcast(
@@ -1401,10 +2023,13 @@ class NotificationService {
                   payload['target_type'] as String? ?? 'all_users';
               final targetUserId = payload['target_user_id'] as String?;
               final currentUserId = SupabaseService.instance.currentUser?.id;
+              final area = payload['area'] as String? ?? '';
 
               bool applies = false;
               if (targetType == 'all_users' || targetType == 'all') {
                 applies = true;
+              } else if (targetType == 'admin') {
+                applies = doesAdminNotificationApply(area: area);
               } else if (targetType == 'all_customers') {
                 applies = true;
               } else if (targetType == 'all_vendors') {
@@ -1421,6 +2046,14 @@ class NotificationService {
                   icon: Icons.campaign_rounded,
                   iconColor: const Color(0xFF7C3AED),
                   bgColor: const Color(0xFFF5F3FF),
+                );
+                showLocalNotification(
+                  id: title.hashCode,
+                  title: title,
+                  body: body,
+                  payload: jsonEncode(payload),
+                  channelId: 'general_notifications',
+                  channelName: 'General App Notifications',
                 );
                 NotificationHubService.instance.initialize();
               }
@@ -1439,14 +2072,19 @@ class NotificationService {
               final body = newRecord['body'] as String? ?? '';
               final metadata = newRecord['metadata'] as Map<String, dynamic>? ?? {};
               final targetAudience = newRecord['target_audience'] as String?;
+              final notifArea = metadata['area']?.toString() ?? metadata['city']?.toString() ?? '';
 
               bool applies = false;
-              if (uid == null ||
-                  (currentUserId != null && uid == currentUserId) ||
-                  (_cachedProviderId != null && uid == _cachedProviderId) ||
-                  (targetAudience == 'all') ||
-                  (targetAudience == 'providers' && _cachedProviderId != null)) {
+              if (uid != null && currentUserId != null && uid == currentUserId) {
                 applies = true;
+              } else if (uid != null && _cachedProviderId != null && uid == _cachedProviderId) {
+                applies = true;
+              } else if (targetAudience == 'all') {
+                applies = true;
+              } else if (targetAudience == 'providers' && _cachedProviderId != null) {
+                applies = true;
+              } else if (targetAudience == 'admin' || targetAudience == 'area_manager') {
+                applies = doesAdminNotificationApply(area: notifArea);
               }
 
               if (!applies) return;
@@ -1473,18 +2111,19 @@ class NotificationService {
                   isEnquiry: isEnquiry,
                 );
 
-                // Show system notification with sound & vibration in notification shade
+                // Show system notification with sound & vibration in notification shade / Web notification
                 showLocalNotification(
                   id: (bookingId ?? enquiryId ?? DateTime.now().millisecondsSinceEpoch.toString()).hashCode,
                   title: title,
                   body: body,
+                  payload: jsonEncode(metadata),
                   channelId: 'inquiry_notifications',
                   channelName: 'Customer Enquiries & Ringing Alerts',
                   importance: Importance.max,
                   priority: Priority.high,
                 );
               } else {
-                // Customer or Admin or normal notification gets single chime sound!
+                // Customer or Admin or normal notification gets single chime sound + in-app toast + app drawer notification!
                 playNotificationSound();
                 showInAppToast(
                   title: title,
@@ -1492,6 +2131,31 @@ class NotificationService {
                   icon: _getToastIcon(type),
                   iconColor: _getToastColor(type),
                   bgColor: const Color(0xFFF8FAFC),
+                );
+
+                final isAdm = targetAudience == 'admin' ||
+                    SupabaseService.instance.isSuperAdmin ||
+                    SupabaseService.instance.isAreaManager;
+
+                final channelId = isAdm
+                    ? 'admin_notifications'
+                    : (type == 'booking' || type == 'booking_status')
+                        ? 'booking_notifications'
+                        : 'general_notifications';
+
+                final channelName = isAdm
+                    ? 'Admin & Area Manager Alerts'
+                    : 'Service Bookings & Updates';
+
+                showLocalNotification(
+                  id: (metadata['order_id'] ?? metadata['booking_id'] ?? metadata['enquiry_id'] ?? newRecord['id'] ?? DateTime.now().millisecondsSinceEpoch).hashCode,
+                  title: title,
+                  body: body,
+                  payload: jsonEncode(metadata),
+                  channelId: channelId,
+                  channelName: channelName,
+                  importance: Importance.max,
+                  priority: Priority.high,
                 );
               }
 
@@ -1514,10 +2178,12 @@ class NotificationService {
       final user = SupabaseService.instance.currentUser;
       if (user == null) return;
       try {
-        var query = SupabaseService.instance.client
-            .from('notifications')
-            .select();
-        if (_cachedProviderId != null && _cachedProviderId != user.id) {
+        final isAdm = SupabaseService.instance.isSuperAdmin || SupabaseService.instance.isAreaManager;
+        var query = SupabaseService.instance.client.from('notifications').select();
+
+        if (isAdm) {
+          query = query.or('user_id.eq.${user.id},target_audience.eq.admin');
+        } else if (_cachedProviderId != null && _cachedProviderId != user.id) {
           query = query.or('user_id.eq.${user.id},user_id.eq.$_cachedProviderId');
         } else {
           query = query.eq('user_id', user.id);
@@ -1531,13 +2197,15 @@ class NotificationService {
         for (final item in list) {
           final id = item['id']?.toString() ?? '';
           if (_handledAlertNotificationIds.contains(id)) continue;
+          _handledAlertNotificationIds.add(id);
+
           final meta = item['metadata'] as Map<String, dynamic>? ?? {};
           final isContinuous = meta['is_continuous_alert'] == true;
+          final title = item['title'] as String? ?? '🔔 LocalConnect Notification';
+          final body = item['body'] as String? ?? '';
+          final type = item['type'] as String? ?? 'general';
+
           if (isContinuous) {
-            _handledAlertNotificationIds.add(id);
-            final title = item['title'] as String? ?? '📩 New Service Request';
-            final body = item['body'] as String? ?? '';
-            final type = item['type'] as String? ?? 'enquiry';
             final isEnquiry = type == 'enquiry';
             final bookingId = meta['order_id']?.toString() ?? meta['booking_id']?.toString();
             final enquiryId = meta['enquiry_id']?.toString();
@@ -1557,9 +2225,31 @@ class NotificationService {
               id: (bookingId ?? enquiryId ?? id).hashCode,
               title: title,
               body: body,
+              payload: jsonEncode(meta),
               channelId: 'inquiry_notifications',
               channelName: 'Customer Enquiries & Ringing Alerts',
               importance: Importance.max,
+              priority: Priority.high,
+            );
+          } else {
+            // Trigger bell chime sound, toast, and drawer notification for customer/admin
+            playNotificationSound();
+            showInAppToast(
+              title: title,
+              subtitle: body,
+              icon: _getToastIcon(type),
+              iconColor: _getToastColor(type),
+              bgColor: const Color(0xFFF8FAFC),
+            );
+
+            showLocalNotification(
+              id: id.hashCode,
+              title: title,
+              body: body,
+              payload: jsonEncode(meta),
+              channelId: 'booking_notifications',
+              channelName: 'Service Bookings & Updates',
+              importance: Importance.high,
               priority: Priority.high,
             );
           }

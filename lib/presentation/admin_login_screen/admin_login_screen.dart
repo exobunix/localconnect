@@ -80,18 +80,15 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       _successMessage = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 250));
-
-    final isMaster = AdminAuthService.instance.isMasterPasscode(pin);
-    if (isMaster) {
-      await AdminAuthService.instance.verifyMasterPasscode(pin);
+    final verified = await AdminAuthService.instance.verifyMasterPasscode(pin);
+    if (verified) {
       _onSuccessNavigate();
       return;
     }
 
     setState(() {
       _isLoading = false;
-      _errorMessage = 'Invalid Admin Passcode. Try 920920 or admin2026';
+      _errorMessage = 'Invalid Admin Passcode. Please check your credentials.';
     });
   }
 
@@ -127,7 +124,17 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.homeScreen);
+        }
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFF0A0E21),
       body: SafeArea(
         child: Column(
@@ -362,7 +369,8 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildTabButton({
@@ -440,7 +448,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
             letterSpacing: 2.0,
           ),
           decoration: InputDecoration(
-            hintText: 'Enter Admin Passcode (e.g. 920920)',
+            hintText: 'Enter Admin Passcode',
             hintStyle: GoogleFonts.plusJakartaSans(
               color: Colors.white.withValues(alpha: 0.3),
               fontSize: 10.sp,
@@ -613,7 +621,33 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
           ),
           onSubmitted: (_) => _loginWithEmailPassword(),
         ),
-        SizedBox(height: 2.5.h),
+        SizedBox(height: 1.2.h),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () {
+              Navigator.pushNamed(
+                context,
+                AppRoutes.resetPasswordScreen,
+                arguments: _emailController.text.trim(),
+              );
+            },
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Forgot Password / Reset Password?',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 9.sp,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFFB388FF),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: 2.h),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(

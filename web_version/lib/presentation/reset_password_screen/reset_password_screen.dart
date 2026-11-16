@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
+import '../../services/admin_auth_service.dart';
 import '../../theme/app_theme.dart';
 
 import 'package:flutter/foundation.dart';
@@ -181,6 +182,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       await SupabaseService.instance.client.auth.updateUser(
         UserAttributes(password: newPassword),
       );
+
+      // If resetting an administrator account, sync password to admin auth registry
+      final resetEmail = _emailController.text.trim().toLowerCase();
+      if (resetEmail.isNotEmpty) {
+        await AdminAuthService.instance.saveAdminPassword(resetEmail, newPassword);
+        if (resetEmail == AdminAuthService.primaryAdminEmail || resetEmail.contains('admin')) {
+          await AdminAuthService.instance.setSuperAdminPasscode(newPassword);
+        }
+      }
 
       // Sign out recovery session to require fresh login with new credentials
       try {

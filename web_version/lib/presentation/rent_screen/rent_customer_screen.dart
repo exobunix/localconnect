@@ -2,6 +2,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import './post_home_for_rent_screen.dart';
 import './rent_listing_detail_screen.dart';
 import './rent_subscription_screen.dart';
 
@@ -15,7 +16,7 @@ class RentCustomerScreen extends StatefulWidget {
 class _RentCustomerScreenState extends State<RentCustomerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String _activeSubcategory = 'room';
+  String _activeSubcategory = 'home_rent';
   String _sortBy = 'nearest';
   double _maxPrice = 50000;
   bool _showAvailableOnly = true;
@@ -26,6 +27,13 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
   final Set<String> _selectedAmenities = {};
 
   static const _subcategories = [
+    {
+      'id': 'home_rent',
+      'label': 'Home for Rent',
+      'icon': Icons.home_work_rounded,
+      'color': Color(0xFF0288D1),
+      'hint': 'Direct from Homeowners • No Provider Account Needed',
+    },
     {
       'id': 'room',
       'label': 'Room',
@@ -121,6 +129,45 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
         };
         grouped.putIfAbsent(subKey, () => []).add(mapped);
       }
+
+      // Load Home for Rent listings directly posted by homeowners
+      try {
+        final homeRentRows = await SupabaseService.instance.getHomeRentListings(onlyAvailable: true);
+        grouped['home_rent'] = homeRentRows.map((r) {
+          final rent = (r['monthly_rent'] as num?)?.toInt() ?? 10000;
+          final deposit = (r['deposit'] as num?)?.toInt() ?? (rent * 2);
+          final locality = (r['area_locality'] ?? '').toString();
+          final city = (r['city'] ?? 'Pune').toString();
+          final loc = locality.isNotEmpty ? '$locality, $city' : city;
+          final img = (r['primary_photo'] ?? '').toString();
+
+          return {
+            'id': r['id'],
+            'title': '${r['bedrooms'] ?? '2 BHK'} ${r['property_type'] ?? 'Flat'}',
+            'location': loc,
+            'price': rent,
+            'priceUnit': '/month',
+            'rating': 4.9,
+            'reviews': 8,
+            'distance': 1.2,
+            'available': r['is_available'] == true,
+            'furnished': r['furnishing_status'] ?? 'Semi-Furnished',
+            'image': img.isNotEmpty ? img : 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600&auto=format&fit=crop&q=80',
+            'amenities': [
+              'Direct Homeowner',
+              'No Brokerage',
+              r['furnishing_status'] ?? 'Semi-Furnished',
+            ],
+            'deposit': deposit,
+            'provider': r['owner_name'] ?? 'Homeowner',
+            'phone': r['owner_phone'] ?? '',
+            'isFeatured': true,
+            'isVerified': true,
+            'is_home_rent': true,
+            'description': r['description'] ?? '',
+          };
+        }).toList();
+      } catch (_) {}
       if (mounted) {
         setState(() {
           _liveListings = grouped;
@@ -691,88 +738,30 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
     );
   }
 
-  Widget _buildWebSubcategoriesGrid(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      color: Colors.white,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1600),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(_subcategories.length, (index) {
-                final sub = _subcategories[index];
-                final id = sub['id'] as String;
-                final label = sub['label'] as String;
-                final icon = sub['icon'] as IconData;
-                final color = sub['color'] as Color;
-                final isActive = _activeSubcategory == id;
-
-                return Padding(
-                  padding: EdgeInsets.only(right: index == _subcategories.length - 1 ? 0 : 10),
-                  child: InkWell(
-                    onTap: () {
-                      setState(() {
-                        _activeSubcategory = id;
-                        _tabController.index = index;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
-                      decoration: BoxDecoration(
-                        color: isActive ? color : color.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isActive ? color : color.withOpacity(0.2),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            icon,
-                            color: isActive ? Colors.white : color,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            label,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: isActive ? Colors.white : color,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isWeb = MediaQuery.of(context).size.width > 850;
     return Scaffold(
       backgroundColor: AppTheme.background,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: const Color(0xFF0288D1),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.home_work_rounded),
+        label: Text(
+          'Post Home for Rent',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PostHomeForRentScreen()),
+          ).then((_) => _fetchListingsFromDb());
+        },
+      ),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
-            expandedHeight: isWeb ? 110 : 170,
+            expandedHeight: 170,
             pinned: true,
             backgroundColor: _activeColor,
             leading: IconButton(
@@ -799,7 +788,7 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: isWeb ? null : SafeArea(
+                child: SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 52, 16, 12),
                     child: Column(
@@ -935,60 +924,56 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                 ),
               ),
             ),
-            bottom: isWeb
-                ? null
-                : PreferredSize(
-                    preferredSize: const Size.fromHeight(46),
-                    child: Container(
-                      color: _activeColor,
-                      child: TabBar(
-                        controller: _tabController,
-                        isScrollable: true,
-                        tabAlignment: TabAlignment.start,
-                        indicatorColor: Colors.white,
-                        indicatorWeight: 3,
-                        labelColor: Colors.white,
-                        unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
-                        labelStyle: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        unselectedLabelStyle: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        tabs: _subcategories
-                            .map(
-                              (s) => Tab(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(s['icon'] as IconData, size: 14),
-                                    const SizedBox(width: 4),
-                                    Text(s['label'] as String),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(46),
+              child: Container(
+                color: _activeColor,
+                child: TabBar(
+                  controller: _tabController,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  indicatorColor: Colors.white,
+                  indicatorWeight: 3,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
+                  labelStyle: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
+                  unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  tabs: _subcategories
+                      .map(
+                        (s) => Tab(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(s['icon'] as IconData, size: 14),
+                              const SizedBox(width: 4),
+                              Text(s['label'] as String),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ),
           ),
         ],
-        body: isWeb
-            ? _buildSubcategoryTab(_activeSubcategory, _activeColor)
-            : TabBarView(
-                controller: _tabController,
-                children: _subcategories
-                    .map(
-                      (s) => _buildSubcategoryTab(
-                        s['id'] as String,
-                        s['color'] as Color,
-                      ),
-                    )
-                    .toList(),
-              ),
+        body: TabBarView(
+          controller: _tabController,
+          children: _subcategories
+              .map(
+                (s) => _buildSubcategoryTab(
+                  s['id'] as String,
+                  s['color'] as Color,
+                ),
+              )
+              .toList(),
+        ),
       ),
     );
   }
@@ -996,7 +981,6 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
   Widget _buildSubcategoryTab(String sub, Color color) {
     final listings = _filteredListings(sub);
     final featured = listings.where((l) => l['isFeatured'] == true).toList();
-    final isWeb = MediaQuery.of(context).size.width > 850;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1020,10 +1004,6 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
               constraints: const BoxConstraints(maxWidth: 1400),
               child: CustomScrollView(
                 slivers: [
-                  if (isWeb)
-                    SliverToBoxAdapter(
-                      child: _buildWebSubcategoriesGrid(context),
-                    ),
                   // Sort bar
                   SliverToBoxAdapter(
                     child: Padding(
@@ -2039,34 +2019,49 @@ class _RentCustomerScreenState extends State<RentCustomerScreen>
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          final name = nameCtrl.text.trim();
+                          final phone = phoneCtrl.text.trim();
+                          final msg = msgCtrl.text.trim();
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.check_circle_rounded,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Inquiry sent! Provider will contact you soon.',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
+                          if (listing['is_home_rent'] == true) {
+                            await SupabaseService.instance.submitHomeRentEnquiry(
+                              listingId: listing['id'].toString(),
+                              customerName: name.isNotEmpty ? name : 'Interested Tenant',
+                              customerPhone: phone.isNotEmpty ? phone : '',
+                              message: msg,
+                            );
+                          }
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: Colors.white,
+                                      size: 18,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      listing['is_home_rent'] == true
+                                          ? 'Inquiry sent to homeowner!'
+                                          : 'Inquiry sent! Provider will contact you soon.',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                backgroundColor: Colors.green.shade700,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
-                              backgroundColor: Colors.green.shade700,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          );
+                            );
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: color,
