@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../routes/app_routes.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/supabase_service.dart';
 
@@ -63,6 +64,15 @@ class _AdminQuotationFunnelWidgetState extends State<AdminQuotationFunnelWidget>
   double _conversionRate(int numerator, int denominator) {
     if (denominator == 0) return 0;
     return (numerator / denominator * 100);
+  }
+
+  void _handleStageTap(String label) {
+    final lower = label.toLowerCase();
+    if (lower.contains('booked') || lower.contains('complete')) {
+      Navigator.pushNamed(context, AppRoutes.adminOrderManagementScreen);
+    } else {
+      Navigator.pushNamed(context, AppRoutes.adminQuotationMonitoringScreen);
+    }
   }
 
   @override
@@ -223,8 +233,8 @@ class _AdminQuotationFunnelWidgetState extends State<AdminQuotationFunnelWidget>
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
-        // Funnel shape: each bar is narrower based on fraction, min 40%
-        final barWidth = maxWidth * (0.4 + animatedFraction * 0.6);
+        // Funnel shape: min width is 85% of maxWidth so label text NEVER truncates
+        final barWidth = maxWidth * (0.85 + animatedFraction * 0.15);
 
         return Column(
           children: [
@@ -232,40 +242,48 @@ class _AdminQuotationFunnelWidgetState extends State<AdminQuotationFunnelWidget>
               children: [
                 Expanded(
                   child: Center(
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: barWidth,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: stage.color,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
                         borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          children: [
-                            Icon(stage.icon, color: Colors.white, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                stage.label,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                        onTap: () => _handleStageTap(stage.label),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          width: barWidth,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: stage.color,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Row(
+                              children: [
+                                Icon(stage.icon, color: Colors.white, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    stage.label,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                                Text(
+                                  '${stage.count}',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              '${stage.count}',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -349,53 +367,60 @@ class _AdminQuotationFunnelWidgetState extends State<AdminQuotationFunnelWidget>
     final overallRate = _conversionRate(_completed, _sent);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withAlpha(13) : const Color(0xFFF8FAFC),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF6366F1).withAlpha(51)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF6366F1),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Overall Conversion (Sent → Completed)',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).colorScheme.onSurface.withAlpha(179),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.adminQuotationMonitoringScreen),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withAlpha(13) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF6366F1).withAlpha(51)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF6366F1),
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Overall Conversion (Sent → Completed)',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurface.withAlpha(179),
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${overallRate.toStringAsFixed(1)}%',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF6366F1),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(
-            '${overallRate.toStringAsFixed(1)}%',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF6366F1),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

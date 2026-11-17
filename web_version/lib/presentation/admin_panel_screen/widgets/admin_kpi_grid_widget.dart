@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../routes/app_routes.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/supabase_service.dart';
 
@@ -233,106 +234,136 @@ class _KpiCard extends StatelessWidget {
 
   const _KpiCard({required this.kpi});
 
+  void _onTap(BuildContext context) {
+    final label = kpi.label.toLowerCase();
+    if (label.contains('user')) {
+      Navigator.pushNamed(context, AppRoutes.adminUserManagementScreen);
+    } else if (label.contains('pending approval')) {
+      Navigator.pushNamed(context, AppRoutes.adminProviderManagementScreen);
+    } else if (label.contains('provider')) {
+      Navigator.pushNamed(context, AppRoutes.adminProviderManagementScreen);
+    } else if (label.contains('pending order')) {
+      Navigator.pushNamed(
+        context,
+        AppRoutes.adminOrderManagementScreen,
+      );
+    } else if (label.contains('completed order')) {
+      Navigator.pushNamed(
+        context,
+        AppRoutes.adminOrderManagementScreen,
+      );
+    } else if (label.contains('order')) {
+      Navigator.pushNamed(context, AppRoutes.adminOrderManagementScreen);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: kpi.isAlert ? kpi.color.withValues(alpha: 0.06) : Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        boxShadow: AppTheme.cardShadow,
-        border: Border.all(
-          color: kpi.isAlert
-              ? kpi.color.withValues(alpha: 0.4)
-              : AppTheme.outlineVariant,
-          width: kpi.isAlert ? 1.5 : 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
+        onTap: () => _onTap(context),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: kpi.isAlert ? kpi.color.withValues(alpha: 0.06) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: AppTheme.cardShadow,
+            border: Border.all(
+              color: kpi.isAlert
+                  ? kpi.color.withValues(alpha: 0.4)
+                  : AppTheme.outlineVariant,
+              width: kpi.isAlert ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: kpi.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(kpi.icon, color: kpi.color, size: 16),
-              ),
-              if (kpi.isAlert)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: kpi.color,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '!',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                kpi.value,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: kpi.isAlert ? kpi.color : const Color(0xFF1A1C1E),
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              Text(
-                kpi.label,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF74777F),
-                ),
-              ),
-              const SizedBox(height: 2),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(
-                    kpi.isPositive
-                        ? Icons.trending_up_rounded
-                        : Icons.trending_down_rounded,
-                    size: 12,
-                    color: kpi.isPositive ? AppTheme.success : kpi.color,
-                  ),
-                  const SizedBox(width: 3),
-                  Expanded(
-                    child: Text(
-                      kpi.change,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        color: kpi.isPositive ? AppTheme.success : kpi.color,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: kpi.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    child: Icon(kpi.icon, color: kpi.color, size: 16),
+                  ),
+                  if (kpi.isAlert)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: kpi.color,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '!',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    kpi.value,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: kpi.isAlert ? kpi.color : const Color(0xFF1A1C1E),
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  Text(
+                    kpi.label,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF74777F),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(
+                        kpi.isPositive
+                            ? Icons.trending_up_rounded
+                            : Icons.trending_down_rounded,
+                        size: 12,
+                        color: kpi.isPositive ? AppTheme.success : kpi.color,
+                      ),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          kpi.change,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            color: kpi.isPositive ? AppTheme.success : kpi.color,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

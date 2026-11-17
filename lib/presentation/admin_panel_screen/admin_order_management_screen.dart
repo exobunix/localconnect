@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../services/supabase_service.dart';
 
@@ -262,7 +263,13 @@ class _AdminOrderManagementScreenState
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, AppRoutes.adminPanelScreen);
+            }
+          },
         ),
         actions: [
           IconButton(

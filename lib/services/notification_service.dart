@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/role_guard.dart';
 import 'supabase_service.dart';
 import 'admin_auth_service.dart';
 import 'notification_hub_service.dart';
@@ -2174,18 +2175,22 @@ class NotificationService {
 
   void _startPeriodicAlertPoll() {
     _alertPollTimer?.cancel();
-    _alertPollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+    _alertPollTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
       final user = SupabaseService.instance.currentUser;
-      if (user == null) return;
+      final isAdm = isAdminSessionActive || SupabaseService.instance.isSuperAdmin || SupabaseService.instance.isAreaManager;
+      if (user == null && !isAdm) return;
       try {
-        final isAdm = SupabaseService.instance.isSuperAdmin || SupabaseService.instance.isAreaManager;
         var query = SupabaseService.instance.client.from('notifications').select();
 
         if (isAdm) {
-          query = query.or('user_id.eq.${user.id},target_audience.eq.admin');
-        } else if (_cachedProviderId != null && _cachedProviderId != user.id) {
+          if (user != null) {
+            query = query.or('user_id.eq.${user.id},target_audience.eq.admin');
+          } else {
+            query = query.eq('target_audience', 'admin');
+          }
+        } else if (user != null && _cachedProviderId != null && _cachedProviderId != user.id) {
           query = query.or('user_id.eq.${user.id},user_id.eq.$_cachedProviderId');
-        } else {
+        } else if (user != null) {
           query = query.eq('user_id', user.id);
         }
 

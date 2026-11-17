@@ -7,7 +7,8 @@ import '../../../core/role_guard.dart';
 import '../admin_provider_dashboards_screen.dart';
 
 class AdminAppBarWidget extends StatelessWidget {
-  const AdminAppBarWidget({super.key});
+  final VoidCallback? onBackPressed;
+  const AdminAppBarWidget({super.key, this.onBackPressed});
 
   void _showDashboardsMenu(BuildContext context) {
     final RenderBox button = context.findRenderObject() as RenderBox;
@@ -135,7 +136,19 @@ class AdminAppBarWidget extends StatelessWidget {
         children: [
           // Back / Menu
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              if (onBackPressed != null) {
+                onBackPressed!();
+              } else if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  AppRoutes.homeScreen,
+                  (route) => false,
+                );
+              }
+            },
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(

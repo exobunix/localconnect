@@ -180,8 +180,8 @@ class AdminAuthService {
     SupabaseService.instance.currentAdminRole = 'super_admin';
     SupabaseService.instance.currentAdminArea = 'ALL';
 
-    // Attempt silent background Supabase sign-in
-    _attemptSilentSupabaseSignIn();
+    // Await silent background Supabase sign-in so that all subsequent queries (orders, subs, etc.) succeed
+    await ensureAdminSupabaseSession();
 
     return true;
   }
@@ -206,6 +206,7 @@ class AdminAuthService {
 
     // Try signing in with verified Supabase admin credentials
     final adminCredentials = [
+      {'email': 'admin_runner@localconnect.com', 'pwd': 'LocalAdmin@2026!'},
       {'email': 'customer@localconnect.com', 'pwd': 'Customer@1234'},
       {'email': 'admin@localconnect.com', 'pwd': 'Admin@1234'},
       {'email': 'admin@localconnect.com', 'pwd': 'admin123'},

@@ -5,6 +5,7 @@ import '../../core/app_export.dart';
 import '../../core/role_guard.dart';
 import '../../core/testing_mode.dart';
 import '../../core/theme_provider.dart';
+import '../../services/admin_auth_service.dart';
 import '../../services/demo_seeder_service.dart';
 import '../../services/supabase_service.dart';
 import './admin_advanced_reports_screen.dart';
@@ -79,6 +80,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   Future<void> _checkAdminRole() async {
     // If admin session is already active (via Master PIN or explicit admin login)
     if (isAdminSessionActive) {
+      await AdminAuthService.instance.ensureAdminSupabaseSession();
       await SupabaseService.instance.loadAdminProfile();
       if (mounted) {
         setState(() {
@@ -969,6 +971,46 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     );
   }
 
+  Future<bool> handleAdminBack() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Exit Admin Panel?',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Do you want to exit the Admin Panel and return to the main app?',
+          style: GoogleFonts.plusJakartaSans(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Stay'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Return to Home'),
+          ),
+        ],
+      ),
+    );
+    if (shouldExit == true && mounted) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.homeScreen,
+        (route) => false,
+      );
+      return true;
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isCheckingRole) {
@@ -986,46 +1028,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     }
 
     final isTablet = MediaQuery.of(context).size.width >= 600;
-
-    Future<bool> handleAdminBack() async {
-      final shouldExit = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Exit Admin Panel?',
-            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
-          ),
-          content: Text(
-            'Do you want to exit the Admin Panel and return to the main app?',
-            style: GoogleFonts.plusJakartaSans(fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Stay'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Return to Home'),
-            ),
-          ],
-        ),
-      );
-      if (shouldExit == true && mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.homeScreen,
-          (route) => false,
-        );
-        return true;
-      }
-      return false;
-    }
 
     if (isTablet) {
       return PopScope(
@@ -1051,7 +1053,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           bottom: false,
           child: Column(
             children: [
-              const AdminAppBarWidget(),
+              AdminAppBarWidget(
+                onBackPressed: () async {
+                  if (_selectedNavIndex != 0) {
+                    setState(() => _selectedNavIndex = 0);
+                  } else {
+                    await handleAdminBack();
+                  }
+                },
+              ),
               _buildSubAdminAreaBanner(),
               Expanded(child: _buildTabContent()),
             ],
@@ -1165,7 +1175,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             Expanded(
               child: Column(
                 children: [
-                  const AdminAppBarWidget(),
+                  AdminAppBarWidget(
+                onBackPressed: () async {
+                  if (_selectedNavIndex != 0) {
+                    setState(() => _selectedNavIndex = 0);
+                  } else {
+                    await handleAdminBack();
+                  }
+                },
+              ),
                   _buildSubAdminAreaBanner(),
                   Expanded(
                     child: _selectedNavIndex == 0
