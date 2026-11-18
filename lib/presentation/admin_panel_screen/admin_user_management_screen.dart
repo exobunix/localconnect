@@ -121,6 +121,39 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           },
         ),
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white),
+            tooltip: 'Add Customer or Provider',
+            onSelected: (val) {
+              if (val == 'provider') {
+                Navigator.pushNamed(context, AppRoutes.adminProviderManagementScreen);
+              } else if (val == 'customer') {
+                Navigator.pushNamed(context, AppRoutes.adminCustomerManagementScreen);
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'customer',
+                child: Row(
+                  children: [
+                    const Icon(Icons.person_outline_rounded, color: AppTheme.primary, size: 20),
+                    const SizedBox(width: 10),
+                    Text('Add Customer', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'provider',
+                child: Row(
+                  children: [
+                    const Icon(Icons.storefront_rounded, color: AppTheme.success, size: 20),
+                    const SizedBox(width: 10),
+                    Text('Add Provider', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             onPressed: _loadUsers,

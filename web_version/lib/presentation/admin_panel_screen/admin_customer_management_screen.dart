@@ -347,6 +347,10 @@ class _AdminCustomerManagementScreenState
       ),
     );
     if (confirm == true) {
+      final customerId = (customer['id'] ?? '').toString();
+      if (customerId.isNotEmpty) {
+        await SupabaseService.instance.adminDeleteCustomer(customerId);
+      }
       setState(() {
         _customers.removeWhere((c) => c['id'] == customer['id']);
         _applyFilters();
@@ -453,6 +457,352 @@ class _AdminCustomerManagementScreenState
     );
   }
 
+  // ─── ADMIN: ADD & EDIT CUSTOMER ─────────────────────────────────────────────
+
+  void _showAddCustomerDialog() {
+    _showCustomerFormDialog();
+  }
+
+  void _showEditCustomerDialog(Map<String, dynamic> customer) {
+    _showCustomerFormDialog(customer: customer);
+  }
+
+  void _showCustomerFormDialog({Map<String, dynamic>? customer}) {
+    final isEditing = customer != null;
+    final formKey = GlobalKey<FormState>();
+
+    final nameCtrl = TextEditingController(
+      text: customer?['full_name'] ?? '',
+    );
+    final phoneCtrl = TextEditingController(
+      text: customer?['phone'] ?? '',
+    );
+    final emailCtrl = TextEditingController(
+      text: customer?['email'] ?? '',
+    );
+    final cityCtrl = TextEditingController(
+      text: customer?['city'] ?? (SupabaseService.instance.currentAdminArea != 'ALL' ? SupabaseService.instance.currentAdminArea : 'Roha'),
+    );
+    final addressCtrl = TextEditingController(
+      text: customer?['address'] ?? customer?['full_address'] ?? '',
+    );
+
+    String selectedStatus = (customer?['status'] ?? (customer?['is_active'] == false ? 'suspended' : 'active')).toString().toLowerCase();
+    if (selectedStatus != 'active' && selectedStatus != 'suspended') {
+      selectedStatus = 'active';
+    }
+
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          actionsPadding: const EdgeInsets.all(16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isEditing ? Icons.edit_note_rounded : Icons.person_add_alt_1_rounded,
+                  color: AppTheme.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isEditing ? 'Edit Customer Profile' : 'Register New Customer',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      isEditing
+                          ? 'Update customer contact number & profile'
+                          : 'Register a new customer account from admin panel',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        color: AppTheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 440,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 12),
+                    // Contact Number Highlight Box
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFA5D6A7)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Primary Contact Number *',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1B5E20),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: phoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 9876543210',
+                              filled: true,
+                              fillColor: Colors.white,
+                              prefixIcon: const Icon(Icons.phone_rounded, size: 18, color: Color(0xFF2E7D32)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
+                              ),
+                            ),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Contact number is required';
+                              final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
+                              if (digits.length < 10) return 'Enter a valid 10-digit phone number';
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Full Name
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Customer Full Name *',
+                        hintText: 'e.g. Amit Sharma',
+                        prefixIcon: const Icon(Icons.person_rounded, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Email Address
+                    TextFormField(
+                      controller: emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email Address',
+                        hintText: 'e.g. amit@example.com',
+                        prefixIcon: const Icon(Icons.email_outlined, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // City / Operating Area
+                    TextFormField(
+                      controller: cityCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'City / Residential Area *',
+                        hintText: 'e.g. Roha, Alibag, Pen, Nagothane',
+                        prefixIcon: const Icon(Icons.location_city_rounded, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'City/Area is required' : null,
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Residential / Full Address
+                    TextFormField(
+                      controller: addressCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: 'Residential / Full Address',
+                        hintText: 'e.g. Flat 302, Green Valley Apartments, Roha',
+                        prefixIcon: const Icon(Icons.home_outlined, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Account Status
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedStatus,
+                      decoration: InputDecoration(
+                        labelText: 'Account Status',
+                        prefixIcon: const Icon(Icons.verified_user_outlined, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'active', child: Text('Active')),
+                        DropdownMenuItem(value: 'suspended', child: Text('Suspended')),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setDialogState(() => selectedStatus = v);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.plusJakartaSans(color: AppTheme.outline),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: isSubmitting ? null : () async {
+                if (!formKey.currentState!.validate()) return;
+                setDialogState(() => isSubmitting = true);
+
+                final phone = phoneCtrl.text.trim();
+                final name = nameCtrl.text.trim();
+                final email = emailCtrl.text.trim();
+                final city = cityCtrl.text.trim();
+                final address = addressCtrl.text.trim();
+                final isActive = selectedStatus == 'active';
+
+                if (isEditing) {
+                  final customerId = (customer['id'] ?? '').toString();
+                  final ok = await SupabaseService.instance.adminUpdateCustomerProfile(
+                    customerId: customerId,
+                    fullName: name,
+                    phone: phone,
+                    email: email,
+                    city: city,
+                    address: address,
+                    isActive: isActive,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    if (ok) {
+                      setState(() {
+                        customer['full_name'] = name;
+                        customer['phone'] = phone;
+                        customer['email'] = email;
+                        customer['city'] = city;
+                        customer['address'] = address;
+                        customer['full_address'] = address;
+                        customer['status'] = selectedStatus;
+                        customer['is_active'] = isActive;
+                        _applyFilters();
+                      });
+                      _showSnack('Customer profile & contact updated successfully!', AppTheme.success);
+                      _loadCustomers();
+                    } else {
+                      _showSnack('Failed to update customer profile', AppTheme.error);
+                    }
+                  }
+                } else {
+                  final newCust = await SupabaseService.instance.adminCreateCustomer(
+                    fullName: name,
+                    phone: phone,
+                    email: email,
+                    city: city,
+                    address: address,
+                    isActive: isActive,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    if (newCust != null) {
+                      setState(() {
+                        _customers.insert(0, newCust);
+                        _applyFilters();
+                      });
+                      _showSnack('Customer registered successfully!', AppTheme.success);
+                      _loadCustomers();
+                    } else {
+                      _showSnack('Failed to register customer', AppTheme.error);
+                    }
+                  }
+                }
+              },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      isEditing ? 'Save Changes' : 'Register Customer',
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSnack(String msg, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.plusJakartaSans()),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeCount = _customers
@@ -486,6 +836,11 @@ class _AdminCustomerManagementScreenState
           },
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white),
+            onPressed: _showAddCustomerDialog,
+            tooltip: 'Add New Customer',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             onPressed: _loadCustomers,
@@ -625,6 +980,18 @@ class _AdminCustomerManagementScreenState
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppTheme.primary,
+        icon: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white),
+        label: Text(
+          'Add Customer',
+          style: GoogleFonts.plusJakartaSans(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        onPressed: _showAddCustomerDialog,
+      ),
     );
   }
 
@@ -694,6 +1061,7 @@ class _AdminCustomerManagementScreenState
         statusColor: _statusColor(list[i]['status'] ?? 'active'),
         statusBg: _statusBg(list[i]['status'] ?? 'active'),
         onTap: () => _showCustomerDetail(list[i]),
+        onEdit: () => _showEditCustomerDialog(list[i]),
         onSuspend: () => _suspendCustomer(list[i]),
         onReactivate: () => _reactivateCustomer(list[i]),
         onDelete: () => _deleteCustomer(list[i]),
@@ -709,6 +1077,7 @@ class _CustomerCard extends StatelessWidget {
   final Color statusColor;
   final Color statusBg;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
   final VoidCallback onSuspend;
   final VoidCallback onReactivate;
   final VoidCallback onDelete;
@@ -719,6 +1088,7 @@ class _CustomerCard extends StatelessWidget {
     required this.statusColor,
     required this.statusBg,
     required this.onTap,
+    required this.onEdit,
     required this.onSuspend,
     required this.onReactivate,
     required this.onDelete,
@@ -888,6 +1258,13 @@ class _CustomerCard extends StatelessWidget {
                     ),
                   const Spacer(),
                   // Action buttons
+                  _ActionIconBtn(
+                    icon: Icons.edit_rounded,
+                    color: AppTheme.primary,
+                    tooltip: 'Edit Profile & Contact',
+                    onTap: onEdit,
+                  ),
+                  const SizedBox(width: 4),
                   _ActionIconBtn(
                     icon: Icons.notifications_rounded,
                     color: AppTheme.primary,

@@ -248,6 +248,25 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                     ),
                   ),
                   const Spacer(),
+                  ElevatedButton.icon(
+                    onPressed: _openEditProfileDialog,
+                    icon: const Icon(Icons.edit_rounded, size: 15),
+                    label: Text(
+                      'Edit',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
@@ -552,6 +571,23 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                   Row(
                     children: [
                       Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primary,
+                            side: const BorderSide(color: AppTheme.primary, width: 1.5),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.edit_note_rounded),
+                          label: Text(
+                            'Edit Profile',
+                            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                          ),
+                          onPressed: _openEditProfileDialog,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isActive ? AppTheme.warning : AppTheme.success,
@@ -567,7 +603,7 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                                 )
                               : Icon(isActive ? Icons.block_rounded : Icons.check_circle_rounded),
                           label: Text(
-                            isActive ? 'Suspend Account' : 'Activate Account',
+                            isActive ? 'Suspend' : 'Activate',
                             style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
                           ),
                           onPressed: _isTogglingStatus ? null : _toggleStatus,
@@ -666,6 +702,554 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
           ),
           if (trailingAction != null) trailingAction,
         ],
+      ),
+    );
+  }
+
+  // ─── EDIT PROFILE & CONTACT NUMBER DIALOGS ──────────────────────────────────
+
+  void _openEditProfileDialog() {
+    final role = (_user['role'] ?? 'customer').toString().toLowerCase();
+    if (role == 'provider') {
+      _showEditProviderDialog();
+    } else {
+      _showEditCustomerDialog();
+    }
+  }
+
+  void _showEditCustomerDialog() {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: (_user['full_name'] ?? '').toString());
+    final phoneCtrl = TextEditingController(text: (_user['phone'] ?? '').toString());
+    final emailCtrl = TextEditingController(text: (_user['email'] ?? '').toString());
+    final cityCtrl = TextEditingController(text: (_user['city'] ?? _user['assigned_area'] ?? '').toString());
+    final addressCtrl = TextEditingController(text: (_user['address'] ?? _user['full_address'] ?? '').toString());
+    bool isActive = _user['is_active'] as bool? ?? true;
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          actionsPadding: const EdgeInsets.all(16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.edit_note_rounded, color: AppTheme.primary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Edit Customer Profile',
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
+                    Text(
+                      'Update mobile contact & address information',
+                      style: GoogleFonts.plusJakartaSans(fontSize: 11, color: AppTheme.outline),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 440,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 10),
+                    // Contact phone highlight box
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFA5D6A7)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Primary Contact Number *',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1B5E20),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: phoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 9876543210',
+                              filled: true,
+                              fillColor: Colors.white,
+                              prefixIcon: const Icon(Icons.phone_rounded, size: 18, color: Color(0xFF2E7D32)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
+                              ),
+                            ),
+                            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 14),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Contact number is required';
+                              final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
+                              if (digits.length < 10) return 'Enter a valid 10-digit phone number';
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Full Name *',
+                        prefixIcon: const Icon(Icons.person_rounded, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email Address',
+                        prefixIcon: const Icon(Icons.email_outlined, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: cityCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'City / Region',
+                        prefixIcon: const Icon(Icons.location_city_rounded, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: addressCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: 'Residential / Full Address',
+                        prefixIcon: const Icon(Icons.home_outlined, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SwitchListTile(
+                      title: Text(
+                        'Account Active',
+                        style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      value: isActive,
+                      activeColor: AppTheme.success,
+                      onChanged: (v) => setDialogState(() => isActive = v),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+              child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: AppTheme.outline)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: isSubmitting ? null : () async {
+                if (!formKey.currentState!.validate()) return;
+                setDialogState(() => isSubmitting = true);
+
+                final userId = (_user['id'] ?? '').toString();
+                final name = nameCtrl.text.trim();
+                final phone = phoneCtrl.text.trim();
+                final email = emailCtrl.text.trim();
+                final city = cityCtrl.text.trim();
+                final address = addressCtrl.text.trim();
+
+                final ok = await SupabaseService.instance.adminUpdateCustomerProfile(
+                  customerId: userId,
+                  fullName: name,
+                  phone: phone,
+                  email: email,
+                  city: city,
+                  address: address,
+                  isActive: isActive,
+                );
+
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  if (ok) {
+                    setState(() {
+                      _user['full_name'] = name;
+                      _user['phone'] = phone;
+                      _user['email'] = email;
+                      _user['city'] = city;
+                      _user['address'] = address;
+                      _user['full_address'] = address;
+                      _user['is_active'] = isActive;
+                    });
+                    widget.onStatusChanged?.call();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Customer profile & contact updated successfully!'),
+                        backgroundColor: AppTheme.success,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: isSubmitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text('Save Changes', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditProviderDialog() {
+    final formKey = GlobalKey<FormState>();
+    final bizNameCtrl = TextEditingController(
+      text: (_providerDetails?['business_name'] ?? _user['business_name'] ?? _user['full_name'] ?? '').toString(),
+    );
+    final ownerNameCtrl = TextEditingController(
+      text: (_providerDetails?['owner_name'] ?? _user['owner_name'] ?? _user['full_name'] ?? '').toString(),
+    );
+    final phoneCtrl = TextEditingController(
+      text: (_providerDetails?['phone'] ?? _user['phone'] ?? '').toString(),
+    );
+    final waCtrl = TextEditingController(
+      text: (_providerDetails?['whatsapp'] ?? _providerDetails?['whatsapp_number'] ?? _user['phone'] ?? '').toString(),
+    );
+    final emailCtrl = TextEditingController(
+      text: (_providerDetails?['email'] ?? _user['email'] ?? '').toString(),
+    );
+    final categoryCtrl = TextEditingController(
+      text: (_providerDetails?['category'] ?? _user['category'] ?? 'Home Maintenance').toString(),
+    );
+    final subcatCtrl = TextEditingController(
+      text: (_providerDetails?['subcategory'] ?? _user['subcategory'] ?? '').toString(),
+    );
+    final cityCtrl = TextEditingController(
+      text: (_providerDetails?['city'] ?? _user['city'] ?? '').toString(),
+    );
+    final addressCtrl = TextEditingController(
+      text: (_providerDetails?['address'] ?? _user['address'] ?? '').toString(),
+    );
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          actionsPadding: const EdgeInsets.all(16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.edit_note_rounded, color: AppTheme.primary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Edit Provider Profile',
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
+                    Text(
+                      'Update contact number & business details',
+                      style: GoogleFonts.plusJakartaSans(fontSize: 11, color: AppTheme.outline),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 10),
+                    // Contact phone highlight box
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFA5D6A7)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Primary Contact Number *',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1B5E20),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: phoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 9876543210',
+                              filled: true,
+                              fillColor: Colors.white,
+                              prefixIcon: const Icon(Icons.phone_rounded, size: 18, color: Color(0xFF2E7D32)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
+                              ),
+                            ),
+                            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 14),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Contact number is required';
+                              final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
+                              if (digits.length < 10) return 'Enter a valid 10-digit phone number';
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: bizNameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Business / Shop Name *',
+                        prefixIcon: const Icon(Icons.storefront_rounded, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Business name is required' : null,
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: ownerNameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Owner Full Name *',
+                        prefixIcon: const Icon(Icons.person_rounded, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Owner name is required' : null,
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: waCtrl,
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(
+                              labelText: 'WhatsApp Number',
+                              prefixIcon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () => setDialogState(() => waCtrl.text = phoneCtrl.text.trim()),
+                          child: Text(
+                            'Same as\nPhone',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.plusJakartaSans(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: categoryCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Category',
+                        prefixIcon: const Icon(Icons.category_rounded, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: subcatCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Subcategory / Specialization',
+                        prefixIcon: const Icon(Icons.build_circle_outlined, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: cityCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'City / Service Area *',
+                        prefixIcon: const Icon(Icons.location_city_rounded, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'City is required' : null,
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: addressCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: 'Shop / Business Address',
+                        prefixIcon: const Icon(Icons.map_outlined, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+              child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: AppTheme.outline)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: isSubmitting ? null : () async {
+                if (!formKey.currentState!.validate()) return;
+                setDialogState(() => isSubmitting = true);
+
+                final userId = (_user['id'] ?? '').toString();
+                final providerId = (_providerDetails?['id'] ?? _user['provider_id'] ?? '').toString();
+                final biz = bizNameCtrl.text.trim();
+                final owner = ownerNameCtrl.text.trim();
+                final phone = phoneCtrl.text.trim();
+                final wa = waCtrl.text.trim();
+                final email = emailCtrl.text.trim();
+                final cat = categoryCtrl.text.trim();
+                final subcat = subcatCtrl.text.trim();
+                final city = cityCtrl.text.trim();
+                final address = addressCtrl.text.trim();
+
+                final ok = await SupabaseService.instance.adminUpdateServiceProviderProfile(
+                  providerId: providerId.isNotEmpty ? providerId : userId,
+                  userId: userId,
+                  businessName: biz,
+                  ownerName: owner,
+                  phone: phone,
+                  whatsapp: wa,
+                  email: email,
+                  category: cat,
+                  subcategory: subcat,
+                  city: city,
+                  address: address,
+                );
+
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  if (ok) {
+                    setState(() {
+                      _user['full_name'] = owner;
+                      _user['owner_name'] = owner;
+                      _user['business_name'] = biz;
+                      _user['phone'] = phone;
+                      _user['whatsapp'] = wa;
+                      _user['city'] = city;
+                      _user['address'] = address;
+                      if (_providerDetails != null) {
+                        _providerDetails!['business_name'] = biz;
+                        _providerDetails!['owner_name'] = owner;
+                        _providerDetails!['phone'] = phone;
+                        _providerDetails!['whatsapp'] = wa;
+                        _providerDetails!['category'] = cat;
+                        _providerDetails!['subcategory'] = subcat;
+                        _providerDetails!['city'] = city;
+                        _providerDetails!['address'] = address;
+                      }
+                    });
+                    widget.onStatusChanged?.call();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Provider profile & contact updated successfully!'),
+                        backgroundColor: AppTheme.success,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: isSubmitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text('Save Changes', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
       ),
     );
   }

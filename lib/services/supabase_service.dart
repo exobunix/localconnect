@@ -5919,4 +5919,304 @@ class SupabaseService {
     }
   }
 
+  // ─── ADMIN: CUSTOMER & SERVICE PROVIDER MANAGEMENT ──────────────────────────
+
+  /// Generates a standard RFC-4122 UUID v4
+  static String generateUuid() {
+    final rnd = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rnd.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant
+    return [
+      bytes.sublist(0, 4).map((b) => b.toRadixString(16).padLeft(2, '0')).join(),
+      bytes.sublist(4, 6).map((b) => b.toRadixString(16).padLeft(2, '0')).join(),
+      bytes.sublist(6, 8).map((b) => b.toRadixString(16).padLeft(2, '0')).join(),
+      bytes.sublist(8, 10).map((b) => b.toRadixString(16).padLeft(2, '0')).join(),
+      bytes.sublist(10, 16).map((b) => b.toRadixString(16).padLeft(2, '0')).join(),
+    ].join('-');
+  }
+
+  /// Admin: Register a new customer directly
+  Future<Map<String, dynamic>?> adminCreateCustomer({
+    required String fullName,
+    required String phone,
+    String? email,
+    String? city,
+    String? address,
+    bool isActive = true,
+  }) async {
+    try {
+      final cleanPhone = phone.trim();
+      final cleanName = fullName.trim();
+      final cleanEmail = (email != null && email.trim().isNotEmpty)
+          ? email.trim()
+          : '${cleanPhone.replaceAll(RegExp(r'[^0-9]'), '')}@customer.localconnect.com';
+      final cleanCity = city?.trim() ?? '';
+      final cleanAddress = address?.trim() ?? '';
+      final newId = generateUuid();
+      final now = DateTime.now().toIso8601String();
+
+      final record = <String, dynamic>{
+        'id': newId,
+        'full_name': cleanName,
+        'email': cleanEmail,
+        'phone': cleanPhone,
+        'role': 'customer',
+        'city': cleanCity,
+        'address': cleanAddress,
+        'full_address': cleanAddress,
+        'is_active': isActive,
+        'created_at': now,
+        'updated_at': now,
+      };
+
+      await client.from('user_profiles').insert(record);
+      return record;
+    } catch (e) {
+      debugPrint('[SupabaseService] adminCreateCustomer error: $e');
+      return null;
+    }
+  }
+
+  /// Admin: Update customer profile details and contact number
+  Future<bool> adminUpdateCustomerProfile({
+    required String customerId,
+    String? fullName,
+    String? phone,
+    String? email,
+    String? city,
+    String? address,
+    bool? isActive,
+  }) async {
+    try {
+      final updates = <String, dynamic>{
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (fullName != null) updates['full_name'] = fullName.trim();
+      if (phone != null) updates['phone'] = phone.trim();
+      if (email != null && email.trim().isNotEmpty) updates['email'] = email.trim();
+      if (city != null) updates['city'] = city.trim();
+      if (address != null) {
+        updates['address'] = address.trim();
+        updates['full_address'] = address.trim();
+      }
+      if (isActive != null) updates['is_active'] = isActive;
+
+      await client.from('user_profiles').update(updates).eq('id', customerId);
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] adminUpdateCustomerProfile error: $e');
+      return false;
+    }
+  }
+
+  /// Admin: Delete customer from user_profiles
+  Future<bool> adminDeleteCustomer(String customerId) async {
+    try {
+      await client.from('user_profiles').delete().eq('id', customerId);
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] adminDeleteCustomer error: $e');
+      return false;
+    }
+  }
+
+  /// Admin: Register a new service provider directly
+  Future<Map<String, dynamic>?> adminCreateServiceProvider({
+    required String businessName,
+    required String ownerName,
+    required String phone,
+    String? whatsapp,
+    String? email,
+    required String category,
+    String? subcategory,
+    required String city,
+    String? address,
+    int experienceYears = 1,
+    String status = 'approved',
+    bool isActive = true,
+  }) async {
+    try {
+      final cleanPhone = phone.trim();
+      final cleanBiz = businessName.trim();
+      final cleanOwner = ownerName.trim();
+      final cleanCat = category.trim();
+      final cleanSub = subcategory?.trim() ?? '';
+      final cleanCity = city.trim();
+      final cleanAddr = address?.trim() ?? '';
+      final cleanWa = (whatsapp != null && whatsapp.trim().isNotEmpty)
+          ? whatsapp.trim()
+          : cleanPhone;
+      final cleanEmail = (email != null && email.trim().isNotEmpty)
+          ? email.trim()
+          : '${cleanPhone.replaceAll(RegExp(r'[^0-9]'), '')}@provider.localconnect.com';
+      final newUserId = generateUuid();
+      final newProviderId = generateUuid();
+      final now = DateTime.now().toIso8601String();
+
+      // 1. Create matching user_profiles row
+      final userRecord = <String, dynamic>{
+        'id': newUserId,
+        'full_name': cleanOwner,
+        'email': cleanEmail,
+        'phone': cleanPhone,
+        'role': 'provider',
+        'city': cleanCity,
+        'address': cleanAddr,
+        'full_address': cleanAddr,
+        'is_active': isActive,
+        'created_at': now,
+        'updated_at': now,
+      };
+      await client.from('user_profiles').upsert(userRecord, onConflict: 'id');
+
+      // 2. Create service_providers row
+      final provRecord = <String, dynamic>{
+        'id': newProviderId,
+        'user_id': newUserId,
+        'business_name': cleanBiz,
+        'owner_name': cleanOwner,
+        'full_name': cleanOwner,
+        'phone': cleanPhone,
+        'whatsapp': cleanWa,
+        'whatsapp_number': cleanWa,
+        'email': cleanEmail,
+        'category': cleanCat,
+        'subcategory': cleanSub,
+        'city': cleanCity,
+        'address': cleanAddr,
+        'experience_years': experienceYears,
+        'rating': 5.0,
+        'is_active': isActive && status == 'approved',
+        'is_verified': status == 'approved',
+        'registration_status': status,
+        'onboarding_completed': true,
+        'member_since': DateTime.now().year.toString(),
+        'created_at': now,
+        'updated_at': now,
+      };
+      await client.from('service_providers').insert(provRecord);
+
+      return {
+        ...provRecord,
+        'total_orders': 0,
+        'earnings': 0,
+      };
+    } catch (e) {
+      debugPrint('[SupabaseService] adminCreateServiceProvider error: $e');
+      return null;
+    }
+  }
+
+  /// Admin: Update service provider complete profile and contact number
+  Future<bool> adminUpdateServiceProviderProfile({
+    required String providerId,
+    String? userId,
+    String? businessName,
+    String? ownerName,
+    String? phone,
+    String? whatsapp,
+    String? email,
+    String? category,
+    String? subcategory,
+    String? city,
+    String? address,
+    String? status,
+    bool? isActive,
+    bool? isVerified,
+    int? experienceYears,
+  }) async {
+    try {
+      final now = DateTime.now().toIso8601String();
+      final provUpdates = <String, dynamic>{
+        'updated_at': now,
+      };
+      if (businessName != null) provUpdates['business_name'] = businessName.trim();
+      if (ownerName != null) {
+        provUpdates['owner_name'] = ownerName.trim();
+        provUpdates['full_name'] = ownerName.trim();
+      }
+      if (phone != null) provUpdates['phone'] = phone.trim();
+      if (whatsapp != null) {
+        provUpdates['whatsapp'] = whatsapp.trim();
+        provUpdates['whatsapp_number'] = whatsapp.trim();
+      }
+      if (email != null && email.trim().isNotEmpty) provUpdates['email'] = email.trim();
+      if (category != null) provUpdates['category'] = category.trim();
+      if (subcategory != null) provUpdates['subcategory'] = subcategory.trim();
+      if (city != null) provUpdates['city'] = city.trim();
+      if (address != null) {
+        provUpdates['address'] = address.trim();
+        provUpdates['business_address'] = address.trim();
+      }
+      if (status != null) {
+        provUpdates['registration_status'] = status;
+        if (status == 'approved') {
+          provUpdates['is_active'] = true;
+          provUpdates['is_verified'] = true;
+        } else if (status == 'suspended' || status == 'rejected') {
+          provUpdates['is_active'] = false;
+        }
+      }
+      if (isActive != null) provUpdates['is_active'] = isActive;
+      if (isVerified != null) provUpdates['is_verified'] = isVerified;
+      if (experienceYears != null) provUpdates['experience_years'] = experienceYears;
+
+      // 1. Update service_providers
+      await client.from('service_providers').update(provUpdates).eq('id', providerId);
+
+      // 2. Determine and update matching user_profiles row
+      String? targetUserId = userId;
+      if (targetUserId == null || targetUserId.isEmpty) {
+        final provRow = await client
+            .from('service_providers')
+            .select('user_id')
+            .eq('id', providerId)
+            .maybeSingle();
+        targetUserId = provRow?['user_id'] as String?;
+      }
+
+      if (targetUserId != null && targetUserId.isNotEmpty) {
+        final userUpdates = <String, dynamic>{
+          'updated_at': now,
+        };
+        if (ownerName != null) userUpdates['full_name'] = ownerName.trim();
+        if (phone != null) userUpdates['phone'] = phone.trim();
+        if (email != null && email.trim().isNotEmpty) userUpdates['email'] = email.trim();
+        if (city != null) userUpdates['city'] = city.trim();
+        if (address != null) {
+          userUpdates['address'] = address.trim();
+          userUpdates['full_address'] = address.trim();
+        }
+        if (isActive != null) userUpdates['is_active'] = isActive;
+
+        await client.from('user_profiles').update(userUpdates).eq('id', targetUserId);
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] adminUpdateServiceProviderProfile error: $e');
+      return false;
+    }
+  }
+
+  /// Admin: Delete service provider
+  Future<bool> adminDeleteServiceProvider(String providerId) async {
+    try {
+      final row = await client
+          .from('service_providers')
+          .select('user_id')
+          .eq('id', providerId)
+          .maybeSingle();
+      final userId = row?['user_id'] as String?;
+      await client.from('service_providers').delete().eq('id', providerId);
+      if (userId != null && userId.isNotEmpty) {
+        await client.from('user_profiles').delete().eq('id', userId);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] adminDeleteServiceProvider error: $e');
+      return false;
+    }
+  }
 }
