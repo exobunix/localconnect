@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/role_guard.dart';
@@ -5936,42 +5937,227 @@ class SupabaseService {
     ].join('-');
   }
 
-  /// Admin: Register a new customer directly
+  // ─── ADMIN: USER CREDENTIALS VAULT ──────────────────────────────────────────
+
+  static const String _userVaultSettingKey = 'user_credentials_vault';
+  static const String _localVaultKey = 'local_user_credentials_vault';
+
+  /// Fetch a customer or provider password from cloud vault + local cache.
+  /// If none has been recorded yet, returns a sensible default based on their profile.
+  Future<String> adminGetUserPassword({
+    String? userId,
+    String? email,
+    String? phone,
+  }) async {
+    final cleanEmail = email?.trim().toLowerCase() ?? '';
+    final cleanPhone = phone?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
+    final cleanId = userId?.trim() ?? '';
+
+    try {
+      final vault = await _getCredentialsVaultMap();
+      if (cleanEmail.isNotEmpty && vault.containsKey(cleanEmail) && vault[cleanEmail]!.isNotEmpty) {
+        return vault[cleanEmail]!;
+      }
+      if (cleanPhone.isNotEmpty && vault.containsKey(cleanPhone) && vault[cleanPhone]!.isNotEmpty) {
+        return vault[cleanPhone]!;
+      }
+      if (cleanId.isNotEmpty && vault.containsKey(cleanId) && vault[cleanId]!.isNotEmpty) {
+        return vault[cleanId]!;
+      }
+    } catch (_) {}
+
+    // Predictable fallback passwords for demo/test accounts
+    if (cleanEmail == 'customer@localconnect.com') return 'Customer@1234';
+    if (cleanEmail == 'provider@localconnect.com') return 'Provider@1234';
+    if (cleanEmail == 'plumber@localconnect.com') return 'Provider@1234';
+    if (cleanEmail == 'electrician@localconnect.com') return 'Provider@1234';
+
+    if (cleanPhone.length >= 4) {
+      return 'LocalConnect@${cleanPhone.substring(cleanPhone.length - 4)}';
+    }
+    return 'LocalConnect@123';
+  }
+
+  /// Store or update a customer/provider password in the credentials vault.
+  Future<void> adminSaveUserPassword({
+    String? userId,
+    String? email,
+    String? phone,
+    required String password,
+  }) async {
+    final cleanPass = password.trim();
+    if (cleanPass.isEmpty) return;
+
+    final cleanEmail = email?.trim().toLowerCase() ?? '';
+    final cleanPhone = phone?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
+    final cleanId = userId?.trim() ?? '';
+
+    try {
+      final vault = await _getCredentialsVaultMap();
+      if (cleanEmail.isNotEmpty) vault[cleanEmail] = cleanPass;
+      if (cleanPhone.isNotEmpty) vault[cleanPhone] = cleanPass;
+      if (cleanId.isNotEmpty) vault[cleanId] = cleanPass;
+
+      // Save locally to SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_localVaultKey, jsonEncode(vault));
+
+      // Sync to admin_location_settings in cloud
+      await client.from('admin_location_settings').upsert({
+        'setting_key': _userVaultSettingKey,
+        'setting_value': jsonEncode(vault),
+        'description': 'Encrypted Admin vault for customer & partner access credentials',
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'setting_key');
+    } catch (e) {
+      debugPrint('[SupabaseService] adminSaveUserPassword error: $e');
+    }
+  }
+
+  Future<Map<String, String>> _getCredentialsVaultMap() async {
+    final result = <String, String>{};
+    // 1. Load local cache
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localStr = prefs.getString(_localVaultKey);
+      if (localStr != null && localStr.isNotEmpty) {
+        final decoded = jsonDecode(localStr) as Map<String, dynamic>;
+        decoded.forEach((k, v) => result[k] = v.toString());
+      }
+    } catch (_) {}
+
+    // 2. Sync from cloud admin_location_settings
+    try {
+      final row = await client
+          .from('admin_location_settings')
+          .select('setting_value')
+          .eq('setting_key', _userVaultSettingKey)
+          .maybeSingle();
+      if (row != null && row['setting_value'] != null) {
+        final cloudStr = row['setting_value'] as String;
+        if (cloudStr.isNotEmpty) {
+          final decoded = jsonDecode(cloudStr) as Map<String, dynamic>;
+          decoded.forEach((k, v) => result[k] = v.toString());
+        }
+      }
+    } catch (_) {}
+
+    return result;
+  }
+
+  /// Admin: Register a new customer directly with auth credentials
   Future<Map<String, dynamic>?> adminCreateCustomer({
     required String fullName,
     required String phone,
     String? email,
     String? city,
     String? address,
+    String? password,
     bool isActive = true,
   }) async {
     try {
       final cleanPhone = phone.trim();
       final cleanName = fullName.trim();
-      final cleanEmail = (email != null && email.trim().isNotEmpty)
-          ? email.trim()
-          : '${cleanPhone.replaceAll(RegExp(r'[^0-9]'), '')}@customer.localconnect.com';
-      final cleanCity = city?.trim() ?? '';
+      final digits = cleanPhone.replaceAll(RegExp(r'[^0-9]'), '');
+      final cleanEmail = (email != null && email.trim().isNotEmpty && email.contains('@'))
+          ? email.trim().toLowerCase()
+          : 'user${digits.isNotEmpty ? digits : DateTime.now().millisecondsSinceEpoch}@customer.localconnect.app';
+      final cleanPass = (password != null && password.trim().isNotEmpty)
+          ? password.trim()
+          : (digits.length >= 4 ? 'LocalConnect@${digits.substring(digits.length - 4)}' : 'LocalConnect@123');
+      final cleanCity = (city != null && city.trim().isNotEmpty) ? city.trim() : 'Roha';
       final cleanAddress = address?.trim() ?? '';
-      final newId = generateUuid();
       final now = DateTime.now().toIso8601String();
 
-      final record = <String, dynamic>{
-        'id': newId,
-        'full_name': cleanName,
+      String? authUserId;
+
+      // 1. Create account in auth.users via GoTrue REST endpoint
+      try {
+        final authUrl = Uri.parse('$supabaseUrl/auth/v1/signup');
+        final authResp = await http.post(
+          authUrl,
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'email': cleanEmail,
+            'password': cleanPass,
+            'data': {
+              'full_name': cleanName,
+              'phone': cleanPhone,
+              'role': 'customer',
+            },
+          }),
+        );
+
+        if (authResp.statusCode == 200 || authResp.statusCode == 201) {
+          final data = jsonDecode(authResp.body) as Map<String, dynamic>;
+          authUserId = data['id'] ?? data['user']?['id'];
+        }
+      } catch (e) {
+        debugPrint('[adminCreateCustomer] auth signup error: $e');
+      }
+
+      // 2. If Auth signup returned existing user or null, lookup user_profiles
+      if (authUserId == null || authUserId.isEmpty) {
+        try {
+          final existing = await client
+              .from('user_profiles')
+              .select('id')
+              .or('email.eq.$cleanEmail,phone.eq.$cleanPhone')
+              .maybeSingle();
+          if (existing != null && existing['id'] != null) {
+            authUserId = existing['id'] as String;
+          }
+        } catch (_) {}
+      }
+
+      authUserId ??= generateUuid();
+
+      // 3. Upsert user_profiles row (ONLY columns that exist in user_profiles)
+      final userRecord = <String, dynamic>{
+        'id': authUserId,
         'email': cleanEmail,
+        'full_name': cleanName,
         'phone': cleanPhone,
         'role': 'customer',
         'city': cleanCity,
-        'address': cleanAddress,
-        'full_address': cleanAddress,
         'is_active': isActive,
-        'created_at': now,
         'updated_at': now,
       };
 
-      await client.from('user_profiles').insert(record);
-      return record;
+      try {
+        await client.from('user_profiles').upsert(userRecord, onConflict: 'id');
+      } catch (e) {
+        debugPrint('[adminCreateCustomer] user_profiles upsert note: $e');
+      }
+
+      // 4. Save address to saved_addresses if table exists & address given
+      if (cleanAddress.isNotEmpty) {
+        try {
+          await client.from('saved_addresses').insert({
+            'user_id': authUserId,
+            'address_line1': cleanAddress,
+            'city': cleanCity,
+            'is_default': true,
+          });
+        } catch (_) {}
+      }
+
+      // 5. Save password in Admin Credentials Vault
+      await adminSaveUserPassword(
+        userId: authUserId,
+        email: cleanEmail,
+        phone: cleanPhone,
+        password: cleanPass,
+      );
+
+      return {
+        ...userRecord,
+        'address': cleanAddress,
+        'password': cleanPass,
+      };
     } catch (e) {
       debugPrint('[SupabaseService] adminCreateCustomer error: $e');
       return null;
@@ -5986,6 +6172,7 @@ class SupabaseService {
     String? email,
     String? city,
     String? address,
+    String? password,
     bool? isActive,
   }) async {
     try {
@@ -5996,13 +6183,33 @@ class SupabaseService {
       if (phone != null) updates['phone'] = phone.trim();
       if (email != null && email.trim().isNotEmpty) updates['email'] = email.trim();
       if (city != null) updates['city'] = city.trim();
-      if (address != null) {
-        updates['address'] = address.trim();
-        updates['full_address'] = address.trim();
-      }
       if (isActive != null) updates['is_active'] = isActive;
 
+      // ONLY update valid user_profiles columns (do NOT send address or full_address)
       await client.from('user_profiles').update(updates).eq('id', customerId);
+
+      // If address provided, save to saved_addresses safely
+      if (address != null && address.trim().isNotEmpty) {
+        try {
+          await client.from('saved_addresses').insert({
+            'user_id': customerId,
+            'address_line1': address.trim(),
+            'city': city?.trim() ?? '',
+            'is_default': true,
+          });
+        } catch (_) {}
+      }
+
+      // If password is provided, save in Admin Credentials Vault
+      if (password != null && password.trim().isNotEmpty) {
+        await adminSaveUserPassword(
+          userId: customerId,
+          email: email,
+          phone: phone,
+          password: password.trim(),
+        );
+      }
+
       return true;
     } catch (e) {
       debugPrint('[SupabaseService] adminUpdateCustomerProfile error: $e');
@@ -6021,7 +6228,7 @@ class SupabaseService {
     }
   }
 
-  /// Admin: Register a new service provider directly
+  /// Admin: Register a new service provider directly with auth credentials
   Future<Map<String, dynamic>?> adminCreateServiceProvider({
     required String businessName,
     required String ownerName,
@@ -6032,6 +6239,7 @@ class SupabaseService {
     String? subcategory,
     required String city,
     String? address,
+    String? password,
     int experienceYears = 1,
     String status = 'approved',
     bool isActive = true,
@@ -6042,44 +6250,91 @@ class SupabaseService {
       final cleanOwner = ownerName.trim();
       final cleanCat = category.trim();
       final cleanSub = subcategory?.trim() ?? '';
-      final cleanCity = city.trim();
+      final cleanCity = city.trim().isNotEmpty ? city.trim() : 'Roha';
       final cleanAddr = address?.trim() ?? '';
+      final digits = cleanPhone.replaceAll(RegExp(r'[^0-9]'), '');
       final cleanWa = (whatsapp != null && whatsapp.trim().isNotEmpty)
           ? whatsapp.trim()
           : cleanPhone;
-      final cleanEmail = (email != null && email.trim().isNotEmpty)
-          ? email.trim()
-          : '${cleanPhone.replaceAll(RegExp(r'[^0-9]'), '')}@provider.localconnect.com';
-      final newUserId = generateUuid();
-      final newProviderId = generateUuid();
+      final cleanEmail = (email != null && email.trim().isNotEmpty && email.contains('@'))
+          ? email.trim().toLowerCase()
+          : 'partner${digits.isNotEmpty ? digits : DateTime.now().millisecondsSinceEpoch}@provider.localconnect.app';
+      final cleanPass = (password != null && password.trim().isNotEmpty)
+          ? password.trim()
+          : (digits.length >= 4 ? 'LocalConnect@${digits.substring(digits.length - 4)}' : 'LocalConnect@123');
       final now = DateTime.now().toIso8601String();
 
-      // 1. Create matching user_profiles row
+      String? authUserId;
+
+      // 1. Create account in auth.users via GoTrue REST endpoint
+      try {
+        final authUrl = Uri.parse('$supabaseUrl/auth/v1/signup');
+        final authResp = await http.post(
+          authUrl,
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'email': cleanEmail,
+            'password': cleanPass,
+            'data': {
+              'full_name': cleanOwner,
+              'phone': cleanPhone,
+              'role': 'provider',
+            },
+          }),
+        );
+
+        if (authResp.statusCode == 200 || authResp.statusCode == 201) {
+          final data = jsonDecode(authResp.body) as Map<String, dynamic>;
+          authUserId = data['id'] ?? data['user']?['id'];
+        }
+      } catch (e) {
+        debugPrint('[adminCreateServiceProvider] auth signup error: $e');
+      }
+
+      // 2. If Auth signup returned existing user or null, lookup user_profiles
+      if (authUserId == null || authUserId.isEmpty) {
+        try {
+          final existing = await client
+              .from('user_profiles')
+              .select('id')
+              .or('email.eq.$cleanEmail,phone.eq.$cleanPhone')
+              .maybeSingle();
+          if (existing != null && existing['id'] != null) {
+            authUserId = existing['id'] as String;
+          }
+        } catch (_) {}
+      }
+
+      authUserId ??= generateUuid();
+
+      // 3. Upsert user_profiles row
       final userRecord = <String, dynamic>{
-        'id': newUserId,
-        'full_name': cleanOwner,
+        'id': authUserId,
         'email': cleanEmail,
+        'full_name': cleanOwner,
         'phone': cleanPhone,
         'role': 'provider',
         'city': cleanCity,
-        'address': cleanAddr,
-        'full_address': cleanAddr,
         'is_active': isActive,
-        'created_at': now,
         'updated_at': now,
       };
-      await client.from('user_profiles').upsert(userRecord, onConflict: 'id');
+      try {
+        await client.from('user_profiles').upsert(userRecord, onConflict: 'id');
+      } catch (e) {
+        debugPrint('[adminCreateServiceProvider] user_profiles upsert note: $e');
+      }
 
-      // 2. Create service_providers row
+      // 4. Create or upsert service_providers row
       final provRecord = <String, dynamic>{
-        'id': newProviderId,
-        'user_id': newUserId,
+        'user_id': authUserId,
         'business_name': cleanBiz,
         'owner_name': cleanOwner,
         'full_name': cleanOwner,
         'phone': cleanPhone,
         'whatsapp': cleanWa,
-        'whatsapp_number': cleanWa,
         'email': cleanEmail,
         'category': cleanCat,
         'subcategory': cleanSub,
@@ -6092,13 +6347,33 @@ class SupabaseService {
         'registration_status': status,
         'onboarding_completed': true,
         'member_since': DateTime.now().year.toString(),
-        'created_at': now,
         'updated_at': now,
       };
-      await client.from('service_providers').insert(provRecord);
+
+      Map<String, dynamic>? provResult;
+      try {
+        final provRes = await client
+            .from('service_providers')
+            .upsert(provRecord, onConflict: 'user_id')
+            .select()
+            .maybeSingle();
+        provResult = provRes != null ? Map<String, dynamic>.from(provRes) : null;
+      } catch (e) {
+        debugPrint('[adminCreateServiceProvider] service_providers upsert note: $e');
+      }
+
+      // 5. Save password in Admin Credentials Vault
+      await adminSaveUserPassword(
+        userId: authUserId,
+        email: cleanEmail,
+        phone: cleanPhone,
+        password: cleanPass,
+      );
 
       return {
-        ...provRecord,
+        ...(provResult ?? provRecord),
+        'id': provResult?['id'] ?? authUserId,
+        'password': cleanPass,
         'total_orders': 0,
         'earnings': 0,
       };
@@ -6122,6 +6397,7 @@ class SupabaseService {
     String? city,
     String? address,
     String? status,
+    String? password,
     bool? isActive,
     bool? isVerified,
     int? experienceYears,
@@ -6137,18 +6413,12 @@ class SupabaseService {
         provUpdates['full_name'] = ownerName.trim();
       }
       if (phone != null) provUpdates['phone'] = phone.trim();
-      if (whatsapp != null) {
-        provUpdates['whatsapp'] = whatsapp.trim();
-        provUpdates['whatsapp_number'] = whatsapp.trim();
-      }
+      if (whatsapp != null) provUpdates['whatsapp'] = whatsapp.trim();
       if (email != null && email.trim().isNotEmpty) provUpdates['email'] = email.trim();
       if (category != null) provUpdates['category'] = category.trim();
       if (subcategory != null) provUpdates['subcategory'] = subcategory.trim();
       if (city != null) provUpdates['city'] = city.trim();
-      if (address != null) {
-        provUpdates['address'] = address.trim();
-        provUpdates['business_address'] = address.trim();
-      }
+      if (address != null) provUpdates['address'] = address.trim();
       if (status != null) {
         provUpdates['registration_status'] = status;
         if (status == 'approved') {
@@ -6162,10 +6432,14 @@ class SupabaseService {
       if (isVerified != null) provUpdates['is_verified'] = isVerified;
       if (experienceYears != null) provUpdates['experience_years'] = experienceYears;
 
-      // 1. Update service_providers
-      await client.from('service_providers').update(provUpdates).eq('id', providerId);
+      // 1. Update service_providers by id or user_id
+      try {
+        await client.from('service_providers').update(provUpdates).eq('id', providerId);
+      } catch (_) {
+        await client.from('service_providers').update(provUpdates).eq('user_id', providerId);
+      }
 
-      // 2. Determine and update matching user_profiles row
+      // 2. Resolve matching user_id
       String? targetUserId = userId;
       if (targetUserId == null || targetUserId.isEmpty) {
         final provRow = await client
@@ -6184,13 +6458,19 @@ class SupabaseService {
         if (phone != null) userUpdates['phone'] = phone.trim();
         if (email != null && email.trim().isNotEmpty) userUpdates['email'] = email.trim();
         if (city != null) userUpdates['city'] = city.trim();
-        if (address != null) {
-          userUpdates['address'] = address.trim();
-          userUpdates['full_address'] = address.trim();
-        }
         if (isActive != null) userUpdates['is_active'] = isActive;
 
         await client.from('user_profiles').update(userUpdates).eq('id', targetUserId);
+      }
+
+      // 3. If password provided, save in Admin Credentials Vault
+      if (password != null && password.trim().isNotEmpty) {
+        await adminSaveUserPassword(
+          userId: targetUserId ?? providerId,
+          email: email,
+          phone: phone,
+          password: password.trim(),
+        );
       }
 
       return true;

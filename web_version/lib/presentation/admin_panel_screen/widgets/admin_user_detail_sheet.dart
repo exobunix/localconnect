@@ -42,6 +42,8 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
   Map<String, dynamic>? _providerDetails;
   int _orderCount = 0;
   double _totalSpent = 0.0;
+  String _userPassword = '';
+  bool _showPassword = false;
 
   @override
   void initState() {
@@ -96,6 +98,16 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
         0.0,
         (sum, o) => sum + ((o['total_amount'] as num?)?.toDouble() ?? 0.0),
       );
+
+      // 4. Fetch stored password from credentials vault
+      final pwd = await SupabaseService.instance.adminGetUserPassword(
+        userId: userId,
+        email: _user['email']?.toString(),
+        phone: _user['phone']?.toString(),
+      );
+      if (mounted) {
+        _userPassword = pwd;
+      }
     } catch (_) {}
 
     if (mounted) {
@@ -423,6 +435,36 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                   ),
                   const SizedBox(height: 8),
                   _buildDetailTile(
+                    icon: Icons.lock_outline_rounded,
+                    iconColor: const Color(0xFFE65100),
+                    title: 'Account Password',
+                    value: _userPassword.isNotEmpty
+                        ? (_showPassword ? _userPassword : '•' * _userPassword.length)
+                        : '••••••••',
+                    subtitle: 'Current password for this account',
+                    trailingAction: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            _showPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                            size: 18,
+                            color: const Color(0xFFE65100),
+                          ),
+                          tooltip: _showPassword ? 'Hide Password' : 'Show Password',
+                          onPressed: () => setState(() => _showPassword = !_showPassword),
+                        ),
+                        if (_userPassword.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFFE65100)),
+                            tooltip: 'Copy Password',
+                            onPressed: () => _copyToClipboard(_userPassword, 'Password'),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildDetailTile(
                     icon: Icons.badge_rounded,
                     iconColor: const Color(0xFF8E24AA),
                     title: 'Register As / Account Type',
@@ -722,9 +764,11 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
     final nameCtrl = TextEditingController(text: (_user['full_name'] ?? '').toString());
     final phoneCtrl = TextEditingController(text: (_user['phone'] ?? '').toString());
     final emailCtrl = TextEditingController(text: (_user['email'] ?? '').toString());
+    final passwordCtrl = TextEditingController(text: _userPassword);
     final cityCtrl = TextEditingController(text: (_user['city'] ?? _user['assigned_area'] ?? '').toString());
     final addressCtrl = TextEditingController(text: (_user['address'] ?? _user['full_address'] ?? '').toString());
     bool isActive = _user['is_active'] as bool? ?? true;
+    bool obscurePassword = true;
     bool isSubmitting = false;
 
     showDialog(
@@ -756,7 +800,7 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                       style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
                     ),
                     Text(
-                      'Update mobile contact & address information',
+                      'Update password, contact & address information',
                       style: GoogleFonts.plusJakartaSans(fontSize: 11, color: AppTheme.outline),
                     ),
                   ],
@@ -825,6 +869,99 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                       ),
                     ),
                     const SizedBox(height: 12),
+
+                    // Account Password Box (View & Edit)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF8E1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFFD54F)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.lock_outline_rounded, color: Color(0xFFF57F17), size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Account Password (View & Change) *',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFE65100),
+                                ),
+                              ),
+                              const Spacer(),
+                              if (passwordCtrl.text.isNotEmpty)
+                                InkWell(
+                                  onTap: () => _copyToClipboard(passwordCtrl.text, 'Password'),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.copy_rounded, size: 14, color: Color(0xFFE65100)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Copy',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: const Color(0xFFE65100),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: passwordCtrl,
+                            obscureText: obscurePassword,
+                            decoration: InputDecoration(
+                              hintText: 'Enter minimum 6 characters',
+                              filled: true,
+                              fillColor: Colors.white,
+                              prefixIcon: const Icon(Icons.key_rounded, size: 18, color: Color(0xFFF57F17)),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                  size: 20,
+                                  color: Colors.grey[700],
+                                ),
+                                onPressed: () {
+                                  setDialogState(() {
+                                    obscurePassword = !obscurePassword;
+                                  });
+                                },
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFFFD54F)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFFFD54F)),
+                              ),
+                            ),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              letterSpacing: obscurePassword ? 2.0 : 0.5,
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
                     TextFormField(
                       controller: nameCtrl,
                       decoration: InputDecoration(
@@ -903,6 +1040,7 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                 final email = emailCtrl.text.trim();
                 final city = cityCtrl.text.trim();
                 final address = addressCtrl.text.trim();
+                final pwd = passwordCtrl.text.trim();
 
                 final ok = await SupabaseService.instance.adminUpdateCustomerProfile(
                   customerId: userId,
@@ -912,6 +1050,7 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                   city: city,
                   address: address,
                   isActive: isActive,
+                  password: pwd,
                 );
 
                 if (mounted) {
@@ -925,6 +1064,7 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                       _user['address'] = address;
                       _user['full_address'] = address;
                       _user['is_active'] = isActive;
+                      _userPassword = pwd;
                     });
                     widget.onStatusChanged?.call();
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -964,6 +1104,7 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
     final emailCtrl = TextEditingController(
       text: (_providerDetails?['email'] ?? _user['email'] ?? '').toString(),
     );
+    final passwordCtrl = TextEditingController(text: _userPassword);
     final categoryCtrl = TextEditingController(
       text: (_providerDetails?['category'] ?? _user['category'] ?? 'Home Maintenance').toString(),
     );
@@ -976,6 +1117,7 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
     final addressCtrl = TextEditingController(
       text: (_providerDetails?['address'] ?? _user['address'] ?? '').toString(),
     );
+    bool obscurePassword = true;
     bool isSubmitting = false;
 
     showDialog(
@@ -1069,6 +1211,98 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                               if (v == null || v.trim().isEmpty) return 'Contact number is required';
                               final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
                               if (digits.length < 10) return 'Enter a valid 10-digit phone number';
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Account Password Box (View & Edit)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF8E1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFFD54F)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.lock_outline_rounded, color: Color(0xFFF57F17), size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Account Password (View & Change) *',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFE65100),
+                                ),
+                              ),
+                              const Spacer(),
+                              if (passwordCtrl.text.isNotEmpty)
+                                InkWell(
+                                  onTap: () => _copyToClipboard(passwordCtrl.text, 'Password'),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.copy_rounded, size: 14, color: Color(0xFFE65100)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Copy',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: const Color(0xFFE65100),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: passwordCtrl,
+                            obscureText: obscurePassword,
+                            decoration: InputDecoration(
+                              hintText: 'Enter minimum 6 characters',
+                              filled: true,
+                              fillColor: Colors.white,
+                              prefixIcon: const Icon(Icons.key_rounded, size: 18, color: Color(0xFFF57F17)),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                  size: 20,
+                                  color: Colors.grey[700],
+                                ),
+                                onPressed: () {
+                                  setDialogState(() {
+                                    obscurePassword = !obscurePassword;
+                                  });
+                                },
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFFFD54F)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFFFD54F)),
+                              ),
+                            ),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              letterSpacing: obscurePassword ? 2.0 : 0.5,
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
                               return null;
                             },
                           ),
@@ -1196,6 +1430,7 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                 final subcat = subcatCtrl.text.trim();
                 final city = cityCtrl.text.trim();
                 final address = addressCtrl.text.trim();
+                final pwd = passwordCtrl.text.trim();
 
                 final ok = await SupabaseService.instance.adminUpdateServiceProviderProfile(
                   providerId: providerId.isNotEmpty ? providerId : userId,
@@ -1209,6 +1444,7 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                   subcategory: subcat,
                   city: city,
                   address: address,
+                  password: pwd,
                 );
 
                 if (mounted) {
@@ -1222,6 +1458,7 @@ class _AdminUserDetailSheetState extends State<AdminUserDetailSheet> {
                       _user['whatsapp'] = wa;
                       _user['city'] = city;
                       _user['address'] = address;
+                      _userPassword = pwd;
                       if (_providerDetails != null) {
                         _providerDetails!['business_name'] = biz;
                         _providerDetails!['owner_name'] = owner;

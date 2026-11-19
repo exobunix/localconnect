@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
@@ -480,12 +481,18 @@ class _AdminCustomerManagementScreenState
     final emailCtrl = TextEditingController(
       text: customer?['email'] ?? '',
     );
+    final passwordCtrl = TextEditingController(
+      text: isEditing ? '' : 'LocalConnect@123',
+    );
     final cityCtrl = TextEditingController(
       text: customer?['city'] ?? (SupabaseService.instance.currentAdminArea != 'ALL' ? SupabaseService.instance.currentAdminArea : 'Roha'),
     );
     final addressCtrl = TextEditingController(
       text: customer?['address'] ?? customer?['full_address'] ?? '',
     );
+
+    bool obscurePassword = true;
+    bool hasLoadedPassword = !isEditing;
 
     String selectedStatus = (customer?['status'] ?? (customer?['is_active'] == false ? 'suspended' : 'active')).toString().toLowerCase();
     if (selectedStatus != 'active' && selectedStatus != 'suspended') {
@@ -498,296 +505,417 @@ class _AdminCustomerManagementScreenState
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-          actionsPadding: const EdgeInsets.all(16),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+        builder: (context, setDialogState) {
+          if (!hasLoadedPassword) {
+            hasLoadedPassword = true;
+            SupabaseService.instance.adminGetUserPassword(
+              userId: customer?['id']?.toString(),
+              email: customer?['email']?.toString(),
+              phone: customer?['phone']?.toString(),
+            ).then((pwd) {
+              if (context.mounted) {
+                setDialogState(() {
+                  passwordCtrl.text = pwd;
+                });
+              }
+            });
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+            actionsPadding: const EdgeInsets.all(16),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isEditing ? Icons.edit_note_rounded : Icons.person_add_alt_1_rounded,
+                    color: AppTheme.primary,
+                    size: 22,
+                  ),
                 ),
-                child: Icon(
-                  isEditing ? Icons.edit_note_rounded : Icons.person_add_alt_1_rounded,
-                  color: AppTheme.primary,
-                  size: 22,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isEditing ? 'Edit Customer Profile' : 'Register New Customer',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        isEditing
+                            ? 'Update password, contact & profile details'
+                            : 'Register a new customer account from admin panel',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: AppTheme.outline,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isEditing ? 'Edit Customer Profile' : 'Register New Customer',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      isEditing
-                          ? 'Update customer contact number & profile'
-                          : 'Register a new customer account from admin panel',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        color: AppTheme.outline,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 440,
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 12),
-                    // Contact Number Highlight Box
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFA5D6A7)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 16),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Primary Contact Number *',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1B5E20),
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+                      // Contact Number Highlight Box
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFA5D6A7)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Primary Contact Number *',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1B5E20),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: phoneCtrl,
+                              keyboardType: TextInputType.phone,
+                              decoration: InputDecoration(
+                                hintText: 'e.g. 9876543210',
+                                filled: true,
+                                fillColor: Colors.white,
+                                prefixIcon: const Icon(Icons.phone_rounded, size: 18, color: Color(0xFF2E7D32)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: phoneCtrl,
-                            keyboardType: TextInputType.phone,
-                            decoration: InputDecoration(
-                              hintText: 'e.g. 9876543210',
-                              filled: true,
-                              fillColor: Colors.white,
-                              prefixIcon: const Icon(Icons.phone_rounded, size: 18, color: Color(0xFF2E7D32)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
                               ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return 'Contact number is required';
+                                final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
+                                if (digits.length < 10) return 'Enter a valid 10-digit phone number';
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Account Password Box (View & Edit)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF8E1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFFD54F)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.lock_outline_rounded, color: Color(0xFFF57F17), size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isEditing ? 'Account Password (View & Change) *' : 'Set Account Password *',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFFE65100),
+                                  ),
+                                ),
+                                const Spacer(),
+                                if (passwordCtrl.text.isNotEmpty)
+                                  InkWell(
+                                    onTap: () {
+                                      Clipboard.setData(ClipboardData(text: passwordCtrl.text));
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Password copied to clipboard'),
+                                          duration: Duration(seconds: 2),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    },
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.copy_rounded, size: 14, color: Color(0xFFE65100)),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Copy',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFFE65100),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: passwordCtrl,
+                              obscureText: obscurePassword,
+                              decoration: InputDecoration(
+                                hintText: isEditing ? 'Loading password...' : 'Enter minimum 6 characters',
+                                filled: true,
+                                fillColor: Colors.white,
+                                prefixIcon: const Icon(Icons.key_rounded, size: 18, color: Color(0xFFF57F17)),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                    size: 20,
+                                    color: Colors.grey[700],
+                                  ),
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      obscurePassword = !obscurePassword;
+                                    });
+                                  },
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Color(0xFFFFD54F)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Color(0xFFFFD54F)),
+                                ),
                               ),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                letterSpacing: obscurePassword ? 2.0 : 0.5,
+                              ),
+                              validator: (v) {
+                                if (v == null || v.trim().length < 6) {
+                                  return 'Password must be at least 6 characters';
+                                }
+                                return null;
+                              },
                             ),
-                            style: GoogleFonts.plusJakartaSans(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                            validator: (v) {
-                              if (v == null || v.trim().isEmpty) return 'Contact number is required';
-                              final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
-                              if (digits.length < 10) return 'Enter a valid 10-digit phone number';
-                              return null;
-                            },
-                          ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Full Name
+                      TextFormField(
+                        controller: nameCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Customer Full Name *',
+                          hintText: 'e.g. Amit Sharma',
+                          prefixIcon: const Icon(Icons.person_rounded, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Email Address
+                      TextFormField(
+                        controller: emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          labelText: 'Email Address',
+                          hintText: 'e.g. amit@example.com',
+                          prefixIcon: const Icon(Icons.email_outlined, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // City / Operating Area
+                      TextFormField(
+                        controller: cityCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'City / Residential Area *',
+                          hintText: 'e.g. Roha, Alibag, Pen, Nagothane',
+                          prefixIcon: const Icon(Icons.location_city_rounded, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'City/Area is required' : null,
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Residential / Full Address
+                      TextFormField(
+                        controller: addressCtrl,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Residential / Full Address',
+                          hintText: 'e.g. Flat 302, Green Valley Apartments, Roha',
+                          prefixIcon: const Icon(Icons.home_outlined, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Account Status
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedStatus,
+                        decoration: InputDecoration(
+                          labelText: 'Account Status',
+                          prefixIcon: const Icon(Icons.verified_user_outlined, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'active', child: Text('Active')),
+                          DropdownMenuItem(value: 'suspended', child: Text('Suspended')),
                         ],
+                        onChanged: (v) {
+                          if (v != null) setDialogState(() => selectedStatus = v);
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Full Name
-                    TextFormField(
-                      controller: nameCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Customer Full Name *',
-                        hintText: 'e.g. Amit Sharma',
-                        prefixIcon: const Icon(Icons.person_rounded, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Email Address
-                    TextFormField(
-                      controller: emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: 'Email Address',
-                        hintText: 'e.g. amit@example.com',
-                        prefixIcon: const Icon(Icons.email_outlined, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // City / Operating Area
-                    TextFormField(
-                      controller: cityCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'City / Residential Area *',
-                        hintText: 'e.g. Roha, Alibag, Pen, Nagothane',
-                        prefixIcon: const Icon(Icons.location_city_rounded, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'City/Area is required' : null,
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Residential / Full Address
-                    TextFormField(
-                      controller: addressCtrl,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: 'Residential / Full Address',
-                        hintText: 'e.g. Flat 302, Green Valley Apartments, Roha',
-                        prefixIcon: const Icon(Icons.home_outlined, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Account Status
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedStatus,
-                      decoration: InputDecoration(
-                        labelText: 'Account Status',
-                        prefixIcon: const Icon(Icons.verified_user_outlined, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'active', child: Text('Active')),
-                        DropdownMenuItem(value: 'suspended', child: Text('Suspended')),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setDialogState(() => selectedStatus = v);
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.plusJakartaSans(color: AppTheme.outline),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.plusJakartaSans(color: AppTheme.outline),
+                ),
               ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: isSubmitting ? null : () async {
-                if (!formKey.currentState!.validate()) return;
-                setDialogState(() => isSubmitting = true);
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: isSubmitting ? null : () async {
+                  if (!formKey.currentState!.validate()) return;
+                  setDialogState(() => isSubmitting = true);
 
-                final phone = phoneCtrl.text.trim();
-                final name = nameCtrl.text.trim();
-                final email = emailCtrl.text.trim();
-                final city = cityCtrl.text.trim();
-                final address = addressCtrl.text.trim();
-                final isActive = selectedStatus == 'active';
+                  final phone = phoneCtrl.text.trim();
+                  final name = nameCtrl.text.trim();
+                  final email = emailCtrl.text.trim();
+                  final city = cityCtrl.text.trim();
+                  final address = addressCtrl.text.trim();
+                  final isActive = selectedStatus == 'active';
+                  final pwd = passwordCtrl.text.trim();
 
-                if (isEditing) {
-                  final customerId = (customer['id'] ?? '').toString();
-                  final ok = await SupabaseService.instance.adminUpdateCustomerProfile(
-                    customerId: customerId,
-                    fullName: name,
-                    phone: phone,
-                    email: email,
-                    city: city,
-                    address: address,
-                    isActive: isActive,
-                  );
+                  if (isEditing) {
+                    final customerId = (customer['id'] ?? '').toString();
+                    final ok = await SupabaseService.instance.adminUpdateCustomerProfile(
+                      customerId: customerId,
+                      fullName: name,
+                      phone: phone,
+                      email: email,
+                      city: city,
+                      address: address,
+                      isActive: isActive,
+                      password: pwd,
+                    );
 
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    if (ok) {
-                      setState(() {
-                        customer['full_name'] = name;
-                        customer['phone'] = phone;
-                        customer['email'] = email;
-                        customer['city'] = city;
-                        customer['address'] = address;
-                        customer['full_address'] = address;
-                        customer['status'] = selectedStatus;
-                        customer['is_active'] = isActive;
-                        _applyFilters();
-                      });
-                      _showSnack('Customer profile & contact updated successfully!', AppTheme.success);
-                      _loadCustomers();
-                    } else {
-                      _showSnack('Failed to update customer profile', AppTheme.error);
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      if (ok) {
+                        setState(() {
+                          customer['full_name'] = name;
+                          customer['phone'] = phone;
+                          customer['email'] = email;
+                          customer['city'] = city;
+                          customer['address'] = address;
+                          customer['full_address'] = address;
+                          customer['status'] = selectedStatus;
+                          customer['is_active'] = isActive;
+                          _applyFilters();
+                        });
+                        _showSnack('Customer profile & contact updated successfully!', AppTheme.success);
+                        _loadCustomers();
+                      } else {
+                        _showSnack('Failed to update customer profile', AppTheme.error);
+                      }
+                    }
+                  } else {
+                    final newCust = await SupabaseService.instance.adminCreateCustomer(
+                      fullName: name,
+                      phone: phone,
+                      email: email,
+                      city: city,
+                      address: address,
+                      isActive: isActive,
+                      password: pwd,
+                    );
+
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      if (newCust != null) {
+                        setState(() {
+                          _customers.insert(0, newCust);
+                          _applyFilters();
+                        });
+                        _showSnack('Customer registered successfully!', AppTheme.success);
+                        _loadCustomers();
+                      } else {
+                        _showSnack('Failed to register customer', AppTheme.error);
+                      }
                     }
                   }
-                } else {
-                  final newCust = await SupabaseService.instance.adminCreateCustomer(
-                    fullName: name,
-                    phone: phone,
-                    email: email,
-                    city: city,
-                    address: address,
-                    isActive: isActive,
-                  );
-
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    if (newCust != null) {
-                      setState(() {
-                        _customers.insert(0, newCust);
-                        _applyFilters();
-                      });
-                      _showSnack('Customer registered successfully!', AppTheme.success);
-                      _loadCustomers();
-                    } else {
-                      _showSnack('Failed to register customer', AppTheme.error);
-                    }
-                  }
-                }
-              },
-              child: isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text(
-                      isEditing ? 'Save Changes' : 'Register Customer',
-                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
-                    ),
-            ),
-          ],
-        ),
+                },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(
+                        isEditing ? 'Save Changes' : 'Register Customer',
+                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                      ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

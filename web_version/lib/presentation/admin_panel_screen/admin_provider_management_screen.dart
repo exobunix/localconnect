@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../services/supabase_service.dart';
@@ -941,6 +942,17 @@ class _AdminProviderManagementScreenState
                       _detailRow('City', provider['city'] ?? ''),
                       _detailRow('Phone', provider['phone'] ?? ''),
                       _detailRow('Email', provider['email'] ?? ''),
+                      FutureBuilder<String>(
+                        future: SupabaseService.instance.adminGetUserPassword(
+                          userId: (provider['user_id'] ?? provider['id'] ?? '').toString(),
+                          email: provider['email']?.toString(),
+                          phone: provider['phone']?.toString(),
+                        ),
+                        builder: (context, snapshot) {
+                          final pwd = snapshot.data ?? '••••••••';
+                          return _detailPasswordRow(pwd);
+                        },
+                      ),
                       _detailRow('Status', provider['status'] ?? ''),
                       _detailRow('Rating', '${provider['rating'] ?? 0} ⭐'),
                       _detailRow('Total Orders', '${provider['total_orders'] ?? 0}'),
@@ -1126,6 +1138,67 @@ class _AdminProviderManagementScreenState
     );
   }
 
+  Widget _detailPasswordRow(String password) {
+    bool show = false;
+    return StatefulBuilder(
+      builder: (context, setPwdState) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 120,
+                child: Text(
+                  'Password',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    color: const Color(0xFFE65100),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  show ? password : '•' * (password.isNotEmpty ? password.length : 8),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: show ? 0.5 : 2.0,
+                    color: const Color(0xFFE65100),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  show ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                  size: 18,
+                  color: const Color(0xFFE65100),
+                ),
+                tooltip: show ? 'Hide Password' : 'Show Password',
+                onPressed: () => setPwdState(() => show = !show),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFFE65100)),
+                tooltip: 'Copy Password',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: password));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Password copied to clipboard'),
+                      duration: Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _sendNotification(Map<String, dynamic> provider) {
     _showSnack(
       'Notification sent to ${provider['full_name']}',
@@ -1267,6 +1340,9 @@ class _AdminProviderManagementScreenState
     final emailCtrl = TextEditingController(
       text: provider?['email'] ?? '',
     );
+    final passwordCtrl = TextEditingController(
+      text: isEditing ? '' : 'LocalConnect@123',
+    );
     final subcatCtrl = TextEditingController(
       text: provider?['subcategory'] ?? '',
     );
@@ -1279,6 +1355,9 @@ class _AdminProviderManagementScreenState
     final expCtrl = TextEditingController(
       text: (provider?['experience_years'] ?? 1).toString(),
     );
+
+    bool obscurePassword = true;
+    bool hasLoadedPassword = !isEditing;
 
     String selectedCategory = (provider?['category'] ?? 'Home Maintenance').toString();
     final validCategories = [
@@ -1309,425 +1388,546 @@ class _AdminProviderManagementScreenState
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-          actionsPadding: const EdgeInsets.all(16),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+        builder: (context, setDialogState) {
+          if (!hasLoadedPassword) {
+            hasLoadedPassword = true;
+            SupabaseService.instance.adminGetUserPassword(
+              userId: (provider?['user_id'] ?? provider?['id'] ?? '').toString(),
+              email: provider?['email']?.toString(),
+              phone: provider?['phone']?.toString(),
+            ).then((pwd) {
+              if (context.mounted) {
+                setDialogState(() {
+                  passwordCtrl.text = pwd;
+                });
+              }
+            });
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+            actionsPadding: const EdgeInsets.all(16),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isEditing ? Icons.edit_note_rounded : Icons.person_add_alt_1_rounded,
+                    color: AppTheme.primary,
+                    size: 22,
+                  ),
                 ),
-                child: Icon(
-                  isEditing ? Icons.edit_note_rounded : Icons.person_add_alt_1_rounded,
-                  color: AppTheme.primary,
-                  size: 22,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isEditing ? 'Edit Provider Profile' : 'Register New Provider',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        isEditing
+                            ? 'Update password, contact & details'
+                            : 'Add service provider directly from admin panel',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: AppTheme.outline,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isEditing ? 'Edit Provider Profile' : 'Register New Provider',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      isEditing
-                          ? 'Update contact number & profile details'
-                          : 'Add service provider directly from admin panel',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        color: AppTheme.outline,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 480,
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 12),
-                    // Contact Number Highlight Box
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFA5D6A7)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 16),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Primary Contact Number *',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1B5E20),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+                      // Contact Number Highlight Box
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFA5D6A7)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Primary Contact Number *',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1B5E20),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: phoneCtrl,
+                              keyboardType: TextInputType.phone,
+                              decoration: InputDecoration(
+                                hintText: 'e.g. 9876543210',
+                                filled: true,
+                                fillColor: Colors.white,
+                                prefixIcon: const Icon(Icons.phone_rounded, size: 18, color: Color(0xFF2E7D32)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
                                 ),
                               ),
-                            ],
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return 'Contact number is required';
+                                final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
+                                if (digits.length < 10) return 'Enter a valid 10-digit phone number';
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Account Password Box (View & Edit)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF8E1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFFD54F)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.lock_outline_rounded, color: Color(0xFFF57F17), size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isEditing ? 'Account Password (View & Change) *' : 'Set Account Password *',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFFE65100),
+                                  ),
+                                ),
+                                const Spacer(),
+                                if (passwordCtrl.text.isNotEmpty)
+                                  InkWell(
+                                    onTap: () {
+                                      Clipboard.setData(ClipboardData(text: passwordCtrl.text));
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Password copied to clipboard'),
+                                          duration: Duration(seconds: 2),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    },
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.copy_rounded, size: 14, color: Color(0xFFE65100)),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Copy',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFFE65100),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: passwordCtrl,
+                              obscureText: obscurePassword,
+                              decoration: InputDecoration(
+                                hintText: isEditing ? 'Loading password...' : 'Enter minimum 6 characters',
+                                filled: true,
+                                fillColor: Colors.white,
+                                prefixIcon: const Icon(Icons.key_rounded, size: 18, color: Color(0xFFF57F17)),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                    size: 20,
+                                    color: Colors.grey[700],
+                                  ),
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      obscurePassword = !obscurePassword;
+                                    });
+                                  },
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Color(0xFFFFD54F)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Color(0xFFFFD54F)),
+                                ),
+                              ),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                letterSpacing: obscurePassword ? 2.0 : 0.5,
+                              ),
+                              validator: (v) {
+                                if (v == null || v.trim().length < 6) {
+                                  return 'Password must be at least 6 characters';
+                                }
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Business Name & Owner Name
+                      TextFormField(
+                        controller: bizNameCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Business / Shop / Service Name *',
+                          hintText: 'e.g. Roha Quick Plumbing Works',
+                          prefixIcon: const Icon(Icons.storefront_rounded, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Business name is required' : null,
+                      ),
+                      const SizedBox(height: 10),
+
+                      TextFormField(
+                        controller: ownerNameCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Owner / Contact Person Full Name *',
+                          hintText: 'e.g. Ramesh Kumar',
+                          prefixIcon: const Icon(Icons.person_rounded, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Owner name is required' : null,
+                      ),
+                      const SizedBox(height: 10),
+
+                      // WhatsApp with "Copy phone" button
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: waCtrl,
+                              keyboardType: TextInputType.phone,
+                              decoration: InputDecoration(
+                                labelText: 'WhatsApp Number',
+                                hintText: 'e.g. 9876543210',
+                                prefixIcon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              ),
+                            ),
                           ),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: phoneCtrl,
-                            keyboardType: TextInputType.phone,
-                            decoration: InputDecoration(
-                              hintText: 'e.g. 9876543210',
-                              filled: true,
-                              fillColor: Colors.white,
-                              prefixIcon: const Icon(Icons.phone_rounded, size: 18, color: Color(0xFF2E7D32)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFA5D6A7)),
-                              ),
-                            ),
-                            style: GoogleFonts.plusJakartaSans(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                            validator: (v) {
-                              if (v == null || v.trim().isEmpty) return 'Contact number is required';
-                              final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
-                              if (digits.length < 10) return 'Enter a valid 10-digit phone number';
-                              return null;
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: () {
+                              setDialogState(() {
+                                waCtrl.text = phoneCtrl.text.trim();
+                              });
                             },
+                            child: Text(
+                              'Same as\nPhone',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.primary,
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 14),
+                      const SizedBox(height: 10),
 
-                    // Business Name & Owner Name
-                    TextFormField(
-                      controller: bizNameCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Business / Shop / Service Name *',
-                        hintText: 'e.g. Roha Quick Plumbing Works',
-                        prefixIcon: const Icon(Icons.storefront_rounded, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      // Email Address
+                      TextFormField(
+                        controller: emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          labelText: 'Email Address',
+                          hintText: 'e.g. provider@example.com',
+                          prefixIcon: const Icon(Icons.email_outlined, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
                       ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Business name is required' : null,
-                    ),
-                    const SizedBox(height: 10),
+                      const SizedBox(height: 10),
 
-                    TextFormField(
-                      controller: ownerNameCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Owner / Contact Person Full Name *',
-                        hintText: 'e.g. Ramesh Kumar',
-                        prefixIcon: const Icon(Icons.person_rounded, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      // Category & Subcategory
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedCategory,
+                        decoration: InputDecoration(
+                          labelText: 'Service Category *',
+                          prefixIcon: const Icon(Icons.category_rounded, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        items: validCategories.map((c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(c, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
+                        )).toList(),
+                        onChanged: (v) {
+                          if (v != null) setDialogState(() => selectedCategory = v);
+                        },
                       ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Owner name is required' : null,
-                    ),
-                    const SizedBox(height: 10),
+                      const SizedBox(height: 10),
 
-                    // WhatsApp with "Copy phone" button
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: waCtrl,
-                            keyboardType: TextInputType.phone,
-                            decoration: InputDecoration(
-                              labelText: 'WhatsApp Number',
-                              hintText: 'e.g. 9876543210',
-                              prefixIcon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      TextFormField(
+                        controller: subcatCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Subcategory / Specialization',
+                          hintText: 'e.g. Plumber, Electrician, Painter, Taxi Driver',
+                          prefixIcon: const Icon(Icons.build_circle_outlined, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // City / Operating Area & Experience
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: TextFormField(
+                              controller: cityCtrl,
+                              decoration: InputDecoration(
+                                labelText: 'City / Service Area *',
+                                hintText: 'e.g. Roha, Alibag, Pen',
+                                prefixIcon: const Icon(Icons.location_city_rounded, size: 18),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              ),
+                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Area/City is required' : null,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              waCtrl.text = phoneCtrl.text.trim();
-                            });
-                          },
-                          child: Text(
-                            'Same as\nPhone',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.primary,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: TextFormField(
+                              controller: expCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'Experience (Yrs)',
+                                hintText: '1',
+                                prefixIcon: const Icon(Icons.history_edu_rounded, size: 18),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              ),
                             ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Shop / Full Address
+                      TextFormField(
+                        controller: addressCtrl,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Shop / Full Address',
+                          hintText: 'e.g. Shop No. 4, Market Road, Roha',
+                          prefixIcon: const Icon(Icons.map_outlined, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Email Address
-                    TextFormField(
-                      controller: emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: 'Email Address',
-                        hintText: 'e.g. provider@example.com',
-                        prefixIcon: const Icon(Icons.email_outlined, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
-                    ),
-                    const SizedBox(height: 10),
+                      const SizedBox(height: 10),
 
-                    // Category & Subcategory
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedCategory,
-                      decoration: InputDecoration(
-                        labelText: 'Service Category *',
-                        prefixIcon: const Icon(Icons.category_rounded, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
-                      items: validCategories.map((c) => DropdownMenuItem(
-                        value: c,
-                        child: Text(c, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
-                      )).toList(),
-                      onChanged: (v) {
-                        if (v != null) setDialogState(() => selectedCategory = v);
-                      },
-                    ),
-                    const SizedBox(height: 10),
-
-                    TextFormField(
-                      controller: subcatCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Subcategory / Specialization',
-                        hintText: 'e.g. Plumber, Electrician, Painter, Taxi Driver',
-                        prefixIcon: const Icon(Icons.build_circle_outlined, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // City / Operating Area & Experience
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextFormField(
-                            controller: cityCtrl,
-                            decoration: InputDecoration(
-                              labelText: 'City / Service Area *',
-                              hintText: 'e.g. Roha, Alibag, Pen',
-                              prefixIcon: const Icon(Icons.location_city_rounded, size: 18),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Area/City is required' : null,
-                          ),
+                      // Registration Status
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedStatus,
+                        decoration: InputDecoration(
+                          labelText: 'Account Status',
+                          prefixIcon: const Icon(Icons.verified_user_outlined, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: TextFormField(
-                            controller: expCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: 'Experience (Yrs)',
-                              hintText: '1',
-                              prefixIcon: const Icon(Icons.history_edu_rounded, size: 18),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Shop / Full Address
-                    TextFormField(
-                      controller: addressCtrl,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: 'Shop / Full Address',
-                        hintText: 'e.g. Shop No. 4, Market Road, Roha',
-                        prefixIcon: const Icon(Icons.map_outlined, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        items: const [
+                          DropdownMenuItem(value: 'approved', child: Text('Approved (Active)')),
+                          DropdownMenuItem(value: 'pending', child: Text('Pending Approval')),
+                          DropdownMenuItem(value: 'suspended', child: Text('Suspended')),
+                          DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) setDialogState(() => selectedStatus = v);
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Registration Status
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedStatus,
-                      decoration: InputDecoration(
-                        labelText: 'Account Status',
-                        prefixIcon: const Icon(Icons.verified_user_outlined, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'approved', child: Text('Approved (Active)')),
-                        DropdownMenuItem(value: 'pending', child: Text('Pending Approval')),
-                        DropdownMenuItem(value: 'suspended', child: Text('Suspended')),
-                        DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setDialogState(() => selectedStatus = v);
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.plusJakartaSans(color: AppTheme.outline),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.plusJakartaSans(color: AppTheme.outline),
+                ),
               ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: isSubmitting ? null : () async {
-                if (!formKey.currentState!.validate()) return;
-                setDialogState(() => isSubmitting = true);
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: isSubmitting ? null : () async {
+                  if (!formKey.currentState!.validate()) return;
+                  setDialogState(() => isSubmitting = true);
 
-                final phone = phoneCtrl.text.trim();
-                final owner = ownerNameCtrl.text.trim();
-                final biz = bizNameCtrl.text.trim();
-                final wa = waCtrl.text.trim().isNotEmpty ? waCtrl.text.trim() : phone;
-                final email = emailCtrl.text.trim();
-                final subcat = subcatCtrl.text.trim();
-                final city = cityCtrl.text.trim();
-                final address = addressCtrl.text.trim();
-                final exp = int.tryParse(expCtrl.text.trim()) ?? 1;
+                  final phone = phoneCtrl.text.trim();
+                  final owner = ownerNameCtrl.text.trim();
+                  final biz = bizNameCtrl.text.trim();
+                  final wa = waCtrl.text.trim().isNotEmpty ? waCtrl.text.trim() : phone;
+                  final email = emailCtrl.text.trim();
+                  final subcat = subcatCtrl.text.trim();
+                  final city = cityCtrl.text.trim();
+                  final address = addressCtrl.text.trim();
+                  final exp = int.tryParse(expCtrl.text.trim()) ?? 1;
+                  final pwd = passwordCtrl.text.trim();
 
-                if (isEditing) {
-                  final providerId = (provider['id'] ?? '').toString();
-                  final userId = (provider['user_id'] ?? '').toString();
-                  final ok = await SupabaseService.instance.adminUpdateServiceProviderProfile(
-                    providerId: providerId,
-                    userId: userId,
-                    businessName: biz,
-                    ownerName: owner,
-                    phone: phone,
-                    whatsapp: wa,
-                    email: email,
-                    category: selectedCategory,
-                    subcategory: subcat,
-                    city: city,
-                    address: address,
-                    status: selectedStatus,
-                    isActive: selectedStatus == 'approved',
-                    isVerified: selectedStatus == 'approved',
-                    experienceYears: exp,
-                  );
+                  if (isEditing) {
+                    final providerId = (provider['id'] ?? '').toString();
+                    final userId = (provider['user_id'] ?? '').toString();
+                    final ok = await SupabaseService.instance.adminUpdateServiceProviderProfile(
+                      providerId: providerId,
+                      userId: userId,
+                      businessName: biz,
+                      ownerName: owner,
+                      phone: phone,
+                      whatsapp: wa,
+                      email: email,
+                      category: selectedCategory,
+                      subcategory: subcat,
+                      city: city,
+                      address: address,
+                      status: selectedStatus,
+                      isActive: selectedStatus == 'approved',
+                      isVerified: selectedStatus == 'approved',
+                      experienceYears: exp,
+                      password: pwd,
+                    );
 
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    if (ok) {
-                      setState(() {
-                        provider['business_name'] = biz;
-                        provider['owner_name'] = owner;
-                        provider['full_name'] = owner;
-                        provider['phone'] = phone;
-                        provider['whatsapp'] = wa;
-                        provider['whatsapp_number'] = wa;
-                        provider['email'] = email;
-                        provider['category'] = selectedCategory;
-                        provider['subcategory'] = subcat;
-                        provider['city'] = city;
-                        provider['address'] = address;
-                        provider['status'] = selectedStatus;
-                        provider['registration_status'] = selectedStatus;
-                        provider['experience_years'] = exp;
-                        _applyFilters();
-                      });
-                      _showSnack('Provider profile & contact updated successfully!', AppTheme.success);
-                      _loadProviders();
-                    } else {
-                      _showSnack('Failed to update provider profile', AppTheme.error);
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      if (ok) {
+                        setState(() {
+                          provider['business_name'] = biz;
+                          provider['owner_name'] = owner;
+                          provider['full_name'] = owner;
+                          provider['phone'] = phone;
+                          provider['whatsapp'] = wa;
+                          provider['whatsapp_number'] = wa;
+                          provider['email'] = email;
+                          provider['category'] = selectedCategory;
+                          provider['subcategory'] = subcat;
+                          provider['city'] = city;
+                          provider['address'] = address;
+                          provider['status'] = selectedStatus;
+                          provider['registration_status'] = selectedStatus;
+                          provider['experience_years'] = exp;
+                          _applyFilters();
+                        });
+                        _showSnack('Provider profile & contact updated successfully!', AppTheme.success);
+                        _loadProviders();
+                      } else {
+                        _showSnack('Failed to update provider profile', AppTheme.error);
+                      }
+                    }
+                  } else {
+                    final newProv = await SupabaseService.instance.adminCreateServiceProvider(
+                      businessName: biz,
+                      ownerName: owner,
+                      phone: phone,
+                      whatsapp: wa,
+                      email: email,
+                      category: selectedCategory,
+                      subcategory: subcat,
+                      city: city,
+                      address: address,
+                      experienceYears: exp,
+                      status: selectedStatus,
+                      isActive: selectedStatus == 'approved',
+                      password: pwd,
+                    );
+
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      if (newProv != null) {
+                        setState(() {
+                          _providers.insert(0, newProv);
+                          _applyFilters();
+                        });
+                        _showSnack('New provider registered successfully!', AppTheme.success);
+                        _loadProviders();
+                      } else {
+                        _showSnack('Failed to register provider', AppTheme.error);
+                      }
                     }
                   }
-                } else {
-                  final newProv = await SupabaseService.instance.adminCreateServiceProvider(
-                    businessName: biz,
-                    ownerName: owner,
-                    phone: phone,
-                    whatsapp: wa,
-                    email: email,
-                    category: selectedCategory,
-                    subcategory: subcat,
-                    city: city,
-                    address: address,
-                    experienceYears: exp,
-                    status: selectedStatus,
-                    isActive: selectedStatus == 'approved',
-                  );
-
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    if (newProv != null) {
-                      setState(() {
-                        _providers.insert(0, newProv);
-                        _applyFilters();
-                      });
-                      _showSnack('New provider registered successfully!', AppTheme.success);
-                      _loadProviders();
-                    } else {
-                      _showSnack('Failed to register provider', AppTheme.error);
-                    }
-                  }
-                }
-              },
-              child: isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text(
-                      isEditing ? 'Save Changes' : 'Register Provider',
-                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
-                    ),
-            ),
-          ],
-        ),
+                },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(
+                        isEditing ? 'Save Changes' : 'Register Provider',
+                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                      ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
