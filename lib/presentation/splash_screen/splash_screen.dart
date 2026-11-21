@@ -138,6 +138,29 @@ class _SplashScreenState extends State<SplashScreen>
       } catch (_) {}
     }
 
+    // 0. Check persistent Admin / Area Manager session
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final bool adminActive = prefs.getBool('localconnect_admin_session_active') ?? false;
+      if (adminActive) {
+        setAdminSessionActive(true);
+        final savedEmail = prefs.getString('localconnect_admin_email') ?? 'admin@localconnect.com';
+        final savedRole = prefs.getString('localconnect_admin_role') ?? 'super_admin';
+        final savedArea = prefs.getString('localconnect_admin_area') ?? 'ALL';
+        SupabaseService.instance.currentAdminEmail = savedEmail;
+        SupabaseService.instance.currentAdminRole = savedRole;
+        SupabaseService.instance.currentAdminArea = savedArea;
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.adminPanelScreen,
+            (route) => false,
+          );
+        }
+        return;
+      }
+    } catch (_) {}
+
     final isLoggedIn = SupabaseService.instance.isLoggedIn;
     if (!isLoggedIn) {
       // Check if first-time user — show onboarding
@@ -228,9 +251,14 @@ class _SplashScreenState extends State<SplashScreen>
     if (userId != null) {
       try {
         final profile = await SupabaseService.instance.getUserProfile(userId);
-        final dbRole = profile?['role'] as String? ?? 'customer';
-        const validRoles = {'customer', 'provider', 'admin'};
-        role = validRoles.contains(dbRole) ? dbRole : 'customer';
+        final dbRole = (profile?['role'] as String? ?? '').toLowerCase();
+        if (dbRole == 'admin' || dbRole == 'super_admin' || dbRole == 'area_admin' || dbRole == 'area_manager') {
+          role = 'admin';
+        } else if (dbRole == 'provider') {
+          role = 'provider';
+        } else {
+          role = 'customer';
+        }
       } catch (_) {
         role = 'customer';
       }

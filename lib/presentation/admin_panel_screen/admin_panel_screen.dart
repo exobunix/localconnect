@@ -900,10 +900,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             subtitle: 'Log out of admin panel',
             color: AppTheme.error,
             onTap: () async {
-              setAdminSessionActive(false);
-              await SupabaseService.instance.signOut();
+              await AdminAuthService.instance.logout();
               if (mounted) {
-                Navigator.pushReplacementNamed(context, AppRoutes.loginScreen);
+                Navigator.pushNamedAndRemoveUntil(context, AppRoutes.adminLoginScreen, (route) => false);
               }
             },
           ),
@@ -972,7 +971,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   Future<bool> handleAdminBack() async {
-    final shouldExit = await showDialog<bool>(
+    final action = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -981,26 +980,45 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
         ),
         content: Text(
-          'Do you want to exit the Admin Panel and return to the main app?',
+          'Choose whether to switch to the customer app view, stay in Admin Panel, or Sign Out.',
           style: GoogleFonts.plusJakartaSans(fontSize: 14),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Stay'),
+            onPressed: () => Navigator.pop(ctx, 'stay'),
+            child: const Text('Stay in Admin'),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, 'home'),
+            child: const Text('Customer View (Home)'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
+              backgroundColor: AppTheme.error,
               foregroundColor: Colors.white,
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Return to Home'),
+            onPressed: () => Navigator.pop(ctx, 'signout'),
+            child: const Text('Sign Out'),
           ),
         ],
       ),
     );
-    if (shouldExit == true && mounted) {
+
+    if (!mounted || action == null || action == 'stay') return false;
+
+    if (action == 'signout') {
+      await AdminAuthService.instance.logout();
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.adminLoginScreen,
+          (route) => false,
+        );
+      }
+      return true;
+    }
+
+    if (action == 'home') {
       Navigator.pushNamedAndRemoveUntil(
         context,
         AppRoutes.homeScreen,
@@ -1008,6 +1026,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       );
       return true;
     }
+
     return false;
   }
 

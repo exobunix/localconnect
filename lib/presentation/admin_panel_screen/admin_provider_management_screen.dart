@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../services/supabase_service.dart';
+import '../../services/notification_service.dart';
+import '../../routes/app_routes.dart';
 import '../admin_panel_screen/admin_kyc_verification_screen.dart';
 
 class AdminProviderManagementScreen extends StatefulWidget {
@@ -1313,6 +1315,105 @@ class _AdminProviderManagementScreenState
 
   // ─── ADMIN: ADD & EDIT SERVICE PROVIDER ─────────────────────────────────────
 
+  static const Map<String, List<String>> _categorySubcategoryMap = {
+    'Home Maintenance': [
+      'Plumber',
+      'Electrician',
+      'Painter',
+      'Carpenter',
+      'AC & Appliance Repair',
+      'Cleaning & Pest Control',
+      'Mason / Construction',
+      'House Maid / Daily Wage',
+      'Other / Custom',
+    ],
+    'Transport': [
+      'Taxi / Cab',
+      'Auto Rickshaw',
+      'Mini Truck / Tempo',
+      'Heavy Truck',
+      'JCB & Excavator',
+      'Ambulance',
+      'Driver on Demand',
+      'Other / Custom',
+    ],
+    'Events': [
+      'Event Planner',
+      'Photographer & Videographer',
+      'Catering Service',
+      'DJ & Sound System',
+      'Decoration & Lighting',
+      'Makeup Artist',
+      'Venue / Hall',
+      'Other / Custom',
+    ],
+    'Shop': [
+      'Grocery & Supermarket',
+      'Electronics & Mobile',
+      'Hardware & Sanitary',
+      'Clothing & Fashion',
+      'Medical & Pharmacy',
+      'Furniture',
+      'Stationery',
+      'Other / Custom',
+    ],
+    'Rent': [
+      'Flat / Apartment',
+      'Independent House',
+      'Room / PG',
+      'Commercial Space / Shop',
+      'Office',
+      'Warehouse',
+      'Other / Custom',
+    ],
+    'Delivery': [
+      'Courier & Parcel',
+      'Food Delivery',
+      'Grocery Delivery',
+      'Medicine Delivery',
+      'Express Logistics',
+      'Other / Custom',
+    ],
+    'Healthcare': [
+      'Clinic & Doctor',
+      'Nursing & Caretaker',
+      'Diagnostic Lab',
+      'Physiotherapy',
+      'Other / Custom',
+    ],
+    'Education': [
+      'Tutor / Coaching',
+      'Music & Dance Classes',
+      'Skill Training',
+      'Other / Custom',
+    ],
+    'Automobile': [
+      'Two-Wheeler Service',
+      'Car Repair & Garage',
+      'Tyre & Puncture',
+      'Towing Service',
+      'Other / Custom',
+    ],
+    'Other': [
+      'General Service',
+      'Specialist',
+      'Other / Custom',
+    ],
+  };
+
+  static const Map<String, String> _defaultCategoryImages = {
+    'Home Maintenance': 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500',
+    'Transport': 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=500',
+    'Events': 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=500',
+    'Shop': 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500',
+    'Rent': 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=500',
+    'Delivery': 'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=500',
+    'Healthcare': 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=500',
+    'Education': 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=500',
+    'Automobile': 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=500',
+    'Other': 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=500',
+  };
+
   void _showAddProviderDialog() {
     _showProviderFormDialog();
   }
@@ -1343,9 +1444,7 @@ class _AdminProviderManagementScreenState
     final passwordCtrl = TextEditingController(
       text: isEditing ? '' : 'LocalConnect@123',
     );
-    final subcatCtrl = TextEditingController(
-      text: provider?['subcategory'] ?? '',
-    );
+    final customSubcatCtrl = TextEditingController();
     final cityCtrl = TextEditingController(
       text: provider?['city'] ?? (SupabaseService.instance.currentAdminArea != 'ALL' ? SupabaseService.instance.currentAdminArea : 'Roha'),
     );
@@ -1353,7 +1452,7 @@ class _AdminProviderManagementScreenState
       text: provider?['address'] ?? provider?['business_address'] ?? '',
     );
     final expCtrl = TextEditingController(
-      text: (provider?['experience_years'] ?? 1).toString(),
+      text: (provider?['years_experience'] ?? provider?['experience_years'] ?? 1).toString(),
     );
 
     bool obscurePassword = true;
@@ -1375,6 +1474,24 @@ class _AdminProviderManagementScreenState
     if (!validCategories.contains(selectedCategory)) {
       selectedCategory = validCategories.first;
     }
+
+    final existingSubcat = (provider?['subcategory'] ?? '').toString().trim();
+    final currentSubList = _categorySubcategoryMap[selectedCategory] ?? ['Other / Custom'];
+    String selectedSubcategory = 'Other / Custom';
+    if (existingSubcat.isNotEmpty) {
+      if (currentSubList.contains(existingSubcat)) {
+        selectedSubcategory = existingSubcat;
+      } else {
+        selectedSubcategory = 'Other / Custom';
+        customSubcatCtrl.text = existingSubcat;
+      }
+    } else {
+      selectedSubcategory = currentSubList.first;
+    }
+
+    final imageUrlCtrl = TextEditingController(
+      text: provider?['image_url'] ?? provider?['cover_image_url'] ?? _defaultCategoryImages[selectedCategory] ?? '',
+    );
 
     String selectedStatus = (provider?['status'] ?? provider?['registration_status'] ?? 'approved').toString().toLowerCase();
     final validStatuses = ['approved', 'pending', 'suspended', 'rejected'];
@@ -1402,6 +1519,11 @@ class _AdminProviderManagementScreenState
                 });
               }
             });
+          }
+
+          final availableSubcategories = _categorySubcategoryMap[selectedCategory] ?? ['Other / Custom'];
+          if (!availableSubcategories.contains(selectedSubcategory)) {
+            selectedSubcategory = availableSubcategories.first;
           }
 
           return AlertDialog(
@@ -1437,7 +1559,7 @@ class _AdminProviderManagementScreenState
                       ),
                       Text(
                         isEditing
-                            ? 'Update password, contact & details'
+                            ? 'Update password, category, photo & details'
                             : 'Add service provider directly from admin panel',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 11,
@@ -1690,8 +1812,8 @@ class _AdminProviderManagementScreenState
                         controller: emailCtrl,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
-                          labelText: 'Email Address',
-                          hintText: 'e.g. provider@example.com',
+                          labelText: 'Email Address (Provider Login ID)',
+                          hintText: 'e.g. partner@example.com',
                           prefixIcon: const Icon(Icons.email_outlined, size: 18),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1699,7 +1821,7 @@ class _AdminProviderManagementScreenState
                       ),
                       const SizedBox(height: 10),
 
-                      // Category & Subcategory
+                      // Category Dropdown
                       DropdownButtonFormField<String>(
                         initialValue: selectedCategory,
                         decoration: InputDecoration(
@@ -1713,19 +1835,153 @@ class _AdminProviderManagementScreenState
                           child: Text(c, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
                         )).toList(),
                         onChanged: (v) {
-                          if (v != null) setDialogState(() => selectedCategory = v);
+                          if (v != null) {
+                            setDialogState(() {
+                              selectedCategory = v;
+                              final subList = _categorySubcategoryMap[v] ?? ['Other / Custom'];
+                              selectedSubcategory = subList.first;
+                              // Update image if currently default or empty
+                              if (imageUrlCtrl.text.isEmpty ||
+                                  _defaultCategoryImages.values.contains(imageUrlCtrl.text)) {
+                                imageUrlCtrl.text = _defaultCategoryImages[v] ?? '';
+                              }
+                            });
+                          }
                         },
                       ),
                       const SizedBox(height: 10),
 
-                      TextFormField(
-                        controller: subcatCtrl,
+                      // Dynamic Subcategory Dropdown
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedSubcategory,
                         decoration: InputDecoration(
-                          labelText: 'Subcategory / Specialization',
-                          hintText: 'e.g. Plumber, Electrician, Painter, Taxi Driver',
+                          labelText: 'Subcategory / Specialization *',
                           prefixIcon: const Icon(Icons.build_circle_outlined, size: 18),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        items: availableSubcategories.map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
+                        )).toList(),
+                        onChanged: (v) {
+                          if (v != null) setDialogState(() => selectedSubcategory = v);
+                        },
+                      ),
+                      const SizedBox(height: 10),
+
+                      // If 'Other / Custom' chosen, show custom subcategory input
+                      if (selectedSubcategory == 'Other / Custom') ...[
+                        TextFormField(
+                          controller: customSubcatCtrl,
+                          decoration: InputDecoration(
+                            labelText: 'Enter Custom Subcategory / Trade *',
+                            hintText: 'e.g. Solar Technician, Welder, CCTV Expert',
+                            prefixIcon: const Icon(Icons.handyman_rounded, size: 18),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                          validator: (v) => (selectedSubcategory == 'Other / Custom' && (v == null || v.trim().isEmpty))
+                              ? 'Please enter subcategory name'
+                              : null,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+
+                      // Business Photo / Image URL Section
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.add_photo_alternate_rounded, size: 16, color: Color(0xFF475569)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Business & Work Photo',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF334155),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                // Thumbnail Preview
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    width: 54,
+                                    height: 54,
+                                    color: Colors.grey[200],
+                                    child: imageUrlCtrl.text.isNotEmpty
+                                        ? Image.network(
+                                            imageUrlCtrl.text,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => const Icon(
+                                              Icons.broken_image_rounded,
+                                              size: 24,
+                                              color: Colors.grey,
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.image_outlined,
+                                            size: 24,
+                                            color: Colors.grey,
+                                          ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: imageUrlCtrl,
+                                    decoration: InputDecoration(
+                                      labelText: 'Image URL',
+                                      hintText: 'https://...',
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onChanged: (_) => setDialogState(() {}),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              children: [
+                                InkWell(
+                                  onTap: () {
+                                    setDialogState(() {
+                                      imageUrlCtrl.text = _defaultCategoryImages[selectedCategory] ?? '';
+                                    });
+                                  },
+                                  child: Chip(
+                                    labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                                    padding: EdgeInsets.zero,
+                                    visualDensity: VisualDensity.compact,
+                                    avatar: const Icon(Icons.auto_fix_high_rounded, size: 14),
+                                    label: Text(
+                                      'Auto Category Image',
+                                      style: GoogleFonts.plusJakartaSans(fontSize: 11),
+                                    ),
+                                    backgroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -1828,11 +2084,14 @@ class _AdminProviderManagementScreenState
                   final biz = bizNameCtrl.text.trim();
                   final wa = waCtrl.text.trim().isNotEmpty ? waCtrl.text.trim() : phone;
                   final email = emailCtrl.text.trim();
-                  final subcat = subcatCtrl.text.trim();
+                  final effectiveSubcat = (selectedSubcategory == 'Other / Custom')
+                      ? customSubcatCtrl.text.trim()
+                      : selectedSubcategory;
                   final city = cityCtrl.text.trim();
                   final address = addressCtrl.text.trim();
                   final exp = int.tryParse(expCtrl.text.trim()) ?? 1;
                   final pwd = passwordCtrl.text.trim();
+                  final imgUrl = imageUrlCtrl.text.trim();
 
                   if (isEditing) {
                     final providerId = (provider['id'] ?? '').toString();
@@ -1846,9 +2105,10 @@ class _AdminProviderManagementScreenState
                       whatsapp: wa,
                       email: email,
                       category: selectedCategory,
-                      subcategory: subcat,
+                      subcategory: effectiveSubcat,
                       city: city,
                       address: address,
+                      imageUrl: imgUrl,
                       status: selectedStatus,
                       isActive: selectedStatus == 'approved',
                       isVerified: selectedStatus == 'approved',
@@ -1868,12 +2128,16 @@ class _AdminProviderManagementScreenState
                           provider['whatsapp_number'] = wa;
                           provider['email'] = email;
                           provider['category'] = selectedCategory;
-                          provider['subcategory'] = subcat;
+                          provider['subcategory'] = effectiveSubcat;
                           provider['city'] = city;
                           provider['address'] = address;
+                          provider['image_url'] = imgUrl;
+                          provider['cover_image_url'] = imgUrl;
+                          provider['business_logo_url'] = imgUrl;
                           provider['status'] = selectedStatus;
                           provider['registration_status'] = selectedStatus;
                           provider['experience_years'] = exp;
+                          provider['years_experience'] = exp;
                           _applyFilters();
                         });
                         _showSnack('Provider profile & contact updated successfully!', AppTheme.success);
@@ -1890,9 +2154,10 @@ class _AdminProviderManagementScreenState
                       whatsapp: wa,
                       email: email,
                       category: selectedCategory,
-                      subcategory: subcat,
+                      subcategory: effectiveSubcat,
                       city: city,
                       address: address,
+                      imageUrl: imgUrl,
                       experienceYears: exp,
                       status: selectedStatus,
                       isActive: selectedStatus == 'approved',
@@ -1906,7 +2171,101 @@ class _AdminProviderManagementScreenState
                           _providers.insert(0, newProv);
                           _applyFilters();
                         });
-                        _showSnack('New provider registered successfully!', AppTheme.success);
+
+                        // Show Popup Confirmation Dialog to Admin
+                        showDialog(
+                          context: context,
+                          builder: (popupCtx) => AlertDialog(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                            title: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE8F5E9),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.check_circle_rounded, color: Color(0xFF2E7D32), size: 24),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Provider Registered!',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Provider has been registered under $selectedCategory and is now live on LocalConnect.',
+                                  style: GoogleFonts.plusJakartaSans(fontSize: 13, color: Colors.grey[800]),
+                                ),
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _infoRow('Business', biz),
+                                      _infoRow('Category', '$selectedCategory ($effectiveSubcat)'),
+                                      _infoRow('Owner', owner),
+                                      _infoRow('Phone', phone),
+                                      _infoRow('Login Email', newProv['email'] ?? email),
+                                      _infoRow('Password', pwd),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  '💡 Provider can log in using these credentials to add services, update prices, and upload business photos.',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11,
+                                    color: Colors.grey[600],
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.copy_rounded, size: 16),
+                                label: const Text('Copy Credentials'),
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(
+                                    text: 'LocalConnect Partner Login:\nBusiness: $biz\nCategory: $selectedCategory ($effectiveSubcat)\nEmail: ${newProv['email'] ?? email}\nPassword: $pwd',
+                                  ));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Login credentials copied to clipboard!'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () => Navigator.pop(popupCtx),
+                                child: const Text('Done'),
+                              ),
+                            ],
+                          ),
+                        );
+
                         _loadProviders();
                       } else {
                         _showSnack('Failed to register provider', AppTheme.error);
@@ -1928,6 +2287,39 @@ class _AdminProviderManagementScreenState
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+          const Text(': ', style: TextStyle(color: Colors.grey)),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/admin_auth_service.dart';
 import '../../../routes/app_routes.dart';
 import '../../../core/role_guard.dart';
 import '../admin_provider_dashboards_screen.dart';
@@ -324,12 +325,12 @@ class AdminAppBarWidget extends StatelessWidget {
                 ),
               );
               if (confirmed == true) {
-                setAdminSessionActive(false);
-                await SupabaseService.instance.signOut();
+                await AdminAuthService.instance.logout();
                 if (context.mounted) {
-                  Navigator.pushReplacementNamed(
+                  Navigator.pushNamedAndRemoveUntil(
                     context,
-                    AppRoutes.loginScreen,
+                    AppRoutes.adminLoginScreen,
+                    (route) => false,
                   );
                 }
               }

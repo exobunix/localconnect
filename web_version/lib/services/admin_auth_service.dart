@@ -282,12 +282,25 @@ class AdminAuthService {
       );
     }
 
+    // Helper to persist active admin session
+    Future<void> persistAdminSession(String adminEmail, String adminRole, String adminArea) async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('localconnect_admin_session_active', true);
+        await prefs.setString('localconnect_admin_email', adminEmail);
+        await prefs.setString('localconnect_admin_role', adminRole);
+        await prefs.setString('localconnect_admin_area', adminArea);
+      } catch (_) {}
+    }
+
     // 1. Check if password is a Master Passcode (for Super Admin)
     if (await checkMasterPasscode(pwd)) {
       setAdminSessionActive(true);
-      SupabaseService.instance.currentAdminEmail = email.isNotEmpty ? email : primaryAdminEmail;
+      final effectiveEmail = email.isNotEmpty ? email : primaryAdminEmail;
+      SupabaseService.instance.currentAdminEmail = effectiveEmail;
       SupabaseService.instance.currentAdminRole = 'super_admin';
       SupabaseService.instance.currentAdminArea = 'ALL';
+      await persistAdminSession(effectiveEmail, 'super_admin', 'ALL');
       _attemptSilentSupabaseSignIn(primaryAdminEmail, pwd);
       return const AdminLoginResult(
         success: true,
@@ -314,6 +327,7 @@ class AdminAuthService {
         SupabaseService.instance.currentAdminEmail = email;
         SupabaseService.instance.currentAdminRole = 'super_admin';
         SupabaseService.instance.currentAdminArea = 'ALL';
+        await persistAdminSession(email, 'super_admin', 'ALL');
         _attemptSilentSupabaseSignIn(email, pwd);
         return const AdminLoginResult(
           success: true,
@@ -355,6 +369,7 @@ class AdminAuthService {
         SupabaseService.instance.currentAdminEmail = email;
         SupabaseService.instance.currentAdminRole = role;
         SupabaseService.instance.currentAdminArea = area;
+        await persistAdminSession(email, role, area);
         _attemptSilentSupabaseSignIn(email, pwd);
         return AdminLoginResult(
           success: true,
@@ -379,6 +394,7 @@ class AdminAuthService {
         SupabaseService.instance.currentAdminEmail = email;
         SupabaseService.instance.currentAdminRole = role == 'super_admin' ? 'super_admin' : 'admin';
         SupabaseService.instance.currentAdminArea = area;
+        await persistAdminSession(email, role == 'super_admin' ? 'super_admin' : 'admin', area);
 
         // Remember password in local store for seamless offline/fallback access
         await saveAdminPassword(email, pwd);
@@ -742,5 +758,21 @@ class AdminAuthService {
     } catch (e) {
       debugPrint('[AdminAuthService] save accounts error: $e');
     }
+  }
+
+  /// Full Admin Sign Out: clears memory and SharedPreferences sessions cleanly
+  Future<void> logout() async {
+    setAdminSessionActive(false);
+    clearCachedRole();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('localconnect_admin_session_active');
+      await prefs.remove('localconnect_admin_email');
+      await prefs.remove('localconnect_admin_role');
+      await prefs.remove('localconnect_admin_area');
+    } catch (_) {}
+    try {
+      await SupabaseService.instance.signOut();
+    } catch (_) {}
   }
 }

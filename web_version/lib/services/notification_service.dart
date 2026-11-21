@@ -713,6 +713,61 @@ class NotificationService {
     return false;
   }
 
+  /// Dispatches provider registration notification with audio chime, in-app toast, app drawer notification & web alert
+  Future<void> notifyProviderRegistered({
+    required String businessName,
+    required String category,
+    String? subcategory,
+    String? phone,
+    String? email,
+  }) async {
+    final title = '🎉 Provider Added: $businessName';
+    final subDesc = (subcategory != null && subcategory.isNotEmpty) ? ' ($subcategory)' : '';
+    final body = '$businessName has been registered under $category$subDesc.';
+
+    // 1. Play audible bell beep chime
+    playNotificationSound();
+
+    // 2. In-app toast
+    showInAppToast(
+      title: title,
+      subtitle: body,
+      icon: Icons.storefront_rounded,
+      iconColor: const Color(0xFF16A34A),
+      bgColor: const Color(0xFFF0FDF4),
+    );
+
+    // 3. Local notification / App Drawer / Web Notification
+    await showLocalNotification(
+      id: businessName.hashCode,
+      title: title,
+      body: body,
+      channelId: 'admin_notifications',
+      channelName: 'Admin & Area Manager Alerts',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    // 4. Save to notifications table in Supabase
+    try {
+      await SupabaseService.instance.client.from('notifications').insert({
+        'title': title,
+        'body': body,
+        'type': 'provider_registered',
+        'target_audience': 'admin',
+        'metadata': {
+          'business_name': businessName,
+          'category': category,
+          'subcategory': subcategory ?? '',
+          'phone': phone ?? '',
+          'email': email ?? '',
+        },
+        'is_read': false,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+  }
+
   /// Dispatches complete booking creation notifications to Customer, Provider, Super Admin, and Area Managers
   Future<void> notifyBookingCreated({
     required String orderId,

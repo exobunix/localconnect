@@ -6239,6 +6239,7 @@ class SupabaseService {
     String? subcategory,
     required String city,
     String? address,
+    String? imageUrl,
     String? password,
     int experienceYears = 1,
     String status = 'approved',
@@ -6262,6 +6263,7 @@ class SupabaseService {
       final cleanPass = (password != null && password.trim().isNotEmpty)
           ? password.trim()
           : (digits.length >= 4 ? 'LocalConnect@${digits.substring(digits.length - 4)}' : 'LocalConnect@123');
+      final cleanImg = (imageUrl != null && imageUrl.trim().isNotEmpty) ? imageUrl.trim() : '';
       final now = DateTime.now().toIso8601String();
 
       String? authUserId;
@@ -6328,25 +6330,30 @@ class SupabaseService {
       }
 
       // 4. Create or upsert service_providers row
+      // CRITICAL: Ensure only valid database columns are included (no 'full_name' or 'experience_years')
       final provRecord = <String, dynamic>{
         'user_id': authUserId,
         'business_name': cleanBiz,
         'owner_name': cleanOwner,
-        'full_name': cleanOwner,
         'phone': cleanPhone,
         'whatsapp': cleanWa,
+        'whatsapp_number': cleanWa,
         'email': cleanEmail,
         'category': cleanCat,
         'subcategory': cleanSub,
         'city': cleanCity,
         'address': cleanAddr,
-        'experience_years': experienceYears,
+        'business_address': cleanAddr,
+        'years_experience': experienceYears,
         'rating': 5.0,
         'is_active': isActive && status == 'approved',
         'is_verified': status == 'approved',
         'registration_status': status,
         'onboarding_completed': true,
         'member_since': DateTime.now().year.toString(),
+        'image_url': cleanImg,
+        'cover_image_url': cleanImg,
+        'business_logo_url': cleanImg,
         'updated_at': now,
       };
 
@@ -6360,6 +6367,27 @@ class SupabaseService {
         provResult = provRes != null ? Map<String, dynamic>.from(provRes) : null;
       } catch (e) {
         debugPrint('[adminCreateServiceProvider] service_providers upsert note: $e');
+        // Fallback: try direct insert if upsert conflict resolution failed
+        try {
+          final insertRes = await client
+              .from('service_providers')
+              .insert(provRecord)
+              .select()
+              .maybeSingle();
+          provResult = insertRes != null ? Map<String, dynamic>.from(insertRes) : null;
+        } catch (e2) {
+          debugPrint('[adminCreateServiceProvider] service_providers fallback insert note: $e2');
+          // If already exists with user_id, update it
+          try {
+            final updRes = await client
+                .from('service_providers')
+                .update(provRecord)
+                .eq('user_id', authUserId)
+                .select()
+                .maybeSingle();
+            provResult = updRes != null ? Map<String, dynamic>.from(updRes) : null;
+          } catch (_) {}
+        }
       }
 
       // 5. Save password in Admin Credentials Vault
@@ -6370,10 +6398,25 @@ class SupabaseService {
         password: cleanPass,
       );
 
+      // 6. Dispatch notification across App Drawer, Web & Real-time
+      try {
+        await NotificationService.instance.notifyProviderRegistered(
+          businessName: cleanBiz,
+          category: cleanCat,
+          subcategory: cleanSub,
+          phone: cleanPhone,
+          email: cleanEmail,
+        );
+      } catch (notifErr) {
+        debugPrint('[adminCreateServiceProvider] notification error: $notifErr');
+      }
+
       return {
         ...(provResult ?? provRecord),
         'id': provResult?['id'] ?? authUserId,
         'password': cleanPass,
+        'full_name': cleanOwner,
+        'status': status,
         'total_orders': 0,
         'earnings': 0,
       };
@@ -6396,6 +6439,7 @@ class SupabaseService {
     String? subcategory,
     String? city,
     String? address,
+    String? imageUrl,
     String? status,
     String? password,
     bool? isActive,
@@ -6410,15 +6454,27 @@ class SupabaseService {
       if (businessName != null) provUpdates['business_name'] = businessName.trim();
       if (ownerName != null) {
         provUpdates['owner_name'] = ownerName.trim();
-        provUpdates['full_name'] = ownerName.trim();
       }
       if (phone != null) provUpdates['phone'] = phone.trim();
-      if (whatsapp != null) provUpdates['whatsapp'] = whatsapp.trim();
+      if (whatsapp != null) {
+        provUpdates['whatsapp'] = whatsapp.trim();
+        provUpdates['whatsapp_number'] = whatsapp.trim();
+      }
       if (email != null && email.trim().isNotEmpty) provUpdates['email'] = email.trim();
       if (category != null) provUpdates['category'] = category.trim();
       if (subcategory != null) provUpdates['subcategory'] = subcategory.trim();
-      if (city != null) provUpdates['city'] = city.trim();
-      if (address != null) provUpdates['address'] = address.trim();
+      if (city != null) {
+        provUpdates['city'] = city.trim();
+      }
+      if (address != null) {
+        provUpdates['address'] = address.trim();
+        provUpdates['business_address'] = address.trim();
+      }
+      if (imageUrl != null && imageUrl.trim().isNotEmpty) {
+        provUpdates['image_url'] = imageUrl.trim();
+        provUpdates['cover_image_url'] = imageUrl.trim();
+        provUpdates['business_logo_url'] = imageUrl.trim();
+      }
       if (status != null) {
         provUpdates['registration_status'] = status;
         if (status == 'approved') {
@@ -6430,24 +6486,45 @@ class SupabaseService {
       }
       if (isActive != null) provUpdates['is_active'] = isActive;
       if (isVerified != null) provUpdates['is_verified'] = isVerified;
-      if (experienceYears != null) provUpdates['experience_years'] = experienceYears;
+      if (experienceYears != null) provUpdates['years_experience'] = experienceYears;
 
       // 1. Update service_providers by id or user_id
+      bool updated = false;
       try {
-        await client.from('service_providers').update(provUpdates).eq('id', providerId);
-      } catch (_) {
-        await client.from('service_providers').update(provUpdates).eq('user_id', providerId);
+        final res = await client
+            .from('service_providers')
+            .update(provUpdates)
+            .eq('id', providerId)
+            .select('id');
+        if (res.isNotEmpty) updated = true;
+      } catch (e) {
+        debugPrint('[adminUpdateServiceProviderProfile] update by id note: $e');
+      }
+
+      if (!updated) {
+        try {
+          final res = await client
+              .from('service_providers')
+              .update(provUpdates)
+              .eq('user_id', providerId)
+              .select('id');
+          if (res.isNotEmpty) updated = true;
+        } catch (e) {
+          debugPrint('[adminUpdateServiceProviderProfile] update by user_id note: $e');
+        }
       }
 
       // 2. Resolve matching user_id
       String? targetUserId = userId;
       if (targetUserId == null || targetUserId.isEmpty) {
-        final provRow = await client
-            .from('service_providers')
-            .select('user_id')
-            .eq('id', providerId)
-            .maybeSingle();
-        targetUserId = provRow?['user_id'] as String?;
+        try {
+          final provRow = await client
+              .from('service_providers')
+              .select('user_id')
+              .or('id.eq.$providerId,user_id.eq.$providerId')
+              .maybeSingle();
+          targetUserId = provRow?['user_id'] as String?;
+        } catch (_) {}
       }
 
       if (targetUserId != null && targetUserId.isNotEmpty) {
@@ -6460,7 +6537,11 @@ class SupabaseService {
         if (city != null) userUpdates['city'] = city.trim();
         if (isActive != null) userUpdates['is_active'] = isActive;
 
-        await client.from('user_profiles').update(userUpdates).eq('id', targetUserId);
+        try {
+          await client.from('user_profiles').update(userUpdates).eq('id', targetUserId);
+        } catch (e) {
+          debugPrint('[adminUpdateServiceProviderProfile] user_profiles update note: $e');
+        }
       }
 
       // 3. If password provided, save in Admin Credentials Vault

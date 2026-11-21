@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../routes/app_routes.dart';
 import '../services/supabase_service.dart';
 
@@ -63,8 +64,18 @@ void setAdminSessionActive(bool active) {
   _isAdminSessionActive = active;
   if (active) {
     _cachedRole = 'admin';
+    try {
+      SharedPreferences.getInstance().then((p) {
+        p.setBool('localconnect_admin_session_active', true);
+      });
+    } catch (_) {}
   } else {
     _cachedRole = null;
+    try {
+      SharedPreferences.getInstance().then((p) {
+        p.remove('localconnect_admin_session_active');
+      });
+    } catch (_) {}
   }
 }
 
@@ -95,11 +106,17 @@ Future<String> _fetchRoleFromDb() async {
 
     final result = await SupabaseService.instance.client
         .from('user_profiles')
-        .select('role')
+        .select('active_role, role')
         .eq('id', user.id)
         .maybeSingle();
 
-    final role = result?['role'] as String? ?? 'customer';
+    // Prefer active_role (set explicitly at login/switch time).
+    // Fall back to role if active_role is missing (older rows).
+    final activeRole = result?['active_role'] as String?;
+    final fallbackRole = result?['role'] as String?;
+    final role = (activeRole != null && activeRole.isNotEmpty)
+        ? activeRole
+        : (fallbackRole ?? 'customer');
 
     // SECURITY: Validate role is one of the known values before caching.
     // This prevents unexpected values from being used for access control.
@@ -120,6 +137,14 @@ Future<String> _fetchRoleFromDb() async {
 void clearCachedRole() {
   _cachedRole = null;
   _isAdminSessionActive = false;
+  try {
+    SharedPreferences.getInstance().then((p) {
+      p.remove('localconnect_admin_session_active');
+      p.remove('localconnect_admin_email');
+      p.remove('localconnect_admin_role');
+      p.remove('localconnect_admin_area');
+    });
+  } catch (_) {}
 }
 
 /// Wraps a screen and redirects unauthorized users to the correct home.
@@ -208,6 +233,8 @@ class _RoleGuardState extends State<RoleGuard> {
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+    // Admin has full access to preview and view customer/provider screens without white screen freeze!
+    if (_role == 'admin') return widget.child;
     if (_role == widget.requiredRole) return widget.child;
     return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
